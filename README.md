@@ -6,13 +6,13 @@ Every Canopy web app (react-trace, react-squirrel, the screen system) needs the 
 
 This is **not** the screen system. `screen-ir`, the IR renderer, and the widget set live in the screen runtime repo, which consumes this SDK exactly like any other client.
 
-## Packages (planned)
+## Packages
 
-| Package | Contents | Framework |
-|---|---|---|
-| `@canopy/client` | `PVService` interface, `HarePVService` (live-PV WS: subscribe/unsubscribe/diff/heartbeat, reconnect + resubscribe), `MockPVService`, typed DTOs for Canopy's REST/WS APIs | none — pure TS |
-| `@canopy/react` | `usePV`, `PVContext` — React bindings over `@canopy/client` | React 19 |
-| `@canopy/shell` | `<AppHeader title toolbar>` + theme store — the standard Carbon chrome | React 19 + Carbon |
+| Package                             | Contents                                                                                                                                                                  | Framework         |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| [`@canopy/client`](packages/client) | `PVService` interface, `HarePVService` (live-PV WS: subscribe/unsubscribe/diff/heartbeat, reconnect + resubscribe), `MockPVService`, typed DTOs for Canopy's REST/WS APIs | none — pure TS    |
+| [`@canopy/react`](packages/react)   | `usePV`, `PVServiceProvider` — React bindings over `@canopy/client`                                                                                                       | React 19          |
+| [`@canopy/shell`](packages/shell)   | `<AppHeader title toolbar>` + theme store — the standard Carbon chrome                                                                                                    | React 19 + Carbon |
 
 Porting sources: `PVService`/`MockPVService` and `usePV` from `canopy-screen-builder`; the header/theme from `react-trace` (the donor app — its own adoption back should be a near-noop); `HarePVService` written new against Hare's `WS /hare/v1/ws/pvs`.
 
@@ -25,7 +25,7 @@ Porting sources: `PVService`/`MockPVService` and `usePV` from `canopy-screen-bui
 
 ## Status
 
-Freshly instantiated from the EED React template — still a single-app scaffold. First change: convert to a pnpm workspace (`packages/client`, `packages/react`, `packages/shell`) and port the sources above.
+Converted to a pnpm workspace publishing the three packages above, each built with `tsc` to `dist/` with type declarations. `PVService`/`MockPVService` and `usePV` are ported from `canopy-screen-builder`, the header/theme shell from `react-trace`, and `HarePVService` is implemented against Hare's `WS /hare/v1/ws/pvs` (subscribe/diff/heartbeat, reconnect with capped backoff + resubscribe; writes via `PUT /hare/v1/pvs/{pv}`). All packages are version 0.1.0; the publish target (registry) is not decided yet, so nothing is published.
 
 ## Development
 
@@ -35,18 +35,19 @@ Requires [pnpm](https://pnpm.io/installation).
 pnpm install
 ```
 
-| Command | Description |
-|---|---|
-| `pnpm dev` | Start dev server at `http://localhost:5173` |
-| `pnpm build` | Type-check and build for production |
-| `pnpm preview` | Preview production build locally |
-| `pnpm test` | Run tests once |
-| `pnpm test:watch` | Run tests in watch mode |
-| `pnpm test:coverage` | Run tests with coverage report |
-| `pnpm lint` | Run ESLint |
-| `pnpm lint:fix` | Run ESLint with auto-fix |
-| `pnpm format` | Format source files with Prettier |
-| `pnpm format:check` | Check formatting without writing |
+| Command              | Description                                                                |
+| -------------------- | -------------------------------------------------------------------------- |
+| `pnpm build`         | Build every package (`tsc` → `dist/` with declarations, topological order) |
+| `pnpm test`          | Build, then run every package's tests once                                 |
+| `pnpm test:watch`    | Run tests in watch mode across packages                                    |
+| `pnpm test:coverage` | Build, then run tests with coverage report                                 |
+| `pnpm typecheck`     | Build, then type-check every package including its tests                   |
+| `pnpm lint`          | Run ESLint                                                                 |
+| `pnpm lint:fix`      | Run ESLint with auto-fix                                                   |
+| `pnpm format`        | Format source files with Prettier                                          |
+| `pnpm format:check`  | Check formatting without writing                                           |
+
+Single-package variants go through `--filter`, e.g. `pnpm --filter @canopy/client test`. Packages that depend on `@canopy/client` resolve it via its built `dist/`, so run `pnpm build` after a fresh clone (the root `test`/`typecheck` scripts do this for you).
 
 ## Documentation
 
