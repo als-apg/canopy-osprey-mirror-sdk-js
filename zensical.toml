@@ -1,14 +1,14 @@
 [project]
-site_name = "App"
-site_description = "Documentation for the EED Software Applications Group React project template."
+site_name = "canopy-sdk-js"
+site_description = "TypeScript SDK for building apps on Canopy — live-PV client, typed API contracts, and the shared Carbon app shell."
 site_author = "SLAC National Accelerator Laboratory - EED / Software Applications Group"
 #site_url = "https://www.example.com/"
 docs_dir = "docs"
 
 
 # Repository
-repo_name = "slaclab/eed-swapps-react-template"
-repo_url = "https://github.com/slaclab/eed-swapps-react-template"
+repo_name = "slaclab/canopy-sdk-js"
+repo_url = "https://github.com/slaclab/canopy-sdk-js"
 
 # ----------------------------------------------------------------------------
 # Section for configuring theme options
@@ -161,7 +161,7 @@ toggle.name = "Switch to light mode"
 # ----------------------------------------------------------------------------
 [[project.extra.social]]
 icon = "fontawesome/brands/github"
-link = "https://github.com/slaclab/eed-swapps-react-template"
+link = "https://github.com/slaclab/canopy-sdk-js"
 
 # ----------------------------------------------------------------------------
 # In this section you can configure the Markdown extensions that are used when
