@@ -1,0 +1,29 @@
+packages:
+  - packages/*
+
+# Dependency postinstall scripts we deliberately do not run: the Carbon and
+# IBM Plex packages' scripts are ibmtelemetry hooks, and @parcel/watcher's
+# native build is unused by our tsc-only builds.
+ignoredBuiltDependencies:
+  - '@carbon/colors'
+  - '@carbon/feature-flags'
+  - '@carbon/grid'
+  - '@carbon/icon-helpers'
+  - '@carbon/icons-react'
+  - '@carbon/layout'
+  - '@carbon/motion'
+  - '@carbon/react'
+  - '@carbon/styles'
+  - '@carbon/themes'
+  - '@carbon/type'
+  - '@carbon/utilities'
+  - '@ibm/plex'
+  - '@ibm/plex-mono'
+  - '@ibm/plex-sans'
+  - '@ibm/plex-sans-arabic'
+  - '@ibm/plex-sans-devanagari'
+  - '@ibm/plex-sans-hebrew'
+  - '@ibm/plex-sans-thai'
+  - '@ibm/plex-sans-thai-looped'
+  - '@ibm/plex-serif'
+  - '@parcel/watcher'
