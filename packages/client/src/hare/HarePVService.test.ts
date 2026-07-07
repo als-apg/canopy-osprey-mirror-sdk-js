@@ -1,0 +1,606 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AlarmSeverity } from '../alarm.js';
+import { createFakeWebSocketFactory } from '../testing/fakeWebSocket.js';
+import { HarePVService } from './HarePVService.js';
+import type { HareError, FetchLike } from './HarePVService.js';
+import type { HareInitialFrame, HareDiffFrame, PVMetaDTO, PVValueDTO } from './types.js';
+
+const BASE_URL = 'ws://host/hare/v1/ws/pvs';
+
+function makeMeta(overrides: Partial<PVMetaDTO> = {}): PVMetaDTO {
+  return {
+    pv: 'X',
+    valueKind: 'scalar',
+    units: null,
+    precision: null,
+    description: null,
+    enumChoices: null,
+    displayLow: null,
+    displayHigh: null,
+    controlLow: null,
+    controlHigh: null,
+    warningLow: null,
+    warningHigh: null,
+    alarmLow: null,
+    alarmHigh: null,
+    writable: null,
+    form: null,
+    ...overrides,
+  };
+}
+
+function makeValue(overrides: Partial<PVValueDTO> = {}): PVValueDTO {
+  return {
+    pv: 'X',
+    value: 0,
+    valueKind: 'scalar',
+    severity: 'NO_ALARM',
+    tsNs: 0,
+    connected: true,
+    error: null,
+    ...overrides,
+  };
+}
+
+function initialFrame(
+  data: Record<string, PVValueDTO>,
+  meta: Record<string, PVMetaDTO> = {}
+): HareInitialFrame {
+  return { type: 'initial', data, meta, count: Object.keys(data).length };
+}
+
+function diffFrame(data: Record<string, PVValueDTO>): HareDiffFrame {
+  return { type: 'diff', data, count: Object.keys(data).length, timestamp: 0 };
+}
+
+describe('HarePVService', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // ── Connection / subscribe wire-up ────────────────────────────────────────
+
+  describe('connect + subscribe', () => {
+    it('appends ?api_key= to the WS URL when apiKey is configured', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new HarePVService({
+        url: BASE_URL,
+        apiKey: 'secret-key',
+        webSocketFactory: factory,
+      });
+
+      service.connect();
+
+      expect(instances).toHaveLength(1);
+      expect(instances[0]!.url).toBe(`${BASE_URL}?api_key=secret-key`);
+    });
+
+    it('does not append api_key when none is configured', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new HarePVService({ url: BASE_URL, webSocketFactory: factory });
+
+      service.connect();
+
+      expect(instances[0]!.url).toBe(BASE_URL);
+    });
+
+    it('sends nothing when subscribing before the socket opens, then one subscribe message on open', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new HarePVService({ url: BASE_URL, webSocketFactory: factory });
+
+      service.connect();
+      service.subscribe('PV1', vi.fn());
+
+      const socket = instances[0]!;
+      expect(socket.sent).toHaveLength(0);
+
+      socket.open();
+
+      expect(socket.parsedSent()).toEqual([{ type: 'subscribe', pvNames: ['PV1'] }]);
+    });
+  });
+
+  // ── Frame application ──────────────────────────────────────────────────────
+
+  describe('initial frame application', () => {
+    it('delivers PVData mapped from the DTO + meta, and exposes it via getSnapshot/getMeta', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new HarePVService({ url: BASE_URL, webSocketFactory: factory });
+      service.connect();
+      const socket = instances[0]!;
+
+      const listener = vi.fn();
+      service.subscribe('PV1', listener);
+      socket.open();
+      listener.mockClear();
+
+      const meta = makeMeta({
+        pv: 'PV1',
+        units: 'mA',
+        precision: 2,
+        displayLow: 0,
+        displayHigh: 10,
+      });
+      const value = makeValue({
+        pv: 'PV1',
+        value: 5.1234,
+        severity: 'NO_ALARM',
+        tsNs: 1_234_000_000,
+        connected: true,
+      });
+      socket.message(initialFrame({ PV1: value }, { PV1: meta }));
+
+      expect(listener).toHaveBeenCalledTimes(1);
+      const data = listener.mock.calls[0]![0];
+      expect(data).toEqual({
+        value: 5.1234,
+        displayValue: '5.12 mA',
+        severity: AlarmSeverity.NO_ALARM,
+        connected: true,
+        timestamp: 1234,
+        units: 'mA',
+        precision: 2,
+        lowerLimit: 0,
+        upperLimit: 10,
+      });
+
+      expect(service.getSnapshot('PV1')).toEqual(data);
+      expect(service.getMeta('PV1')).toEqual(meta);
+    });
+  });
+
+  describe('diff frame application', () => {
+    it('updates the snapshot and notifies again, reusing meta from the earlier initial frame', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new HarePVService({ url: BASE_URL, webSocketFactory: factory });
+      service.connect();
+      const socket = instances[0]!;
+
+      const listener = vi.fn();
+      service.subscribe('PV1', listener);
+      socket.open();
+
+      const meta = makeMeta({ pv: 'PV1', units: 'V', precision: 1 });
+      socket.message(initialFrame({ PV1: makeValue({ pv: 'PV1', value: 1.0 }) }, { PV1: meta }));
+      listener.mockClear();
+
+      socket.message(diffFrame({ PV1: makeValue({ pv: 'PV1', value: 2.5, tsNs: 2_000_000 }) }));
+
+      expect(listener).toHaveBeenCalledTimes(1);
+      const data = listener.mock.calls[0]![0];
+      expect(data.value).toBe(2.5);
+      expect(data.displayValue).toBe('2.5 V'); // units survive from the initial frame's meta
+      expect(data.timestamp).toBe(2);
+      expect(service.getSnapshot('PV1')?.value).toBe(2.5);
+    });
+  });
+
+  describe('enum and waveform values', () => {
+    it('maps an enum value through meta.enumChoices', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new HarePVService({ url: BASE_URL, webSocketFactory: factory });
+      service.connect();
+      const socket = instances[0]!;
+
+      const listener = vi.fn();
+      service.subscribe('PV1', listener);
+      socket.open();
+
+      socket.message(
+        initialFrame(
+          { PV1: makeValue({ pv: 'PV1', value: 1, valueKind: 'enum' }) },
+          { PV1: makeMeta({ pv: 'PV1', valueKind: 'enum', enumChoices: ['OFF', 'ON'] }) }
+        )
+      );
+
+      const data = listener.mock.calls.at(-1)![0];
+      expect(data.value).toBe(1);
+      expect(data.displayValue).toBe('ON');
+    });
+
+    it('passes waveform arrays through as-is and formats a length-based displayValue', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new HarePVService({ url: BASE_URL, webSocketFactory: factory });
+      service.connect();
+      const socket = instances[0]!;
+
+      const listener = vi.fn();
+      service.subscribe('PV1', listener);
+      socket.open();
+
+      socket.message(
+        initialFrame({
+          PV1: makeValue({ pv: 'PV1', value: [1, 2, 3], valueKind: 'waveform' }),
+        })
+      );
+
+      const data = listener.mock.calls.at(-1)![0];
+      expect(data.value).toEqual([1, 2, 3]);
+      expect(data.displayValue).toBe('waveform[3]');
+    });
+
+    it('formats a table value as table[rows x cols]', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new HarePVService({ url: BASE_URL, webSocketFactory: factory });
+      service.connect();
+      const socket = instances[0]!;
+
+      const listener = vi.fn();
+      service.subscribe('PV1', listener);
+      socket.open();
+
+      socket.message(
+        initialFrame({
+          PV1: makeValue({
+            pv: 'PV1',
+            value: {
+              labels: ['a', 'b'],
+              columns: [
+                [1, 2],
+                [3, 4],
+              ],
+            },
+            valueKind: 'table',
+          }),
+        })
+      );
+
+      const data = listener.mock.calls.at(-1)![0];
+      expect(data.value).toEqual({
+        labels: ['a', 'b'],
+        columns: [
+          [1, 2],
+          [3, 4],
+        ],
+      });
+      expect(data.displayValue).toBe('table[2x2]');
+    });
+  });
+
+  describe('severity mapping', () => {
+    it('maps MAJOR to AlarmSeverity 2', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new HarePVService({ url: BASE_URL, webSocketFactory: factory });
+      service.connect();
+      const socket = instances[0]!;
+
+      const listener = vi.fn();
+      service.subscribe('PV1', listener);
+      socket.open();
+
+      socket.message(initialFrame({ PV1: makeValue({ pv: 'PV1', severity: 'MAJOR' }) }));
+
+      expect(listener.mock.calls.at(-1)![0].severity).toBe(AlarmSeverity.MAJOR);
+    });
+
+    it('forces DISCONNECTED severity and connected:false when the DTO says connected:false', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new HarePVService({ url: BASE_URL, webSocketFactory: factory });
+      service.connect();
+      const socket = instances[0]!;
+
+      const listener = vi.fn();
+      service.subscribe('PV1', listener);
+      socket.open();
+
+      socket.message(
+        initialFrame({
+          PV1: makeValue({ pv: 'PV1', severity: 'NO_ALARM', connected: false, value: 3 }),
+        })
+      );
+
+      const data = listener.mock.calls.at(-1)![0];
+      expect(data.connected).toBe(false);
+      expect(data.severity).toBe(AlarmSeverity.DISCONNECTED);
+      expect(data.displayValue).toBe('---');
+    });
+  });
+
+  // ── Reconnect / resubscribe ──────────────────────────────────────────────
+
+  describe('reconnect + resubscribe', () => {
+    it('marks all subscribed PVs disconnected, reconnects with backoff, and resubscribes everything in one message', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new HarePVService({ url: BASE_URL, webSocketFactory: factory });
+      service.connect();
+
+      const listenerA = vi.fn();
+      const listenerB = vi.fn();
+      service.subscribe('A', listenerA);
+      service.subscribe('B', listenerB);
+
+      const socket1 = instances[0]!;
+      socket1.open();
+      socket1.message(
+        initialFrame({ A: makeValue({ pv: 'A', value: 1 }), B: makeValue({ pv: 'B', value: 2 }) })
+      );
+      listenerA.mockClear();
+      listenerB.mockClear();
+
+      socket1.close();
+
+      // Every listener notified with connected:false immediately on close.
+      expect(listenerA).toHaveBeenCalledTimes(1);
+      expect(listenerB).toHaveBeenCalledTimes(1);
+      expect(listenerA.mock.calls[0]![0].connected).toBe(false);
+      expect(listenerA.mock.calls[0]![0].severity).toBe(AlarmSeverity.DISCONNECTED);
+      expect(listenerB.mock.calls[0]![0].connected).toBe(false);
+
+      // First backoff delay is 1000ms.
+      expect(instances).toHaveLength(1);
+      vi.advanceTimersByTime(999);
+      expect(instances).toHaveLength(1);
+      vi.advanceTimersByTime(1);
+      expect(instances).toHaveLength(2);
+
+      const socket2 = instances[1]!;
+      socket2.open();
+
+      expect(socket2.parsedSent()).toEqual([{ type: 'subscribe', pvNames: ['A', 'B'] }]);
+
+      // A fresh initial frame revives values.
+      socket2.message(
+        initialFrame({ A: makeValue({ pv: 'A', value: 42 }), B: makeValue({ pv: 'B', value: 43 }) })
+      );
+      expect(listenerA.mock.calls.at(-1)![0]).toMatchObject({ value: 42, connected: true });
+      expect(listenerB.mock.calls.at(-1)![0]).toMatchObject({ value: 43, connected: true });
+    });
+
+    it('connect() during a pending reconnect supersedes the timer instead of double-opening', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new HarePVService({ url: BASE_URL, webSocketFactory: factory });
+      service.connect();
+      service.subscribe('A', vi.fn());
+
+      const socket1 = instances[0]!;
+      socket1.open();
+      socket1.close(); // schedules a reconnect at +1000ms
+
+      service.connect(); // explicit reconnect supersedes the pending timer
+      expect(instances).toHaveLength(2);
+
+      vi.advanceTimersByTime(60_000);
+      expect(instances).toHaveLength(2); // the old timer never opened a third socket
+    });
+
+    it('grows the backoff delay when a reconnect attempt itself fails to open', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new HarePVService({ url: BASE_URL, webSocketFactory: factory });
+      service.connect();
+      service.subscribe('A', vi.fn());
+
+      const socket1 = instances[0]!;
+      socket1.open();
+      socket1.close();
+
+      // First reconnect scheduled for 1000ms.
+      vi.advanceTimersByTime(1000);
+      expect(instances).toHaveLength(2);
+
+      // The second socket closes again without ever opening.
+      instances[1]!.close();
+
+      // Second backoff delay is 2000ms (delays[1]).
+      vi.advanceTimersByTime(1999);
+      expect(instances).toHaveLength(2);
+      vi.advanceTimersByTime(1);
+      expect(instances).toHaveLength(3);
+    });
+  });
+
+  // ── Heartbeat ─────────────────────────────────────────────────────────────
+
+  describe('heartbeat', () => {
+    it('pings on the configured interval and a reply disarms the pong deadline', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new HarePVService({
+        url: BASE_URL,
+        webSocketFactory: factory,
+        pingIntervalMs: 1000,
+        pongTimeoutMs: 500,
+      });
+      service.connect();
+      const socket = instances[0]!;
+      socket.open();
+
+      vi.advanceTimersByTime(1000);
+      expect(socket.parsedSent()).toEqual([{ type: 'ping' }]);
+
+      // Reply (pong) disarms the deadline; the socket must not be closed by it.
+      socket.message({ type: 'pong', timestamp: 0 });
+      vi.advanceTimersByTime(500);
+      expect(socket.readyState).toBe(1);
+    });
+
+    it('closes the socket and schedules a reconnect when no reply follows a ping', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new HarePVService({
+        url: BASE_URL,
+        webSocketFactory: factory,
+        pingIntervalMs: 1000,
+        pongTimeoutMs: 500,
+      });
+      service.connect();
+      const socket = instances[0]!;
+      socket.open();
+
+      vi.advanceTimersByTime(1000); // ping sent
+      vi.advanceTimersByTime(500); // no reply -> pong deadline fires
+
+      expect(socket.readyState).toBe(3); // CLOSED
+      expect(instances).toHaveLength(1);
+
+      vi.advanceTimersByTime(1000); // first backoff delay
+      expect(instances).toHaveLength(2);
+    });
+
+    it('a heartbeat frame also counts as a reply and disarms the deadline', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new HarePVService({
+        url: BASE_URL,
+        webSocketFactory: factory,
+        pingIntervalMs: 1000,
+        pongTimeoutMs: 500,
+      });
+      service.connect();
+      const socket = instances[0]!;
+      socket.open();
+
+      vi.advanceTimersByTime(1000);
+      socket.message({ type: 'heartbeat', timestamp: 0, backend: 'simulation' });
+      vi.advanceTimersByTime(500);
+
+      expect(socket.readyState).toBe(1);
+    });
+  });
+
+  // ── Unsubscribe ───────────────────────────────────────────────────────────
+
+  describe('unsubscribe', () => {
+    it('sends nothing while other listeners remain, and unsubscribes + drops the snapshot when the last one leaves', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new HarePVService({ url: BASE_URL, webSocketFactory: factory });
+      service.connect();
+      const socket = instances[0]!;
+      socket.open();
+
+      const listener1 = vi.fn();
+      const listener2 = vi.fn();
+      const unsub1 = service.subscribe('PV1', listener1);
+      const unsub2 = service.subscribe('PV1', listener2);
+      socket.message(initialFrame({ PV1: makeValue({ pv: 'PV1', value: 1 }) }));
+
+      socket.sent.length = 0;
+      unsub1();
+      expect(socket.sent).toHaveLength(0);
+      expect(service.getSnapshot('PV1')).toBeDefined();
+
+      unsub2();
+      expect(socket.parsedSent()).toEqual([{ type: 'unsubscribe', pvNames: ['PV1'] }]);
+      expect(service.getSnapshot('PV1')).toBeUndefined();
+    });
+  });
+
+  // ── put / write ───────────────────────────────────────────────────────────
+
+  describe('put / write', () => {
+    function makeFetchMock(response: { ok: boolean; status: number; text?: string }) {
+      return vi.fn<FetchLike>(async () => ({
+        ok: response.ok,
+        status: response.status,
+        text: async () => response.text ?? '',
+      }));
+    }
+
+    it('put() PUTs to the derived REST base with X-API-Key and a {value} body', async () => {
+      const fetchFn = makeFetchMock({ ok: true, status: 200 });
+      const service = new HarePVService({
+        url: BASE_URL,
+        apiKey: 'secret-key',
+        fetchFn,
+      });
+
+      service.put('X', 3.2);
+      await vi.runAllTimersAsync();
+
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchFn.mock.calls[0]!;
+      expect(url).toBe('http://host/hare/v1/pvs/X');
+      expect(init.method).toBe('PUT');
+      expect(init.headers['X-API-Key']).toBe('secret-key');
+      expect(init.headers['Content-Type']).toBe('application/json');
+      expect(init.body).toBe('{"value":3.2}');
+    });
+
+    it('write() includes wait when explicitly set to false', async () => {
+      const fetchFn = makeFetchMock({ ok: true, status: 200 });
+      const service = new HarePVService({ url: BASE_URL, fetchFn });
+
+      await service.write('X', 3.2, { wait: false });
+
+      const [, init] = fetchFn.mock.calls[0]!;
+      expect(init.body).toBe('{"value":3.2,"wait":false}');
+    });
+
+    it('write() rejects with an Error mentioning the HTTP status on a non-ok response', async () => {
+      const fetchFn = makeFetchMock({ ok: false, status: 422, text: 'bad value' });
+      const service = new HarePVService({ url: BASE_URL, fetchFn });
+
+      await expect(service.write('X', 3.2)).rejects.toThrow(/422/);
+    });
+
+    it('put() routes a failing fetch to onError instead of throwing an unhandled rejection', async () => {
+      const fetchFn: FetchLike = vi.fn(async () => {
+        throw new Error('network down');
+      });
+      const onError = vi.fn<(error: HareError) => void>();
+      const service = new HarePVService({ url: BASE_URL, fetchFn, onError });
+
+      service.put('X', 1);
+      await vi.runAllTimersAsync();
+
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError.mock.calls[0]![0].message).toMatch(/network down/);
+    });
+  });
+
+  // ── disconnect / connect lifecycle ───────────────────────────────────────
+
+  describe('disconnect', () => {
+    it('closes the socket, marks PVs disconnected, and does not schedule a reconnect', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new HarePVService({ url: BASE_URL, webSocketFactory: factory });
+      service.connect();
+      const socket = instances[0]!;
+      socket.open();
+
+      const listener = vi.fn();
+      service.subscribe('PV1', listener);
+      socket.message(initialFrame({ PV1: makeValue({ pv: 'PV1', value: 1 }) }));
+      listener.mockClear();
+
+      service.disconnect();
+
+      expect(socket.readyState).toBe(3); // CLOSED
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener.mock.calls[0]![0].connected).toBe(false);
+      expect(service.isConnected).toBe(false);
+
+      vi.advanceTimersByTime(60_000);
+      expect(instances).toHaveLength(1); // no reconnect attempted
+
+      service.connect();
+      expect(instances).toHaveLength(2);
+
+      instances[1]!.open();
+      expect(instances[1]!.parsedSent()).toEqual([{ type: 'subscribe', pvNames: ['PV1'] }]);
+    });
+  });
+
+  // ── status changes ────────────────────────────────────────────────────────
+
+  describe('status changes', () => {
+    it('fires onStatusChange exactly when the status value changes', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const onStatusChange = vi.fn();
+      const service = new HarePVService({
+        url: BASE_URL,
+        webSocketFactory: factory,
+        onStatusChange,
+      });
+
+      service.connect();
+      expect(onStatusChange.mock.calls).toEqual([['connecting']]);
+
+      instances[0]!.open();
+      expect(onStatusChange.mock.calls).toEqual([['connecting'], ['connected']]);
+
+      instances[0]!.close();
+      expect(onStatusChange.mock.calls).toEqual([['connecting'], ['connected'], ['disconnected']]);
+    });
+  });
+});
