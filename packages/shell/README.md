@@ -1,4 +1,4 @@
-# @canopy/shell
+# @slaclab/canopy-shell
 
 The standard Canopy app chrome: a Carbon `<AppHeader>` (a dark g100 brand bar
 that stays dark even when the rest of the app is in light mode) plus a
@@ -14,10 +14,10 @@ Peer dependencies (install alongside this package): `react`, `react-dom`,
 
 ```tsx
 import '@carbon/styles/css/styles.css';
-import '@canopy/shell/styles.css';
+import '@slaclab/canopy-shell/styles.css';
 import { Theme, HeaderGlobalAction } from '@carbon/react';
 import { Asleep, Light } from '@carbon/icons-react';
-import { AppHeader, useColorMode } from '@canopy/shell';
+import { AppHeader, useColorMode } from '@slaclab/canopy-shell';
 
 function AppRoot() {
   const { colorMode, toggle } = useColorMode();

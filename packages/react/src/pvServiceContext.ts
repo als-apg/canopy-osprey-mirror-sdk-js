@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import type { PVService } from '@canopy/client';
+import type { PVService } from '@slaclab/canopy-client';
 
 export const PVServiceContext = createContext<PVService | null>(null);
 

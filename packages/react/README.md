@@ -1,6 +1,6 @@
-# @canopy/react
+# @slaclab/canopy-react
 
-React bindings over [`@canopy/client`](../client): a context provider for the
+React bindings over [`@slaclab/canopy-client`](../client): a context provider for the
 `PVService` and the `usePV` hook, ported from `canopy-screen-builder`.
 
 Peer dependencies: `react`, `react-dom` (^19).
@@ -12,8 +12,8 @@ Canopy backend, or a `MockPVService` for development — and hands it to the
 provider:
 
 ```tsx
-import { HarePVService } from '@canopy/client';
-import { PVServiceProvider, usePV } from '@canopy/react';
+import { HarePVService } from '@slaclab/canopy-client';
+import { PVServiceProvider, usePV } from '@slaclab/canopy-react';
 
 const pvService = new HarePVService({
   url: 'wss://canopy.example.org/hare/v1/ws/pvs',

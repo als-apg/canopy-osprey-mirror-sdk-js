@@ -1,4 +1,4 @@
-// @canopy/client — framework-free TypeScript client for Canopy's live-PV
+// @slaclab/canopy-client — framework-free TypeScript client for Canopy's live-PV
 // protocol (Hare WebSocket) and typed wire DTOs.
 
 export * from './alarm.js';

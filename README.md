@@ -8,24 +8,40 @@ This is **not** the screen system. `screen-ir`, the IR renderer, and the widget 
 
 ## Packages
 
-| Package                             | Contents                                                                                                                                                                  | Framework         |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
-| [`@canopy/client`](packages/client) | `PVService` interface, `HarePVService` (live-PV WS: subscribe/unsubscribe/diff/heartbeat, reconnect + resubscribe), `MockPVService`, typed DTOs for Canopy's REST/WS APIs | none — pure TS    |
-| [`@canopy/react`](packages/react)   | `usePV`, `PVServiceProvider` — React bindings over `@canopy/client`                                                                                                       | React 19          |
-| [`@canopy/shell`](packages/shell)   | `<AppHeader title toolbar>` + theme store — the standard Carbon chrome                                                                                                    | React 19 + Carbon |
+| Package                                     | Contents                                                                                                                                                                  | Framework         |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| [`@slaclab/canopy-client`](packages/client) | `PVService` interface, `HarePVService` (live-PV WS: subscribe/unsubscribe/diff/heartbeat, reconnect + resubscribe), `MockPVService`, typed DTOs for Canopy's REST/WS APIs | none — pure TS    |
+| [`@slaclab/canopy-react`](packages/react)   | `usePV`, `PVServiceProvider` — React bindings over `@slaclab/canopy-client`                                                                                               | React 19          |
+| [`@slaclab/canopy-shell`](packages/shell)   | `<AppHeader title toolbar>` + theme store — the standard Carbon chrome                                                                                                    | React 19 + Carbon |
 
 Porting sources: `PVService`/`MockPVService` and `usePV` from `canopy-screen-builder`; the header/theme from `react-trace` (the donor app — its own adoption back should be a near-noop); `HarePVService` written new against Hare's `WS /hare/v1/ws/pvs`.
 
 ## Ground rules
 
 - **One-way dependency arrow.** trace, squirrel, and the screen system import the SDK; the SDK never imports from any app repo. CI-enforced once packages land.
-- **`@canopy/client` stays framework-free.** React enters only in `@canopy/react` and `@canopy/shell`, so Node-side consumers (headless render workers, monitoring scripts, CI) can use the protocol client directly.
+- **`@slaclab/canopy-client` stays framework-free.** React enters only in `@slaclab/canopy-react` and `@slaclab/canopy-shell`, so Node-side consumers (headless render workers, monitoring scripts, CI) can use the protocol client directly.
 - **The screen system stays out.** If a package is only useful when rendering `.screen.json`, it belongs in the screen runtime repo.
 - **Language-scoped by design.** A Python SDK would be a sibling (`canopy-sdk-python`), not a tenant here.
 
 ## Status
 
-Converted to a pnpm workspace publishing the three packages above, each built with `tsc` to `dist/` with type declarations. `PVService`/`MockPVService` and `usePV` are ported from `canopy-screen-builder`, the header/theme shell from `react-trace`, and `HarePVService` is implemented against Hare's `WS /hare/v1/ws/pvs` (subscribe/diff/heartbeat, reconnect with capped backoff + resubscribe; writes via `PUT /hare/v1/pvs/{pv}`). All packages are version 0.1.0; the publish target (registry) is not decided yet, so nothing is published.
+Converted to a pnpm workspace publishing the three packages above, each built with `tsc` to `dist/` with type declarations. `PVService`/`MockPVService` and `usePV` are ported from `canopy-screen-builder`, the header/theme shell from `react-trace`, and `HarePVService` is implemented against Hare's `WS /hare/v1/ws/pvs` (subscribe/diff/heartbeat, reconnect with capped backoff + resubscribe; writes via `PUT /hare/v1/pvs/{pv}`). All packages are version 0.1.0.
+
+Packages publish to **GitHub Packages** under the org scope (`@slaclab/canopy-*`; the registry requires the scope to match the org). Releasing: bump the three versions in lockstep on `main`, tag `v<version>`, push the tag — [release.yml](.github/workflows/release.yml) builds, tests, and publishes with the workflow's own `GITHUB_TOKEN`. After the first publish, grant each consumer repo read access on every package (package page → Package settings → _Manage Actions access_), or its CI cannot install them.
+
+## Installing (consumers)
+
+Add to the consuming repo's `.npmrc`:
+
+```
+@slaclab:registry=https://npm.pkg.github.com
+```
+
+then `pnpm add @slaclab/canopy-client` (etc.). Auth: in GitHub Actions, use `actions/setup-node` with `registry-url: https://npm.pkg.github.com` and `NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}` (plus the Actions-access grant above). On a dev machine, create a classic PAT with `read:packages` and add to `~/.npmrc`:
+
+```
+//npm.pkg.github.com/:_authToken=<PAT>
+```
 
 ## Development
 
@@ -47,7 +63,7 @@ pnpm install
 | `pnpm format`        | Format source files with Prettier                                          |
 | `pnpm format:check`  | Check formatting without writing                                           |
 
-Single-package variants go through `--filter`, e.g. `pnpm --filter @canopy/client test`. Packages that depend on `@canopy/client` resolve it via its built `dist/`, so run `pnpm build` after a fresh clone (the root `test`/`typecheck` scripts do this for you).
+Single-package variants go through `--filter`, e.g. `pnpm --filter @slaclab/canopy-client test`. Packages that depend on `@slaclab/canopy-client` resolve it via its built `dist/`, so run `pnpm build` after a fresh clone (the root `test`/`typecheck` scripts do this for you).
 
 ## Documentation
 

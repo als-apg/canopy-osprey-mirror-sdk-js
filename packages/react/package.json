@@ -1,8 +1,16 @@
 {
-  "name": "@canopy/react",
+  "name": "@slaclab/canopy-react",
   "version": "0.1.0",
   "private": false,
-  "description": "React bindings for @canopy/client — usePV and the PV service context",
+  "description": "React bindings for @slaclab/canopy-client — usePV and the PV service context",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/slaclab/canopy-sdk-js.git",
+    "directory": "packages/react"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -24,7 +32,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@canopy/client": "workspace:^"
+    "@slaclab/canopy-client": "workspace:^"
   },
   "peerDependencies": {
     "react": "^19.0.0",

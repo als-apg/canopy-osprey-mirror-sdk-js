@@ -1,4 +1,4 @@
-// @canopy/react — React bindings over @canopy/client.
+// @slaclab/canopy-react — React bindings over @slaclab/canopy-client.
 
 export { PVServiceProvider } from './PVServiceProvider.js';
 export { PVServiceContext, usePVService } from './pvServiceContext.js';

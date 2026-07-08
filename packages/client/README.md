@@ -1,4 +1,4 @@
-# @canopy/client
+# @slaclab/canopy-client
 
 Framework-free TypeScript client for Canopy's live-PV protocol (Hare
 WebSocket) and typed wire DTOs. Pure TypeScript — no React, no DOM lib
@@ -12,12 +12,12 @@ get notified of updates, write a new value) with two implementations:
 - `MockPVService` — simulates PV data locally, for development and demos
   without a backend.
 
-React bindings (hooks, context providers) live in `@canopy/react`, not here.
+React bindings (hooks, context providers) live in `@slaclab/canopy-react`, not here.
 
 ## HarePVService
 
 ```ts
-import { HarePVService } from '@canopy/client';
+import { HarePVService } from '@slaclab/canopy-client';
 
 const pvService = new HarePVService({
   url: 'wss://canopy.example.org/hare/v1/ws/pvs',
@@ -58,7 +58,7 @@ interval, pong timeout, reconnect delays, REST base URL override).
 `PVService` without a live Hare backend:
 
 ```ts
-import { MockPVService } from '@canopy/client';
+import { MockPVService } from '@slaclab/canopy-client';
 
 const pvService = new MockPVService();
 pvService.connect();

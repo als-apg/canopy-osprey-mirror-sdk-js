@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import type { PVService } from '@canopy/client';
+import type { PVService } from '@slaclab/canopy-client';
 import { PVServiceContext } from './pvServiceContext.js';
 
 /**

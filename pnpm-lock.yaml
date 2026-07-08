@@ -47,7 +47,7 @@ importers:
 
   packages/react:
     dependencies:
-      '@canopy/client':
+      '@slaclab/canopy-client':
         specifier: workspace:^
         version: link:../client
     devDependencies:

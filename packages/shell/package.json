@@ -1,8 +1,16 @@
 {
-  "name": "@canopy/shell",
+  "name": "@slaclab/canopy-shell",
   "version": "0.1.0",
   "private": false,
   "description": "The standard Canopy app chrome — Carbon AppHeader and light/dark theme store",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/slaclab/canopy-sdk-js.git",
+    "directory": "packages/shell"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

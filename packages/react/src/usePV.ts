@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { usePVService } from './pvServiceContext.js';
-import type { PVData } from '@canopy/client';
-import { DISCONNECTED_PV } from '@canopy/client';
+import type { PVData } from '@slaclab/canopy-client';
+import { DISCONNECTED_PV } from '@slaclab/canopy-client';
 
 export interface PVHandle extends PVData {
   address: string;
