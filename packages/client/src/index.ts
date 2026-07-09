@@ -12,6 +12,8 @@ export type {
 } from './rest/canopyFetch.js';
 export { CanopyError, canopyFetch } from './rest/canopyFetch.js';
 
+export * from './time.js';
+
 export type { PVData, PVListener, PVService } from './pv/PVService.js';
 export { DISCONNECTED_PV } from './pv/PVService.js';
 export { MockPVService } from './pv/MockPVService.js';
