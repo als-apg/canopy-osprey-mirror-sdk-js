@@ -1,11 +1,14 @@
 import { AlarmSeverity } from '../alarm.js';
 import type { PVData, PVListener, PVService } from '../pv/PVService.js';
 import { DISCONNECTED_PV } from '../pv/PVService.js';
+import { canopyFetch } from '../rest/canopyFetch.js';
 import type {
   HareAlarmSeverity,
   HareServerFrame,
   PVMetaDTO,
   PVValueDTO,
+  PVWriteRequestDTO,
+  PVWriteResultDTO,
   PVWriteValue,
 } from './types.js';
 import { ValueKind } from './types.js';
@@ -249,12 +252,7 @@ export class HarePVService implements PVService {
       );
     }
 
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (this.apiKey) {
-      headers['X-API-Key'] = this.apiKey;
-    }
-
-    const body: { value: PVWriteValue; wait?: boolean; timeout?: number } = { value };
+    const body: PVWriteRequestDTO = { value };
     if (options?.wait !== undefined) {
       body.wait = options.wait;
     }
@@ -262,17 +260,13 @@ export class HarePVService implements PVService {
       body.timeout = options.timeoutS;
     }
 
-    const path = encodePvNameForPath(pvName);
-    const response = await fetchFn(`${this.httpPvsBaseUrl}/${path}`, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`HarePVService.write: PUT ${pvName} failed with ${response.status}: ${text}`);
-    }
+    // Failures surface as CanopyError carrying the backend's {code, detail}
+    // envelope (see ../rest/canopyFetch.ts).
+    await canopyFetch<PVWriteResultDTO | undefined>(
+      { baseUrl: this.httpPvsBaseUrl, apiKey: this.apiKey, fetch: fetchFn },
+      `/${encodePvNameForPath(pvName)}`,
+      { method: 'PUT', body }
+    );
   }
 
   // ── Socket lifecycle ────────────────────────────────────────────────────

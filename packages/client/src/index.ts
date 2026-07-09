@@ -1,7 +1,16 @@
-// @slaclab/canopy-client — framework-free TypeScript client for Canopy's live-PV
-// protocol (Hare WebSocket) and typed wire DTOs.
+// @slaclab/canopy-client — framework-free TypeScript client for Canopy's
+// protocols: Hare live PVs (WebSocket), Fox formulas (WebSocket), Mole history
+// (REST), background jobs (REST), the shared REST core, and typed wire DTOs.
 
 export * from './alarm.js';
+
+export type {
+  AbortSignalLike,
+  CanopyConnection,
+  CanopyFetchOptions,
+  ErrorEnvelope,
+} from './rest/canopyFetch.js';
+export { CanopyError, canopyFetch } from './rest/canopyFetch.js';
 
 export type { PVData, PVListener, PVService } from './pv/PVService.js';
 export { DISCONNECTED_PV } from './pv/PVService.js';

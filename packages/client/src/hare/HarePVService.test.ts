@@ -533,6 +533,22 @@ describe('HarePVService', () => {
       await expect(service.write('X', 3.2)).rejects.toThrow(/422/);
     });
 
+    it('write() surfaces the backend {code, detail} envelope as a CanopyError', async () => {
+      const fetchFn = makeFetchMock({
+        ok: false,
+        status: 403,
+        text: '{"code":"insufficient_write_access","detail":"API key does not have write access"}',
+      });
+      const service = new HarePVService({ url: BASE_URL, apiKey: 'ro-key', fetchFn });
+
+      await expect(service.write('X', 3.2)).rejects.toMatchObject({
+        name: 'CanopyError',
+        code: 'insufficient_write_access',
+        status: 403,
+        detail: 'API key does not have write access',
+      });
+    });
+
     it('put() routes a failing fetch to onError instead of throwing an unhandled rejection', async () => {
       const fetchFn: FetchLike = vi.fn(async () => {
         throw new Error('network down');
