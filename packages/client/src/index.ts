@@ -28,6 +28,9 @@ export { FoxFormulaService } from './fox/FoxFormulaService.js';
 export * from './mole/types.js';
 export * from './mole/mole.js';
 
+export * from './jobs/types.js';
+export * from './jobs/jobs.js';
+
 export type { PVData, PVListener, PVService } from './pv/PVService.js';
 export { DISCONNECTED_PV } from './pv/PVService.js';
 export { MockPVService } from './pv/MockPVService.js';
