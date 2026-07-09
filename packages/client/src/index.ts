@@ -14,6 +14,17 @@ export { CanopyError, canopyFetch } from './rest/canopyFetch.js';
 
 export * from './time.js';
 
+export * from './wire.js';
+
+export * from './fox/types.js';
+export type {
+  FoxConnectionStatus,
+  FoxError,
+  FoxFormulaServiceOptions,
+  FoxSubscribeOptions,
+} from './fox/FoxFormulaService.js';
+export { FoxFormulaService } from './fox/FoxFormulaService.js';
+
 export type { PVData, PVListener, PVService } from './pv/PVService.js';
 export { DISCONNECTED_PV } from './pv/PVService.js';
 export { MockPVService } from './pv/MockPVService.js';
