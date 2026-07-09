@@ -2,7 +2,7 @@
   "name": "@slaclab/canopy-react",
   "version": "0.1.0",
   "private": false,
-  "description": "React bindings for @slaclab/canopy-client — usePV and the PV service context",
+  "description": "React bindings for @slaclab/canopy-client — usePV, the PV service context, and useJob",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/slaclab/canopy-sdk-js.git",

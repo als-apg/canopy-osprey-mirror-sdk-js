@@ -1,7 +1,8 @@
 # @slaclab/canopy-react
 
 React bindings over [`@slaclab/canopy-client`](../client): a context provider for the
-`PVService` and the `usePV` hook, ported from `canopy-screen-builder`.
+`PVService`, the `usePV` hook (ported from `canopy-screen-builder`), and the
+`useJob` polling hook for background jobs.
 
 Peer dependencies: `react`, `react-dom` (^19).
 
@@ -47,3 +48,29 @@ with unbound addresses render harmlessly.
 
 `usePVService()` returns the raw `PVService` from context and throws when no
 `PVServiceProvider` is above the caller.
+
+## useJob
+
+`useJob(conn, jobId | null, { pollMs? })` polls a Canopy background job
+(`GET /jobs/v1/{id}`) while the component is mounted and the job is
+non-terminal, returning `{ job, error, loading }`:
+
+```tsx
+import { useJob } from '@slaclab/canopy-react';
+
+function RestoreProgress({ jobId }: { jobId: string | null }) {
+  const { job, error, loading } = useJob(
+    { baseUrl: 'https://canopy.example.org', apiKey: 'my-api-key' },
+    jobId
+  );
+
+  if (loading) return <span>starting…</span>;
+  if (error) return <span>failed to poll: {error.message}</span>;
+  if (!job) return null;
+  return <progress value={job.progress} max={100} data-status={job.status} />;
+}
+```
+
+Polling stops on a terminal status (`completed`/`failed` — branch on
+`job.status`), on a fetch error (surfaced via `error`), when `jobId`
+changes, or on unmount. Pass `null` to render without a job.

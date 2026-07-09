@@ -8,11 +8,11 @@ This is **not** the screen system. `screen-ir`, the IR renderer, and the widget 
 
 ## Packages
 
-| Package                                     | Contents                                                                                                                                                                  | Framework         |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
-| [`@slaclab/canopy-client`](packages/client) | `PVService` interface, `HarePVService` (live-PV WS: subscribe/unsubscribe/diff/heartbeat, reconnect + resubscribe), `MockPVService`, typed DTOs for Canopy's REST/WS APIs | none — pure TS    |
-| [`@slaclab/canopy-react`](packages/react)   | `usePV`, `PVServiceProvider` — React bindings over `@slaclab/canopy-client`                                                                                               | React 19          |
-| [`@slaclab/canopy-shell`](packages/shell)   | `<AppHeader title toolbar>` + theme store — the standard Carbon chrome                                                                                                    | React 19 + Carbon |
+| Package                                     | Contents                                                                                                                                                                                                                                                       | Framework         |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| [`@slaclab/canopy-client`](packages/client) | Hare live PVs (`PVService`/`HarePVService`/`MockPVService`), Fox formula subscriptions (`FoxFormulaService`), Mole history, background jobs (`getJob`/`awaitJob`), the REST core (`CanopyConnection`/`canopyFetch`/`CanopyError`), ns time helpers, typed DTOs | none — pure TS    |
+| [`@slaclab/canopy-react`](packages/react)   | `usePV`, `PVServiceProvider`, `useJob` — React bindings over `@slaclab/canopy-client`                                                                                                                                                                          | React 19          |
+| [`@slaclab/canopy-shell`](packages/shell)   | `<AppHeader title toolbar>` + theme store — the standard Carbon chrome                                                                                                                                                                                         | React 19 + Carbon |
 
 Porting sources: `PVService`/`MockPVService` and `usePV` from `canopy-screen-builder`; the header/theme from `react-trace` (the donor app — its own adoption back should be a near-noop); `HarePVService` written new against Hare's `WS /hare/v1/ws/pvs`.
 
@@ -25,7 +25,7 @@ Porting sources: `PVService`/`MockPVService` and `usePV` from `canopy-screen-bui
 
 ## Status
 
-Converted to a pnpm workspace publishing the three packages above, each built with `tsc` to `dist/` with type declarations. `PVService`/`MockPVService` and `usePV` are ported from `canopy-screen-builder`, the header/theme shell from `react-trace`, and `HarePVService` is implemented against Hare's `WS /hare/v1/ws/pvs` (subscribe/diff/heartbeat, reconnect with capped backoff + resubscribe; writes via `PUT /hare/v1/pvs/{pv}`). All packages are version 0.1.0.
+Converted to a pnpm workspace publishing the three packages above, each built with `tsc` to `dist/` with type declarations. `PVService`/`MockPVService` and `usePV` are ported from `canopy-screen-builder`, the header/theme shell from `react-trace`, and `HarePVService` is implemented against Hare's `WS /hare/v1/ws/pvs` (subscribe/diff/heartbeat, reconnect with capped backoff + resubscribe; writes via `PUT /hare/v1/pvs/{pv}`). The client now also covers the rest of the protocol surface: a REST core ported from `react-trace` (`CanopyConnection` + `canopyFetch` with the `{code, detail}` error envelope), `FoxFormulaService` against Fox's `WS /fox/v1/ws/formulas` (server-assigned subscription ids remapped across reconnects), the Mole history endpoints, job polling (`getJob`/`awaitJob`, plus the `useJob` React hook), and epoch-ns time helpers. All packages are version 0.1.0.
 
 Packages publish to **GitHub Packages** under the org scope (`@slaclab/canopy-*`; the registry requires the scope to match the org). Releasing: bump the three versions in lockstep on `main`, tag `v<version>`, push the tag — [release.yml](.github/workflows/release.yml) builds, tests, and publishes with the workflow's own `GITHUB_TOKEN`. After the first publish, grant each consumer repo read access on every package (package page → Package settings → _Manage Actions access_), or its CI cannot install them.
 
