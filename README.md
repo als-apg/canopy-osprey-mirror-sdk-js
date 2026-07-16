@@ -1,36 +1,49 @@
-# EED SWApps React Template
+# canopy-sdk-js
 
-A template repository for React projects in the EED Software Applications Group at SLAC National Accelerator Laboratory.
+TypeScript SDK for building apps on [Canopy](https://github.com/slaclab/canopy) — live-PV client, typed API contracts, and the shared Carbon app shell.
 
-## What's included
+Every Canopy web app (react-trace, react-squirrel, the screen system) needs the same three things: a client for Canopy's wire protocols, TypeScript types for its REST/WS contracts, and the standard header/theme. This repo is the single home for those, so they are written once instead of hand-rolled per app.
 
-- **React 19** with **TypeScript**
-- **Vite** for fast dev server and builds
-- **Vitest** + **React Testing Library** for unit/integration tests
-- **ESLint** + **Prettier** + **Husky** pre-commit hooks for consistent code style
-- **Zensical** (MkDocs-based) documentation site with GitHub Pages deployment
-- GitHub Actions workflows for lint, type-check, test, and docs deployment
+This is **not** the screen system. `screen-ir`, the IR renderer, and the widget set live in the screen runtime repo, which consumes this SDK exactly like any other client.
 
-## Getting started
+## Packages
 
-### Create a new project from this template
+| Package                                     | Contents                                                                                                                                                                                                                                                       | Framework         |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| [`@slaclab/canopy-client`](packages/client) | Hare live PVs (`PVService`/`HarePVService`/`MockPVService`), Fox formula subscriptions (`FoxFormulaService`), Mole history, background jobs (`getJob`/`awaitJob`), the REST core (`CanopyConnection`/`canopyFetch`/`CanopyError`), ns time helpers, typed DTOs | none — pure TS    |
+| [`@slaclab/canopy-react`](packages/react)   | `usePV`, `PVServiceProvider`, `useJob` — React bindings over `@slaclab/canopy-client`                                                                                                                                                                          | React 19          |
+| [`@slaclab/canopy-shell`](packages/shell)   | `<AppHeader title toolbar>` + theme store — the standard Carbon chrome                                                                                                                                                                                         | React 19 + Carbon |
 
-Click **Use this template** on GitHub, or clone and reinitialize:
+Porting sources: `PVService`/`MockPVService` and `usePV` from `canopy-screen-builder`; the header/theme from `react-trace` (the donor app — its own adoption back should be a near-noop); `HarePVService` written new against Hare's `WS /hare/v1/ws/pvs`.
 
-```sh
-git clone https://github.com/slaclab/eed-swapps-react-template.git my-app
-cd my-app
-git remote remove origin
+## Ground rules
+
+- **One-way dependency arrow.** trace, squirrel, and the screen system import the SDK; the SDK never imports from any app repo. CI-enforced once packages land.
+- **`@slaclab/canopy-client` stays framework-free.** React enters only in `@slaclab/canopy-react` and `@slaclab/canopy-shell`, so Node-side consumers (headless render workers, monitoring scripts, CI) can use the protocol client directly.
+- **The screen system stays out.** If a package is only useful when rendering `.screen.json`, it belongs in the screen runtime repo.
+- **Language-scoped by design.** A Python SDK would be a sibling (`canopy-sdk-python`), not a tenant here.
+
+## Status
+
+Converted to a pnpm workspace publishing the three packages above, each built with `tsc` to `dist/` with type declarations. `PVService`/`MockPVService` and `usePV` are ported from `canopy-screen-builder`, the header/theme shell from `react-trace`, and `HarePVService` is implemented against Hare's `WS /hare/v1/ws/pvs` (subscribe/diff/heartbeat, reconnect with capped backoff + resubscribe; writes via `PUT /hare/v1/pvs/{pv}`). The client now also covers the rest of the protocol surface: a REST core ported from `react-trace` (`CanopyConnection` + `canopyFetch` with the `{code, detail}` error envelope), `FoxFormulaService` against Fox's `WS /fox/v1/ws/formulas` (server-assigned subscription ids remapped across reconnects), the Mole history endpoints, job polling (`getJob`/`awaitJob`, plus the `useJob` React hook), and epoch-ns time helpers. All packages are version 0.1.0.
+
+Packages publish to **GitHub Packages** under the org scope (`@slaclab/canopy-*`; the registry requires the scope to match the org). Releasing: bump the three versions in lockstep on `main`, tag `v<version>`, push the tag — [release.yml](.github/workflows/release.yml) builds, tests, and publishes with the workflow's own `GITHUB_TOKEN`. After the first publish, grant each consumer repo read access on every package (package page → Package settings → _Manage Actions access_), or its CI cannot install them.
+
+## Installing (consumers)
+
+Add to the consuming repo's `.npmrc`:
+
+```
+@slaclab:registry=https://npm.pkg.github.com
 ```
 
-### After cloning, update the project name
+then `pnpm add @slaclab/canopy-client` (etc.). Auth: in GitHub Actions, use `actions/setup-node` with `registry-url: https://npm.pkg.github.com` and `NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}` (plus the Actions-access grant above). On a dev machine, create a classic PAT with `read:packages` and add to `~/.npmrc`:
 
-1. `package.json` — update `name` and `description`
-2. `index.html` — update `<title>`
-3. `pyproject.toml` — update `name` and `description`
-4. `zensical.toml` — update `site_name`, `site_description`, `repo_name`, `repo_url`, and the social link
+```
+//npm.pkg.github.com/:_authToken=<PAT>
+```
 
-### Install dependencies
+## Development
 
 Requires [pnpm](https://pnpm.io/installation).
 
@@ -38,20 +51,19 @@ Requires [pnpm](https://pnpm.io/installation).
 pnpm install
 ```
 
-## Development
+| Command              | Description                                                                |
+| -------------------- | -------------------------------------------------------------------------- |
+| `pnpm build`         | Build every package (`tsc` → `dist/` with declarations, topological order) |
+| `pnpm test`          | Build, then run every package's tests once                                 |
+| `pnpm test:watch`    | Run tests in watch mode across packages                                    |
+| `pnpm test:coverage` | Build, then run tests with coverage report                                 |
+| `pnpm typecheck`     | Build, then type-check every package including its tests                   |
+| `pnpm lint`          | Run ESLint                                                                 |
+| `pnpm lint:fix`      | Run ESLint with auto-fix                                                   |
+| `pnpm format`        | Format source files with Prettier                                          |
+| `pnpm format:check`  | Check formatting without writing                                           |
 
-| Command | Description |
-|---|---|
-| `pnpm dev` | Start dev server at `http://localhost:5173` |
-| `pnpm build` | Type-check and build for production |
-| `pnpm preview` | Preview production build locally |
-| `pnpm test` | Run tests once |
-| `pnpm test:watch` | Run tests in watch mode |
-| `pnpm test:coverage` | Run tests with coverage report |
-| `pnpm lint` | Run ESLint |
-| `pnpm lint:fix` | Run ESLint with auto-fix |
-| `pnpm format` | Format source files with Prettier |
-| `pnpm format:check` | Check formatting without writing |
+Single-package variants go through `--filter`, e.g. `pnpm --filter @slaclab/canopy-client test`. Packages that depend on `@slaclab/canopy-client` resolve it via its built `dist/`, so run `pnpm build` after a fresh clone (the root `test`/`typecheck` scripts do this for you).
 
 ## Documentation
 

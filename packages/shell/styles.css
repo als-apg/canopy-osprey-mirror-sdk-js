@@ -1,0 +1,16 @@
+/*
+ * @slaclab/canopy-shell — header styles. Import once per app:
+ *   import '@slaclab/canopy-shell/styles.css';
+ * Carbon's own styles (@carbon/styles/css/styles.css) must be loaded by the app.
+ */
+
+/* Carbon Header takes position: fixed by default; pin it into the app's flex
+   column instead so the content below fills the remaining height. */
+.canopy-header {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.canopy-header__name {
+  letter-spacing: 0.04em;
+}

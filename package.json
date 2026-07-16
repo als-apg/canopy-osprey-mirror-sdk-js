@@ -1,46 +1,31 @@
 {
-  "name": "eed-swapps-react-template",
+  "name": "canopy-sdk-js",
   "version": "0.1.0",
   "private": true,
-  "description": "React project template for EED Software Applications Group",
+  "description": "TypeScript SDK for building apps on Canopy — live-PV client, typed API contracts, and the shared Carbon app shell",
+  "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "pnpm -r run build",
+    "test": "pnpm run build && pnpm -r run test",
+    "test:watch": "pnpm -r --parallel run test:watch",
+    "test:coverage": "pnpm run build && pnpm -r run test:coverage",
+    "typecheck": "pnpm run build && pnpm -r run typecheck",
     "lint": "eslint .",
-    "lint:fix": "eslint . --ext ts,tsx --fix",
-    "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
-    "preview": "vite preview",
-    "prepare": "husky",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
-  },
-  "dependencies": {
-    "react": "^19.2.6",
-    "react-dom": "^19.2.6"
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"packages/*/src/**/*.{ts,tsx,css}\" \"packages/*/*.{md,css}\"",
+    "format:check": "prettier --check \"packages/*/src/**/*.{ts,tsx,css}\" \"packages/*/*.{md,css}\"",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@testing-library/dom": "^10.4.1",
-    "@testing-library/jest-dom": "github:testing-library/jest-dom",
-    "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "github:testing-library/user-event",
-    "@types/node": "^24.12.3",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^10.3.0",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
     "husky": "^9.1.7",
     "lint-staged": "^17.0.4",
     "prettier": "^3.8.3",
     "typescript": "~6.0.2",
-    "typescript-eslint": "^8.59.2",
-    "vite": "^8.0.12",
-    "vitest": "^4.1.6"
+    "typescript-eslint": "^8.59.2"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
