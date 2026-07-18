@@ -1,0 +1,43 @@
+{
+  "name": "@slaclab/canopy-screen-ir",
+  "version": "0.1.0",
+  "private": false,
+  "description": "The Canopy Screen IR contract — the *.screen.json JSON Schema, its schemaVersion, TypeScript model types, and a validate() helper. The single source shared by the screen builder, the runtime viewer, the content repo's CI, and the PyDM converter.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/slaclab/canopy-sdk-js.git",
+    "directory": "packages/screen-ir"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js"
+    },
+    "./schema.json": "./schema/screen-ir.schema.json"
+  },
+  "files": [
+    "dist",
+    "schema"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2",
+    "vitest": "^4.1.6"
+  }
+}
