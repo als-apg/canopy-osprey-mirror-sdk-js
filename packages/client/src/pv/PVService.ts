@@ -15,6 +15,8 @@ export interface PVData {
   precision: number;
   lowerLimit: number;
   upperLimit: number;
+  /** Enum state labels (mbbo/bo choices) when the PV is enum-kind; undefined otherwise. */
+  enumChoices?: string[];
 }
 
 export type PVListener = (data: PVData) => void;
