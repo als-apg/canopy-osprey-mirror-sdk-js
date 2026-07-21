@@ -34,6 +34,8 @@ export * from './jobs/jobs.js';
 export type { PVData, PVListener, PVService } from './pv/PVService.js';
 export { DISCONNECTED_PV } from './pv/PVService.js';
 export { MockPVService } from './pv/MockPVService.js';
+export { LocalPVService, parseLocUrl } from './pv/LocalPVService.js';
+export { RoutedPVService } from './pv/RoutedPVService.js';
 
 export * from './hare/types.js';
 
