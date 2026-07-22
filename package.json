@@ -1,6 +1,6 @@
 {
   "name": "canopy-sdk-js",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "private": true,
   "description": "TypeScript SDK for building apps on Canopy — live-PV client, typed API contracts, and the shared Carbon app shell",
   "type": "module",

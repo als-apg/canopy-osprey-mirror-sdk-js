@@ -1,6 +1,6 @@
 {
   "name": "@slaclab/canopy-shell",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "private": false,
   "description": "The standard Canopy app chrome — Carbon AppHeader and light/dark theme store",
   "repository": {

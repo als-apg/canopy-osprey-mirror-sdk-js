@@ -33,6 +33,23 @@ jobs:
           cache: pnpm
           registry-url: "https://npm.pkg.github.com"
 
+      - name: Verify tag matches package versions
+        # Guard against the silent-skip footgun: pnpm -r publish skips any
+        # version the registry already has, so an un-bumped manifest turns a
+        # release into a green no-op. Fail loudly instead.
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          FAIL=0
+          for f in packages/*/package.json; do
+            PKG_NAME=$(node -p "require('./$f').name")
+            PKG_VERSION=$(node -p "require('./$f').version")
+            if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+              echo "::error::$PKG_NAME is $PKG_VERSION but the tag says $TAG_VERSION (lockstep bump missing)"
+              FAIL=1
+            fi
+          done
+          exit $FAIL
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
