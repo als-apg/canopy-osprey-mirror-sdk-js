@@ -1,5 +1,10 @@
-export { AppHeader } from './AppHeader.js';
-export type { AppHeaderProps } from './AppHeader.js';
+export { AppHeader, ThemeToggleAction } from './AppHeader.js';
+export type {
+  AppHeaderMenu,
+  AppHeaderProps,
+  HeaderTheme,
+  ThemeToggleActionProps,
+} from './AppHeader.js';
 
 export type {
   CarbonColorModeTheme,

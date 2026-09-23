@@ -1,16 +1,74 @@
 /*
- * @slaclab/canopy-shell — header styles. Import once per app:
+ * @slaclab/canopy-shell styles. Import once per app, after Carbon's CSS:
+ *   import '@carbon/styles/css/styles.css';
  *   import '@slaclab/canopy-shell/styles.css';
- * Carbon's own styles (@carbon/styles/css/styles.css) must be loaded by the app.
+ * Every color is a Carbon --cds-* token except the documented brand variable.
  */
 
-/* Carbon Header takes position: fixed by default; pin it into the app's flex
-   column instead so the content below fills the remaining height. */
+:root {
+  /* SLAC brand red (react-squirrel #181). */
+  --canopy-brand: #901515;
+}
+
+/*
+ * DECISION NEEDED: #901515 on the g100 header background (#161616) is about
+ * 2.0:1, which fails WCAG AA (about 8:1 on g10). react-squirrel ships it as-is,
+ * so this package matches it. A dark-mode override such as Carbon red-40
+ * (about 7.6:1) would look like:
+ *
+ * .cds--g90 .canopy-header,
+ * .cds--g100 .canopy-header {
+ *   --canopy-brand: #ff8389;
+ * }
+ */
+
+/* ---------------------------------------------------------------- Header -- */
+
 .canopy-header {
-  position: relative;
   flex-shrink: 0;
 }
 
-.canopy-header__name {
-  letter-spacing: 0.04em;
+/* Carbon's Header is position: fixed by default. Unless `fixed` is set, pin it
+   into the app's flex column instead so the content below fills the rest. */
+.canopy-header:not(.canopy-header--fixed) {
+  position: relative;
+}
+
+.canopy-header .cds--header__name,
+.canopy-header .cds--header__name--prefix {
+  color: var(--canopy-brand);
+}
+
+/* Mouse-click focus: drop the persistent background and ring on header icon
+   buttons. :focus:not(:focus-visible) matches pointer focus only, so keyboard
+   focus rings stay. Active actions (e.g. an admin toggle) are excluded. */
+.canopy-header .cds--btn--icon-only.cds--btn--ghost:focus:not(.cds--header__action--active) {
+  background-color: transparent;
+}
+
+.canopy-header .cds--header__action:focus:not(:focus-visible):not(.cds--header__action--active),
+.canopy-header
+  .cds--btn--icon-only.cds--btn--ghost:focus:not(:focus-visible):not(.cds--header__action--active) {
+  border-color: transparent;
+  box-shadow: none;
+  outline: none;
+}
+
+/* The hamburger uses isActive only to swap the Menu/Close icon; no active background. */
+.canopy-header .cds--header__menu-trigger.cds--header__action--active {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+/* Header tooltips follow the theme via Carbon's inverse tokens. */
+.canopy-header .cds--popover--high-contrast .cds--popover,
+.canopy-header .cds--popover {
+  --cds-popover-background-color: var(--cds-background-inverse);
+  --cds-popover-text-color: var(--cds-text-inverse);
+}
+
+/* Always show the hamburger when a menu is wired up; Carbon hides it at wide viewports. */
+.canopy-header--with-menu .cds--header__menu-toggle,
+.canopy-header--with-menu .cds--header__menu-trigger {
+  display: flex !important;
 }
