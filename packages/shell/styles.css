@@ -235,3 +235,50 @@
 .canopy-rail--collapsed .canopy-rail__footer-slot {
   padding: 0.25rem;
 }
+
+/* --------------------------------------------------------------- Toasts -- */
+
+.canopy-toasts {
+  position: fixed;
+  top: calc(var(--canopy-header-height, 3rem) + 0.5rem);
+  right: 1rem;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: calc(100vh - var(--canopy-header-height, 3rem) - 1rem);
+  overflow: hidden;
+  background: transparent;
+  pointer-events: none;
+}
+
+.canopy-toasts .cds--toast-notification {
+  margin: 0;
+  pointer-events: auto;
+}
+
+/* ---------------------------------------------------- Confirm / errors -- */
+
+.canopy-confirm .cds--modal-container,
+.canopy-confirm .cds--modal-container:focus {
+  border: none;
+  outline: none;
+}
+
+.canopy-confirm__body {
+  font-size: 0.875rem;
+}
+
+.canopy-error-fallback {
+  padding: 1rem;
+}
+
+.canopy-error-fallback .cds--inline-notification {
+  max-width: 100%;
+}
+
+.canopy-error-fallback__actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}

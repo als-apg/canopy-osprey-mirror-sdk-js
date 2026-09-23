@@ -30,3 +30,12 @@ export type { NavItem, SideNavRailProps } from './SideNavRail.js';
 
 export { AppShell } from './AppShell.js';
 export type { AppShellProps } from './AppShell.js';
+
+export { ToastProvider, useToast } from './toast.js';
+export type { ToastApi, ToastKind, ToastOptions, ToastProviderProps } from './toast.js';
+
+export { ConfirmProvider, useConfirm } from './confirm.js';
+export type { ConfirmFn, ConfirmOptions, ConfirmProviderProps } from './confirm.js';
+
+export { ErrorBoundary, ErrorFallback } from './ErrorBoundary.js';
+export type { ErrorBoundaryProps, ErrorFallbackProps } from './ErrorBoundary.js';
