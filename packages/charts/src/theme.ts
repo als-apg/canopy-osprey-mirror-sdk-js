@@ -30,6 +30,16 @@ export interface ChartTheme {
   crosshair: string;
   /** Legend text — `text-secondary`. */
   legend: string;
+  /** Errors, violations, infeasible points — `support-error`. */
+  danger: string;
+  /** Success marks — `support-success`. */
+  success: string;
+  /** Warnings and "best" markers — `support-warning`. */
+  warning: string;
+  /** The selected point or cursor line — `border-interactive`. */
+  selection: string;
+  /** Shaded bands behind the data (`markArea`) — `highlight`. */
+  highlight: string;
 }
 
 /**
@@ -50,6 +60,11 @@ export const CHART_THEMES: Readonly<Record<ChartColorMode, Readonly<ChartTheme>>
     tooltipMuted: '#6f6f6f',
     crosshair: '#6f6f6f',
     legend: '#525252',
+    danger: '#da1e28',
+    success: '#24a148',
+    warning: '#f1c21b',
+    selection: '#0f62fe',
+    highlight: '#d0e2ff',
   }),
   dark: Object.freeze({
     bg: '#161616',
@@ -63,6 +78,11 @@ export const CHART_THEMES: Readonly<Record<ChartColorMode, Readonly<ChartTheme>>
     tooltipMuted: '#a8a8a8',
     crosshair: '#a8a8a8',
     legend: '#c6c6c6',
+    danger: '#fa4d56',
+    success: '#42be65',
+    warning: '#f1c21b',
+    selection: '#4589ff',
+    highlight: '#001d6c',
   }),
 });
 
