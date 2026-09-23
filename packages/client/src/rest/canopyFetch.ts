@@ -8,7 +8,7 @@
 // - `method`/`body` support so non-GET endpoints (e.g. Hare PV writes) can
 //   share the same envelope-aware error path.
 
-import type { FetchLike } from '../hare/HarePVService.js';
+import type { FetchLike } from '../transport.js';
 
 /**
  * Error envelope returned by every non-2xx Canopy response

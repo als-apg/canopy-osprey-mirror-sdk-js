@@ -1,8 +1,26 @@
 // @slaclab/canopy-client — framework-free TypeScript client for Canopy's
 // protocols: Hare live PVs (WebSocket), Fox formulas (WebSocket), Mole history
-// (REST), background jobs (REST), the shared REST core, and typed wire DTOs.
+// (REST), background jobs (REST), the shared REST core, the reconnecting
+// WebSocket they stream over, and typed wire DTOs.
 
 export * from './alarm.js';
+
+export type {
+  FetchLike,
+  WebSocketCloseEventLike,
+  WebSocketFactory,
+  WebSocketLike,
+} from './transport.js';
+
+export type {
+  ResilientSocketOptions,
+  SocketCloseInfo,
+  SocketError,
+  SocketFrame,
+  SocketStatus,
+  WsLocationLike,
+} from './ws/ResilientSocket.js';
+export { ResilientSocket, toWsUrl } from './ws/ResilientSocket.js';
 
 export type {
   AbortSignalLike,
@@ -40,9 +58,6 @@ export { RoutedPVService } from './pv/RoutedPVService.js';
 export * from './hare/types.js';
 
 export type {
-  WebSocketLike,
-  WebSocketFactory,
-  FetchLike,
   HareConnectionStatus,
   HareError,
   HarePVServiceOptions,

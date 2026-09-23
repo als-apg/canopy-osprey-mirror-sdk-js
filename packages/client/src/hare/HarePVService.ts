@@ -2,6 +2,9 @@ import { AlarmSeverity } from '../alarm.js';
 import type { PVData, PVListener, PVService } from '../pv/PVService.js';
 import { DISCONNECTED_PV } from '../pv/PVService.js';
 import { canopyFetch } from '../rest/canopyFetch.js';
+import type { FetchLike, WebSocketFactory } from '../transport.js';
+import { ResilientSocket } from '../ws/ResilientSocket.js';
+import type { SocketError, SocketFrame, SocketStatus } from '../ws/ResilientSocket.js';
 import type {
   HareAlarmSeverity,
   HareServerFrame,
@@ -13,28 +16,9 @@ import type {
 } from './types.js';
 import { ValueKind } from './types.js';
 
-// ── Environment-agnostic structural types ───────────────────────────────────
-//
-// No DOM lib, no @types/node: consumers inject their own WebSocket/fetch (or
-// we read them off `globalThis` at call time), so this file never names the
-// concrete `WebSocket`/`Response` types from either environment.
-
-export interface WebSocketLike {
-  readyState: number;
-  send(data: string): void;
-  close(code?: number, reason?: string): void;
-  onopen: (() => void) | null;
-  onmessage: ((ev: { data: unknown }) => void) | null;
-  onclose: (() => void) | null;
-  onerror: (() => void) | null;
-}
-
-export type WebSocketFactory = (url: string) => WebSocketLike;
-
-export type FetchLike = (
-  url: string,
-  init: { method: string; headers: Record<string, string>; body: string }
-) => Promise<{ ok: boolean; status: number; text(): Promise<string> }>;
+// The structural transport types moved to ../transport.ts; re-exported here
+// so existing `from './hare/HarePVService.js'` imports keep working.
+export type { FetchLike, WebSocketFactory, WebSocketLike } from '../transport.js';
 
 export type HareConnectionStatus = 'idle' | 'connecting' | 'connected' | 'disconnected';
 
@@ -70,16 +54,6 @@ export interface HareWriteOptions {
   timeoutS?: number;
 }
 
-// A WebSocket is OPEN when readyState === 1 in both the browser and Node
-// WebSocket implementations (the WHATWG-standardized numeric readyState
-// values). We avoid referencing `WebSocket.OPEN` since that requires a
-// concrete WebSocket type we deliberately don't depend on.
-const WS_OPEN = 1;
-
-const DEFAULT_RECONNECT_DELAYS_MS = [1000, 2000, 4000, 8000, 15000];
-const DEFAULT_PING_INTERVAL_MS = 15000;
-const DEFAULT_PONG_TIMEOUT_MS = 10000;
-
 const SEVERITY_MAP: Record<HareAlarmSeverity, AlarmSeverity> = {
   NO_ALARM: AlarmSeverity.NO_ALARM,
   MINOR: AlarmSeverity.MINOR,
@@ -100,11 +74,6 @@ function encodePvNameForPath(pvName: string): string {
   return pvName.split('/').map(encodeURIComponent).join('/');
 }
 
-function defaultWebSocketFactory(): WebSocketFactory | undefined {
-  const ctor = (globalThis as { WebSocket?: new (url: string) => WebSocketLike }).WebSocket;
-  return ctor ? (url: string) => new ctor(url) : undefined;
-}
-
 function defaultFetchFn(): FetchLike | undefined {
   return (globalThis as { fetch?: FetchLike }).fetch;
 }
@@ -113,45 +82,50 @@ function defaultFetchFn(): FetchLike | undefined {
  * `PVService` implementation over Canopy Hare's live-PV WebSocket
  * (`WS /hare/v1/ws/pvs`) with REST writes (`PUT /hare/v1/pvs/{pv}`).
  *
+ * The connection (capped-backoff reconnect, ping/pong liveness, orphaned
+ * socket guards) is a {@link ResilientSocket}; this class handles the Hare
+ * protocol on top: one `subscribe` frame for every PV with listeners on each
+ * (re)open, `initial`/`diff` frames into `PVData` snapshots, and every
+ * listener marked disconnected when the socket drops.
+ *
  * Framework- and environment-agnostic: takes an injectable `WebSocketFactory`
  * / `FetchLike` so it runs unmodified in browsers, Node, and tests.
  */
 export class HarePVService implements PVService {
-  private readonly url: string;
-  private readonly apiKey: string | undefined;
   private readonly httpPvsBaseUrl: string;
-  private readonly reconnectDelaysMs: number[];
-  private readonly pingIntervalMs: number;
-  private readonly pongTimeoutMs: number;
-  private readonly webSocketFactory: WebSocketFactory | undefined;
+  private readonly apiKey: string | undefined;
   private readonly fetchFn: FetchLike | undefined;
   private readonly onErrorCallback: ((error: HareError) => void) | undefined;
   private readonly onStatusChangeCallback: ((status: HareConnectionStatus) => void) | undefined;
+  private readonly socket: ResilientSocket;
 
   private listeners = new Map<string, Set<PVListener>>();
   private snapshots = new Map<string, PVData>();
   private metas = new Map<string, PVMetaDTO>();
 
-  private socket: WebSocketLike | null = null;
-  private desiredConnected = false;
   private _status: HareConnectionStatus = 'idle';
-  private reconnectAttempt = 0;
-
-  private reconnectTimer: number | undefined;
-  private pingTimer: number | undefined;
-  private pongTimer: number | undefined;
 
   constructor(options: HarePVServiceOptions) {
-    this.url = options.url;
     this.apiKey = options.apiKey;
     this.httpPvsBaseUrl = options.httpPvsBaseUrl ?? deriveHttpPvsBaseUrl(options.url);
-    this.reconnectDelaysMs = options.reconnectDelaysMs ?? DEFAULT_RECONNECT_DELAYS_MS;
-    this.pingIntervalMs = options.pingIntervalMs ?? DEFAULT_PING_INTERVAL_MS;
-    this.pongTimeoutMs = options.pongTimeoutMs ?? DEFAULT_PONG_TIMEOUT_MS;
-    this.webSocketFactory = options.webSocketFactory ?? defaultWebSocketFactory();
     this.fetchFn = options.fetchFn ?? defaultFetchFn();
     this.onErrorCallback = options.onError;
     this.onStatusChangeCallback = options.onStatusChange;
+    this.socket = new ResilientSocket({
+      url: options.url,
+      apiKey: options.apiKey,
+      reconnectDelaysMs: options.reconnectDelaysMs,
+      pingIntervalMs: options.pingIntervalMs,
+      pongTimeoutMs: options.pongTimeoutMs,
+      webSocketFactory: options.webSocketFactory,
+      terminalCloseCodes: [],
+      label: 'HarePVService',
+      onOpen: () => this.resubscribeAll(),
+      onFrame: (frame) => this.handleFrame(frame),
+      onClose: () => this.markAllDisconnected(),
+      onStatusChange: (status) => this.handleSocketStatus(status),
+      onError: (error) => this.handleSocketError(error),
+    });
   }
 
   // ── PVService lifecycle ────────────────────────────────────────────────
@@ -165,31 +139,11 @@ export class HarePVService implements PVService {
   }
 
   connect(): void {
-    this.desiredConnected = true;
-    // An explicit connect supersedes any pending backoff timer; otherwise the
-    // timer could fire later and open a second, orphaned socket.
-    this.clearReconnectTimer();
-    if (this.socket && (this.socket.readyState === WS_OPEN || this.socket.readyState === 0)) {
-      // Already open or connecting.
-      return;
-    }
-    this.openSocket();
+    this.socket.connect();
   }
 
   disconnect(): void {
-    this.desiredConnected = false;
-    this.clearReconnectTimer();
-    this.stopHeartbeat();
-    const socket = this.socket;
-    this.socket = null;
-    if (socket) {
-      socket.onopen = null;
-      socket.onmessage = null;
-      socket.onclose = null;
-      socket.onerror = null;
-      socket.close();
-    }
-    this.setStatus('disconnected');
+    this.socket.close();
     this.markAllDisconnected();
   }
 
@@ -209,8 +163,10 @@ export class HarePVService implements PVService {
       listener(snapshot);
     }
 
-    if (isFirstListener && this.socket && this.socket.readyState === WS_OPEN) {
-      this.sendSubscribe([pvName]);
+    if (isFirstListener) {
+      // Sent only while the socket is open; otherwise the next open
+      // resubscribes every PV with listeners.
+      this.socket.send({ type: 'subscribe', pvNames: [pvName] });
     }
 
     return () => {
@@ -221,9 +177,7 @@ export class HarePVService implements PVService {
         this.listeners.delete(pvName);
         this.snapshots.delete(pvName);
         this.metas.delete(pvName);
-        if (this.socket && this.socket.readyState === WS_OPEN) {
-          this.sendUnsubscribe([pvName]);
-        }
+        this.socket.send({ type: 'unsubscribe', pvNames: [pvName] });
       }
     };
   }
@@ -269,102 +223,29 @@ export class HarePVService implements PVService {
     );
   }
 
-  // ── Socket lifecycle ────────────────────────────────────────────────────
+  // ── Connection callbacks ────────────────────────────────────────────────
 
-  private openSocket(): void {
-    const factory = this.webSocketFactory;
-    if (!factory) {
-      throw new Error(
-        'HarePVService.connect: no WebSocket implementation available (inject `webSocketFactory` or run in an environment with global WebSocket).'
-      );
-    }
+  private handleSocketStatus(status: SocketStatus): void {
+    // A stopped socket ('closed') is reported as 'disconnected', the status
+    // this service has always used for both drops and disconnect().
+    this.setStatus(status === 'closed' ? 'disconnected' : status);
+  }
 
-    this.setStatus('connecting');
-
-    const wsUrl = this.apiKey
-      ? `${this.url}${this.url.includes('?') ? '&' : '?'}api_key=${encodeURIComponent(this.apiKey)}`
-      : this.url;
-
-    let socket: WebSocketLike;
-    try {
-      socket = factory(wsUrl);
-    } catch (err) {
-      this.setStatus('disconnected');
+  private handleSocketError(error: SocketError): void {
+    if (error.code === 'ws_connect_failed') {
       this.reportError({
-        code: 'ws_connect_failed',
-        message: `Could not open live connection: ${errorMessage(err)}`,
+        code: error.code,
+        message: `Could not open live connection: ${errorMessage(error.cause)}`,
       });
-      if (this.desiredConnected) {
-        this.scheduleReconnect();
-      }
       return;
     }
-    this.socket = socket;
-
-    // Every handler ignores events from a socket we have since replaced or
-    // dropped, so a late close/open from an orphaned socket cannot clobber
-    // the current connection's bookkeeping.
-    socket.onopen = () => {
-      if (this.socket !== socket) return;
-      this.reconnectAttempt = 0;
-      this.setStatus('connected');
-      this.resubscribeAll();
-      this.startHeartbeat();
-    };
-
-    socket.onmessage = (ev: { data: unknown }) => {
-      if (this.socket !== socket) return;
-      this.handleMessage(ev.data);
-    };
-
-    socket.onclose = () => {
-      if (this.socket !== socket) return;
-      this.handleSocketClose();
-    };
-
-    socket.onerror = () => {
-      // The subsequent onclose (fired by every WebSocket implementation
-      // after an error) drives the actual reconnect/disconnect bookkeeping.
-    };
-  }
-
-  private handleSocketClose(): void {
-    this.socket = null;
-    this.stopHeartbeat();
-    this.setStatus('disconnected');
-    this.markAllDisconnected();
-
-    if (this.desiredConnected) {
-      this.scheduleReconnect();
-    }
-  }
-
-  private scheduleReconnect(): void {
-    this.clearReconnectTimer();
-    const delays = this.reconnectDelaysMs;
-    const delay = delays[Math.min(this.reconnectAttempt, delays.length - 1)] ?? 0;
-    this.reconnectAttempt += 1;
-    this.reconnectTimer = setTimeout(() => {
-      this.reconnectTimer = undefined;
-      // The !socket guard covers a connect() that already opened one while
-      // this timer was pending.
-      if (this.desiredConnected && !this.socket) {
-        this.openSocket();
-      }
-    }, delay);
-  }
-
-  private clearReconnectTimer(): void {
-    if (this.reconnectTimer !== undefined) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = undefined;
-    }
+    this.reportError({ code: error.code, message: error.message });
   }
 
   private resubscribeAll(): void {
     const pvNames = [...this.listeners.keys()];
     if (pvNames.length > 0) {
-      this.sendSubscribe(pvNames);
+      this.socket.send({ type: 'subscribe', pvNames });
     }
   }
 
@@ -381,64 +262,10 @@ export class HarePVService implements PVService {
     }
   }
 
-  // ── Heartbeat (client ping / pong liveness) ─────────────────────────────
-
-  private startHeartbeat(): void {
-    this.stopHeartbeat();
-    this.pingTimer = setInterval(() => {
-      this.sendPing();
-    }, this.pingIntervalMs);
-  }
-
-  private stopHeartbeat(): void {
-    if (this.pingTimer !== undefined) {
-      clearInterval(this.pingTimer);
-      this.pingTimer = undefined;
-    }
-    this.disarmPongDeadline();
-  }
-
-  private sendPing(): void {
-    const socket = this.socket;
-    if (!socket || socket.readyState !== WS_OPEN) return;
-    socket.send(JSON.stringify({ type: 'ping' }));
-    this.armPongDeadline();
-  }
-
-  private armPongDeadline(): void {
-    if (this.pongTimer !== undefined) return; // one deadline in flight at a time
-    this.pongTimer = setTimeout(() => {
-      this.pongTimer = undefined;
-      // No server frame arrived in time: treat the connection as dead.
-      // Closing triggers the normal onclose -> reconnect path.
-      const socket = this.socket;
-      if (socket) {
-        socket.close();
-      }
-    }, this.pongTimeoutMs);
-  }
-
-  private disarmPongDeadline(): void {
-    if (this.pongTimer !== undefined) {
-      clearTimeout(this.pongTimer);
-      this.pongTimer = undefined;
-    }
-  }
-
   // ── Frame handling ──────────────────────────────────────────────────────
 
-  private handleMessage(raw: unknown): void {
-    // Any inbound frame is proof of life, regardless of whether it parses.
-    this.disarmPongDeadline();
-
-    if (typeof raw !== 'string') return;
-    let frame: HareServerFrame;
-    try {
-      frame = JSON.parse(raw) as HareServerFrame;
-    } catch {
-      return; // Malformed frame: ignore.
-    }
-
+  private handleFrame(raw: SocketFrame): void {
+    const frame = raw as unknown as HareServerFrame;
     switch (frame.type) {
       case 'initial':
         for (const [pvName, meta] of Object.entries(frame.meta)) {
@@ -462,7 +289,7 @@ export class HarePVService implements PVService {
         break;
       case 'heartbeat':
       case 'pong':
-        // Liveness only; already handled above.
+        // Liveness only (the socket already counted it).
         break;
     }
   }
@@ -504,16 +331,6 @@ export class HarePVService implements PVService {
     for (const listener of subs) {
       listener(data);
     }
-  }
-
-  // ── Outbound messages ───────────────────────────────────────────────────
-
-  private sendSubscribe(pvNames: string[]): void {
-    this.socket?.send(JSON.stringify({ type: 'subscribe', pvNames }));
-  }
-
-  private sendUnsubscribe(pvNames: string[]): void {
-    this.socket?.send(JSON.stringify({ type: 'unsubscribe', pvNames }));
   }
 
   // ── Status / error reporting ────────────────────────────────────────────
