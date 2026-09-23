@@ -1,0 +1,43 @@
+{
+  "name": "@slaclab/canopy-vite",
+  "version": "0.1.2",
+  "private": false,
+  "description": "Vite dev-server proxy for Canopy apps — forwards the API (REST + WebSocket) and elog, injecting the keys server-side so they never reach the browser bundle",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/slaclab/canopy-sdk-js.git",
+    "directory": "packages/vite"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "peerDependencies": {
+    "vite": "^6.0.0 || ^7.0.0 || ^8.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.12.3",
+    "typescript": "~6.0.2",
+    "vite": "^8.0.12",
+    "vitest": "^4.1.6"
+  }
+}
