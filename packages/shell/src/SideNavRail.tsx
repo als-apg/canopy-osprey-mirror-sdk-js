@@ -21,8 +21,10 @@ export interface SideNavRailProps {
   /** true = 256px rail with labels; false = 48px icon rail with tooltips. */
   expanded: boolean;
   /**
-   * Current location pathname. An item is active when it equals its `href` or
-   * starts with `href + '/'`; when several match, the longest `href` wins.
+   * Current location, in the same form as the item hrefs (a pathname, or a
+   * `#/...` hash for hash routing; query and fragment are ignored). An item is
+   * active when it equals its `href` or starts with `href + '/'`; when several
+   * match, the longest `href` wins.
    */
   activeHref: string;
   /**
@@ -39,7 +41,10 @@ export interface SideNavRailProps {
   className?: string;
 }
 
-function stripQueryAndHash(path: string): string {
+// '/runs/7?tab=events#top' -> '/runs/7'. A leading '#' is a hash-router path
+// ('#/runs/7' -> '/runs/7'), not a fragment to drop.
+function toPath(href: string): string {
+  const path = href.startsWith('#') ? href.slice(1) : href;
   const cut = path.search(/[?#]/);
   return cut === -1 ? path : path.slice(0, cut);
 }
@@ -50,12 +55,12 @@ function matches(href: string, pathname: string): boolean {
 
 /** The id of the item that should render active: the longest matching href. */
 export function findActiveNavItem(items: NavItem[], activeHref: string): string | undefined {
-  const pathname = stripQueryAndHash(activeHref);
-  let best: NavItem | undefined;
+  const pathname = toPath(activeHref);
+  let best: { id: string; length: number } | undefined;
   for (const item of items) {
-    const href = stripQueryAndHash(item.href);
-    if (matches(href, pathname) && (!best || href.length > stripQueryAndHash(best.href).length)) {
-      best = item;
+    const href = toPath(item.href);
+    if (matches(href, pathname) && (!best || href.length > best.length)) {
+      best = { id: item.id, length: href.length };
     }
   }
   return best?.id;

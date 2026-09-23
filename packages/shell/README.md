@@ -263,7 +263,8 @@ const NAV_ITEMS: NavItem[] = [
   `onNavigate`, the links navigate normally (full page load).
 - **Active item.** An item is active when `activeHref` equals its `href` or
   starts with `href + '/'`. If several match, the longest `href` wins. Query
-  strings and hashes are ignored. The active link gets `aria-current="page"`.
+  strings and fragments are ignored; a leading `#` (hash routing, `#/runs`) is
+  read as the path. The active link gets `aria-current="page"`.
   The matcher is exported as `findActiveNavItem(items, activeHref)`.
 - **Look.** Squirrel's Sidebar: 256px expanded, 48px collapsed, a
   `--cds-layer` background, and a 3px `--cds-link-primary` left border plus

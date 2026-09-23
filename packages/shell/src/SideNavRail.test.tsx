@@ -62,6 +62,13 @@ describe('findActiveNavItem', () => {
     expect(findActiveNavItem(items, '/runs/7?tab=events#top')).toBe('runs');
   });
 
+  it('supports hash-router hrefs', () => {
+    const hashed = items.map((i) => ({ ...i, href: `#${i.href}` }));
+    expect(findActiveNavItem(hashed, '#/runs/42')).toBe('runs');
+    expect(findActiveNavItem(hashed, '#/')).toBe('dash');
+    expect(findActiveNavItem(hashed, '#/runs/new?x=1')).toBe('runs-new');
+  });
+
   it('works with a base path', () => {
     const based = items.map((i) => ({ ...i, href: `/badger${i.href === '/' ? '' : i.href}` }));
     expect(findActiveNavItem(based, '/badger')).toBe('dash');
