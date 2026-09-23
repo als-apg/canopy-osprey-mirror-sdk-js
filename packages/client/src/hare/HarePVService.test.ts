@@ -619,4 +619,63 @@ describe('HarePVService', () => {
       expect(onStatusChange.mock.calls).toEqual([['connecting'], ['connected'], ['disconnected']]);
     });
   });
+
+  // ── terminal close codes ────────────────────────────────────────────────
+
+  describe('terminal close codes', () => {
+    it('stops reconnecting after a 1008 close, reports it, and marks PVs disconnected', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const onError = vi.fn<(error: HareError) => void>();
+      const onStatusChange = vi.fn();
+      const service = new HarePVService({
+        url: BASE_URL,
+        webSocketFactory: factory,
+        onError,
+        onStatusChange,
+      });
+      service.connect();
+      const listener = vi.fn();
+      service.subscribe('PV1', listener);
+      instances[0]!.open();
+      listener.mockClear();
+
+      instances[0]!.close(1008, 'invalid_api_key: Invalid API key');
+
+      expect(service.status).toBe('disconnected');
+      expect(onStatusChange.mock.calls.at(-1)).toEqual(['disconnected']);
+      expect(listener.mock.calls[0]![0].connected).toBe(false);
+      expect(onError).toHaveBeenCalledExactlyOnceWith({
+        code: 'ws_terminal_close',
+        message:
+          'HarePVService: server closed the connection with code 1008 (invalid_api_key: Invalid API key); not reconnecting',
+      });
+
+      vi.advanceTimersByTime(60_000);
+      expect(instances).toHaveLength(1);
+
+      // An explicit connect() starts over and resubscribes.
+      service.connect();
+      instances[1]!.open();
+      expect(instances[1]!.parsedSent()).toEqual([{ type: 'subscribe', pvNames: ['PV1'] }]);
+    });
+
+    it('keeps reconnecting on 1008 when terminalCloseCodes is empty, and always on 1006', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new HarePVService({
+        url: BASE_URL,
+        webSocketFactory: factory,
+        terminalCloseCodes: [],
+      });
+      service.connect();
+      instances[0]!.close(1008);
+      vi.advanceTimersByTime(1000);
+      expect(instances).toHaveLength(2);
+
+      const defaults = createFakeWebSocketFactory();
+      new HarePVService({ url: BASE_URL, webSocketFactory: defaults.factory }).connect();
+      defaults.instances[0]!.close(1006);
+      vi.advanceTimersByTime(1000);
+      expect(defaults.instances).toHaveLength(2);
+    });
+  });
 });

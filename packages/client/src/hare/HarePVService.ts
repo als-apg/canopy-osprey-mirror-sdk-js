@@ -42,6 +42,14 @@ export interface HarePVServiceOptions {
   pongTimeoutMs?: number;
   /** Injectable for tests / Node consumers. Default: globalThis.WebSocket. */
   webSocketFactory?: WebSocketFactory;
+  /**
+   * Close codes after which the service stops reconnecting (status
+   * `disconnected`, `onError` with `ws_terminal_close`) until `connect()` is
+   * called again. Default `[1008]` (Canopy's "invalid API key"). Browsers
+   * report a rejected handshake as 1006, which never stops the service; pass
+   * `[]` to always reconnect.
+   */
+  terminalCloseCodes?: number[];
   /** Injectable for tests / Node consumers. Default: globalThis.fetch. */
   fetchFn?: FetchLike;
   onError?: (error: HareError) => void;
@@ -118,7 +126,7 @@ export class HarePVService implements PVService {
       pingIntervalMs: options.pingIntervalMs,
       pongTimeoutMs: options.pongTimeoutMs,
       webSocketFactory: options.webSocketFactory,
-      terminalCloseCodes: [],
+      terminalCloseCodes: options.terminalCloseCodes,
       label: 'HarePVService',
       onOpen: () => this.resubscribeAll(),
       onFrame: (frame) => this.handleFrame(frame),

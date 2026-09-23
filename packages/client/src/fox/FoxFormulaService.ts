@@ -29,6 +29,14 @@ export interface FoxFormulaServiceOptions {
   pongTimeoutMs?: number;
   /** Injectable for tests / Node consumers. Default: globalThis.WebSocket. */
   webSocketFactory?: WebSocketFactory;
+  /**
+   * Close codes after which the service stops reconnecting (status
+   * `disconnected`, `onError` with `ws_terminal_close`) until `connect()` is
+   * called again. Default `[1008]` (Canopy's "invalid API key"). Browsers
+   * report a rejected handshake as 1006, which never stops the service; pass
+   * `[]` to always reconnect.
+   */
+  terminalCloseCodes?: number[];
   /** Connection-level errors and error frames that match no subscription. */
   onError?: (error: FoxError) => void;
   onStatusChange?: (status: FoxConnectionStatus) => void;
@@ -111,7 +119,7 @@ export class FoxFormulaService {
       pingIntervalMs: options.pingIntervalMs,
       pongTimeoutMs: options.pongTimeoutMs,
       webSocketFactory: options.webSocketFactory,
-      terminalCloseCodes: [],
+      terminalCloseCodes: options.terminalCloseCodes,
       label: 'FoxFormulaService',
       onOpen: () => this.resubscribeAll(),
       onFrame: (frame) => this.handleFrame(frame),

@@ -429,4 +429,48 @@ describe('FoxFormulaService', () => {
       expect(onStatusChange.mock.calls).toEqual([['connecting'], ['connected'], ['disconnected']]);
     });
   });
+
+  describe('terminal close codes', () => {
+    it('stops reconnecting after a 1008 close and keeps subscriptions for a later connect()', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const onError = vi.fn<(error: FoxError) => void>();
+      const service = new FoxFormulaService({
+        baseUrl: BASE_URL,
+        webSocketFactory: factory,
+        onError,
+      });
+      service.connect();
+      service.subscribe(makeSpec(), { onResult: vi.fn() });
+      instances[0]!.open();
+      instances[0]!.message({ type: 'subscribed', id: 'srv-1' });
+
+      instances[0]!.close(1008, 'invalid_api_key');
+
+      expect(service.status).toBe('disconnected');
+      expect(onError).toHaveBeenCalledExactlyOnceWith({
+        code: 'ws_terminal_close',
+        message:
+          'FoxFormulaService: server closed the connection with code 1008 (invalid_api_key); not reconnecting',
+      });
+      vi.advanceTimersByTime(60_000);
+      expect(instances).toHaveLength(1);
+
+      service.connect();
+      instances[1]!.open();
+      expect(instances[1]!.parsedSent()).toEqual([{ type: 'subscribe', spec: makeSpec() }]);
+    });
+
+    it('keeps reconnecting on 1008 when terminalCloseCodes is empty', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new FoxFormulaService({
+        baseUrl: BASE_URL,
+        webSocketFactory: factory,
+        terminalCloseCodes: [],
+      });
+      service.connect();
+      instances[0]!.close(1008);
+      vi.advanceTimersByTime(1000);
+      expect(instances).toHaveLength(2);
+    });
+  });
 });
