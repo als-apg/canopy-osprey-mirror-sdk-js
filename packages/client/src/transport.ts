@@ -31,7 +31,29 @@ export interface WebSocketLike {
 
 export type WebSocketFactory = (url: string) => WebSocketLike;
 
+/**
+ * `FormData` when the consumer's type universe declares one (the DOM lib, or
+ * `@types/node`), `never` otherwise. Resolved in the consumer's program, so a
+ * DOM app sees `body?: string | FormData` while this package itself (which
+ * compiles without either lib) sees `body?: string`.
+ */
+export type HostFormData = typeof globalThis extends {
+  FormData: abstract new (...args: never) => infer F;
+}
+  ? F
+  : never;
+
+/**
+ * Minimal `fetch` shape used by every REST call. The global `fetch` (browser
+ * or Node) satisfies it, as do simple test fakes.
+ *
+ * `body` is the JSON-serialized request body, or the caller's `FormData`
+ * passed through untouched for multipart requests; it is absent for requests
+ * without a body. At runtime `canopyFetch` also passes `signal` when the
+ * caller provided one (not declared here so the global `fetch` stays
+ * assignable).
+ */
 export type FetchLike = (
   url: string,
-  init: { method: string; headers: Record<string, string>; body: string }
+  init: { method: string; headers: Record<string, string>; body?: string | HostFormData }
 ) => Promise<{ ok: boolean; status: number; text(): Promise<string> }>;

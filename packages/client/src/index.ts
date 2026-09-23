@@ -7,6 +7,7 @@ export * from './alarm.js';
 
 export type {
   FetchLike,
+  HostFormData,
   WebSocketCloseEventLike,
   WebSocketFactory,
   WebSocketLike,
@@ -27,6 +28,7 @@ export type {
   CanopyConnection,
   CanopyFetchOptions,
   ErrorEnvelope,
+  ValidationIssue,
 } from './rest/canopyFetch.js';
 export { CanopyError, canopyFetch } from './rest/canopyFetch.js';
 

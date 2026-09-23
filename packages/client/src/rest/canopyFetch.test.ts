@@ -118,3 +118,166 @@ describe('canopyFetch', () => {
     await expect(canopyFetch({ baseUrl: BASE_URL, fetch: fetchFn }, '/x')).resolves.toBeUndefined();
   });
 });
+
+describe('canopyFetch error normalization (FastAPI bodies without a code)', () => {
+  async function errorFor(status: number, text: string): Promise<CanopyError> {
+    const fetchFn = makeFetchMock({ ok: false, status, text });
+    const error = await canopyFetch({ baseUrl: BASE_URL, fetch: fetchFn }, '/x').catch(
+      (err: unknown) => err
+    );
+    expect(error).toBeInstanceOf(CanopyError);
+    return error as CanopyError;
+  }
+
+  it('maps a request-validation array to validation_error with issues and a readable detail', async () => {
+    const error = await errorFor(
+      422,
+      JSON.stringify({
+        detail: [
+          {
+            type: 'literal_error',
+            loc: ['body', 'action'],
+            msg: "Input should be 'pause', 'resume' or 'stop'",
+            input: 'explode',
+            ctx: { expected: "'pause', 'resume' or 'stop'" },
+          },
+          {
+            type: 'value_error',
+            loc: ['body', 'variables', 0, 'lower'],
+            msg: 'Value error, lower > upper',
+          },
+        ],
+      })
+    );
+
+    expect(error.code).toBe('validation_error');
+    expect(error.status).toBe(422);
+    expect(error.detail).toBe(
+      "body.action: Input should be 'pause', 'resume' or 'stop'; body.variables[0].lower: Value error, lower > upper"
+    );
+    expect(error.message).toBe(`validation_error (422): ${error.detail}`);
+    expect(error.issues).toEqual([
+      {
+        loc: ['body', 'action'],
+        msg: "Input should be 'pause', 'resume' or 'stop'",
+        type: 'literal_error',
+        input: 'explode',
+        ctx: { expected: "'pause', 'resume' or 'stop'" },
+      },
+      {
+        loc: ['body', 'variables', 0, 'lower'],
+        msg: 'Value error, lower > upper',
+        type: 'value_error',
+      },
+    ]);
+  });
+
+  it('normalizes malformed validation entries instead of leaking objects into detail', async () => {
+    const error = await errorFor(422, JSON.stringify({ detail: ['plain text', { weird: 1 }] }));
+    expect(error.issues).toEqual([
+      { loc: [], msg: 'plain text', type: 'unknown' },
+      { loc: [], msg: '{"weird":1}', type: 'unknown' },
+    ]);
+    expect(error.detail).toBe('plain text; {"weird":1}');
+
+    const empty = await errorFor(422, '{"detail":[]}');
+    expect(empty.detail).toBe('Request validation failed');
+    expect(empty.issues).toEqual([]);
+  });
+
+  it('maps a bare string detail to not_found for 404 and http_error otherwise', async () => {
+    await expect(errorFor(404, '{"detail":"Not Found"}')).resolves.toMatchObject({
+      code: 'not_found',
+      status: 404,
+      detail: 'Not Found',
+      issues: undefined,
+    });
+    await expect(errorFor(405, '{"detail":"Method Not Allowed"}')).resolves.toMatchObject({
+      code: 'http_error',
+      status: 405,
+      detail: 'Method Not Allowed',
+    });
+  });
+
+  it('stringifies a structured (non-array) detail', async () => {
+    const error = await errorFor(400, '{"detail":{"reason":"bad","field":"x"}}');
+    expect(error.code).toBe('http_error');
+    expect(error.detail).toBe('{"reason":"bad","field":"x"}');
+  });
+
+  it('keeps an envelope code even when the detail is missing or an array', async () => {
+    await expect(errorFor(409, '{"code":"run_invalid_state"}')).resolves.toMatchObject({
+      code: 'run_invalid_state',
+      detail: '{"code":"run_invalid_state"}',
+    });
+    const withIssues = await errorFor(
+      422,
+      '{"code":"routine_invalid","detail":[{"loc":["body"],"msg":"m","type":"t"}]}'
+    );
+    expect(withIssues.code).toBe('routine_invalid');
+    expect(withIssues.detail).toBe('body: m');
+  });
+
+  it('falls back to unknown_error with the raw text for JSON that is not an object', async () => {
+    await expect(errorFor(500, '"oops"')).resolves.toMatchObject({
+      code: 'unknown_error',
+      detail: '"oops"',
+    });
+    await expect(errorFor(500, '{"message":"boom"}')).resolves.toMatchObject({
+      code: 'unknown_error',
+      detail: '{"message":"boom"}',
+    });
+  });
+
+  it('CanopyError.detail is always a string', () => {
+    const error = new CanopyError('x', 400, [{ a: 1 }] as unknown as string);
+    expect(error.detail).toBe('[{"a":1}]');
+    expect(error.message).toBe('x (400): [{"a":1}]');
+    expect(new CanopyError('x', 400, 'plain').issues).toBeUndefined();
+  });
+});
+
+describe('canopyFetch FormData bodies', () => {
+  type FormDataLike = { append(name: string, value: string): void };
+  const FormDataCtor = (globalThis as unknown as { FormData: new () => FormDataLike }).FormData;
+
+  it('passes a FormData body through untouched, without a JSON Content-Type', async () => {
+    const fetchFn = makeFetchMock({ ok: true, status: 201, text: '{"id":"e1"}' });
+    const form = new FormDataCtor();
+    form.append('title', 'Run summary');
+
+    const result = await canopyFetch(
+      { baseUrl: BASE_URL, apiKey: 'k', fetch: fetchFn },
+      '/v2/entries',
+      { method: 'POST', body: form }
+    );
+
+    expect(result).toEqual({ id: 'e1' });
+    const [, init] = fetchFn.mock.calls[0]!;
+    expect(init.method).toBe('POST');
+    expect(init.body).toBe(form);
+    expect(init.headers).toEqual({ Accept: 'application/json', 'X-API-Key': 'k' });
+  });
+
+  it('recognizes a FormData from another realm by its toStringTag', async () => {
+    const fetchFn = makeFetchMock({ ok: true, status: 204 });
+    const foreign = { [Symbol.toStringTag]: 'FormData', append() {} };
+
+    await canopyFetch({ baseUrl: BASE_URL, fetch: fetchFn }, '/x', {
+      method: 'POST',
+      body: foreign,
+    });
+
+    const [, init] = fetchFn.mock.calls[0]!;
+    expect(init.body).toBe(foreign);
+    expect(init.headers['Content-Type']).toBeUndefined();
+  });
+
+  it('still JSON-serializes plain objects, arrays and strings', async () => {
+    const fetchFn = makeFetchMock({ ok: true, status: 204 });
+    await canopyFetch({ baseUrl: BASE_URL, fetch: fetchFn }, '/x', { method: 'POST', body: 'a' });
+    await canopyFetch({ baseUrl: BASE_URL, fetch: fetchFn }, '/x', { method: 'POST', body: [1] });
+
+    expect(fetchFn.mock.calls.map(([, init]) => init.body)).toEqual(['"a"', '[1]']);
+  });
+});
