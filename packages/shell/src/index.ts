@@ -24,3 +24,9 @@ export {
 
 export { ColorModeTheme } from './ColorModeTheme.js';
 export type { ColorModeThemeProps } from './ColorModeTheme.js';
+
+export { SideNavRail, findActiveNavItem } from './SideNavRail.js';
+export type { NavItem, SideNavRailProps } from './SideNavRail.js';
+
+export { AppShell } from './AppShell.js';
+export type { AppShellProps } from './AppShell.js';

@@ -72,3 +72,166 @@
 .canopy-header--with-menu .cds--header__menu-trigger {
   display: flex !important;
 }
+
+/* ------------------------------------------------------------- AppShell -- */
+
+.canopy-shell {
+  --canopy-header-height: 3rem;
+  --canopy-rail-expanded-width: 16rem;
+  --canopy-rail-collapsed-width: 3rem;
+  --canopy-rail-transition: 0.11s ease;
+
+  position: relative;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--cds-background);
+}
+
+/* The shell always pins its header, whether or not `fixed` was passed. */
+.canopy-shell .cds--header.canopy-header {
+  position: fixed;
+}
+
+.canopy-shell__main {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - var(--canopy-header-height));
+  margin-top: var(--canopy-header-height);
+  margin-left: 0;
+  overflow: hidden;
+  background-color: var(--cds-background);
+  transition: margin-left var(--canopy-rail-transition);
+}
+
+.canopy-shell__main:focus {
+  outline: none;
+}
+
+.canopy-shell--rail-expanded .canopy-shell__main {
+  margin-left: var(--canopy-rail-expanded-width);
+}
+
+.canopy-shell--rail-collapsed .canopy-shell__main {
+  margin-left: var(--canopy-rail-collapsed-width);
+}
+
+.canopy-shell__banners {
+  flex-shrink: 0;
+}
+
+/* Banners span the content width, squared off (react-squirrel). */
+.canopy-shell__banners .cds--inline-notification,
+.canopy-shell__banners .cds--actionable-notification {
+  max-width: 100%;
+  border-radius: 0;
+}
+
+.canopy-shell__content {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* ---------------------------------------------------------- SideNavRail -- */
+
+.canopy-rail {
+  position: fixed;
+  top: var(--canopy-header-height, 3rem);
+  bottom: 0;
+  left: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  width: var(--canopy-rail-expanded-width, 16rem);
+  overflow: hidden;
+  background-color: var(--cds-layer);
+  border-right: 1px solid var(--cds-border-subtle);
+  transition: width var(--canopy-rail-transition, 0.11s ease);
+}
+
+/* Collapsed: icons only, so nothing to clip, and tooltips must escape the rail. */
+.canopy-rail--collapsed {
+  width: var(--canopy-rail-collapsed-width, 3rem);
+  overflow: visible;
+}
+
+.canopy-rail__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.canopy-rail .canopy-rail__tooltip,
+.canopy-rail .canopy-rail__tooltip .cds--tooltip-trigger__wrapper {
+  display: block;
+}
+
+.canopy-rail__link {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  height: 3rem;
+  padding: 0 0.875rem;
+  overflow: hidden;
+  color: var(--cds-text-secondary);
+  font-size: 0.875rem;
+  white-space: nowrap;
+  text-decoration: none;
+  background-color: transparent;
+  border-left: 3px solid transparent;
+}
+
+.canopy-rail__link:hover {
+  color: var(--cds-text-primary);
+  background-color: var(--cds-layer-hover);
+}
+
+.canopy-rail__link[aria-current='page'] {
+  color: var(--cds-link-primary);
+  font-weight: 600;
+  background-color: var(--cds-layer-selected);
+  border-left-color: var(--cds-link-primary);
+}
+
+.canopy-rail__link[aria-current='page']:hover {
+  background-color: var(--cds-layer-selected-hover);
+}
+
+.canopy-rail__link:focus {
+  outline: 2px solid var(--cds-focus);
+  outline-offset: -2px;
+}
+
+.canopy-rail__link:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.canopy-rail__icon {
+  flex-shrink: 0;
+  fill: currentColor;
+}
+
+.canopy-rail__icon--initial {
+  width: 20px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.canopy-rail__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.canopy-rail__footer {
+  margin-top: auto;
+  border-top: 1px solid var(--cds-border-subtle);
+}
+
+.canopy-rail__footer-slot {
+  padding: 0.5rem;
+}
+
+.canopy-rail--collapsed .canopy-rail__footer-slot {
+  padding: 0.25rem;
+}
