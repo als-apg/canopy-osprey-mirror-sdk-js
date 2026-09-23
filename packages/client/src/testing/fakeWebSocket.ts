@@ -1,7 +1,7 @@
 import type { WebSocketCloseEventLike, WebSocketFactory, WebSocketLike } from '../transport.js';
 
-// Excluded from the built package (see tsconfig.build.json) — import only
-// from tests.
+// Published as part of `@slaclab/canopy-client/testing` (see ./index.ts).
+// Keep it free of test-runner imports: consumers use it from any framework.
 
 const READY_STATE_CONNECTING = 0;
 const READY_STATE_OPEN = 1;
