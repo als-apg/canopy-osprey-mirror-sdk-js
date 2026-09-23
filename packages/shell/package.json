@@ -2,7 +2,7 @@
   "name": "@slaclab/canopy-shell",
   "version": "0.1.2",
   "private": false,
-  "description": "The standard Canopy app chrome — Carbon AppHeader and light/dark theme store",
+  "description": "The standard Canopy app chrome — SLAC-branded Carbon AppHeader, g10/g100 color-mode store, AppShell/SideNavRail layout, toasts, confirm dialogs and an error boundary",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/slaclab/canopy-sdk-js.git",

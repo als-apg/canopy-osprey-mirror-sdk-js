@@ -26,3 +26,14 @@ for registry setup.
   `useCanopyJob`/`useJob`, `usePV`.
 - [`@slaclab/canopy-vite`](vite.md): Vite dev proxy that forwards the Canopy
   API (and elog) and injects the API key server-side.
+
+## UI packages
+
+- [`@slaclab/canopy-shell`](shell.md): the SLAC-branded app chrome —
+  `AppHeader`, the g10/g100 color-mode store, `AppShell`/`SideNavRail`
+  layout, toasts, confirm dialogs, and `ErrorBoundary`.
+- [`@slaclab/canopy-charts`](charts.md): Carbon-themed ECharts helpers —
+  chart themes, `baseChartOption`, the `CanopyChart` wrapper, PNG capture,
+  categorical palettes, and number formatters.
+- `@slaclab/canopy-screen-ir`: the Screen IR contract (`*.screen.json`
+  schema, types and `validate()`); see its package in the repository.
