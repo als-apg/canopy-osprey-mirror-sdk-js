@@ -24,7 +24,9 @@ export type {
   PropertyTagged,
   Props,
   UnknownWidgetProps,
+  Action,
 } from './widget.js';
+export { isAction, readActions } from './widget.js';
 
 export type { Rule, RulePvBinding, RuleCondition } from './rules.js';
 
