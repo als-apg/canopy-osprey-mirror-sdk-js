@@ -79,6 +79,23 @@ describe('createFakeFetch', () => {
     expect(statuses).toEqual(['pending', 'completed', 'completed']);
   });
 
+  it('sequences may mix fixed responses and handlers', async () => {
+    const fetch = createFakeFetch({
+      '/j': [
+        jsonResponse('first'),
+        () => {
+          throw new Error('blip');
+        },
+        (req) => jsonResponse(req.query.n),
+      ],
+    });
+    const conn = { baseUrl: 'http://canopy', fetch };
+    await expect(canopyFetch(conn, '/j')).resolves.toBe('first');
+    await expect(canopyFetch(conn, '/j')).rejects.toMatchObject({ code: 'network_error' });
+    await expect(canopyFetch(conn, '/j', { query: { n: 3 } })).resolves.toBe('3');
+    await expect(canopyFetch(conn, '/j', { query: { n: 4 } })).resolves.toBe('4');
+  });
+
   it('a path-only route answers any method; method routes are exact', async () => {
     const fetch = createFakeFetch({
       'DELETE /runs/:id': jsonResponse(undefined, { status: 204 }),

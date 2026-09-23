@@ -14,5 +14,6 @@ export type {
   FakeResponse,
   FakeRoute,
   FakeRouteHandler,
+  FakeRouteStep,
   FakeRoutes,
 } from './fakeFetch.js';

@@ -48,12 +48,14 @@ export interface FakeFetchRequest {
 
 export type FakeRouteHandler = (req: FakeFetchRequest) => FakeResponse | Promise<FakeResponse>;
 
+/** A fixed response, or a handler (throw from it to simulate a network failure). */
+export type FakeRouteStep = FakeResponse | FakeRouteHandler;
+
 /**
- * What a route answers with: a fixed response, a sequence (one per call,
- * repeating the last), or a handler (throw from it to simulate a network
- * failure).
+ * What a route answers with: a fixed response, a handler, or a sequence of
+ * either (one per call, repeating the last).
  */
-export type FakeRoute = FakeResponse | FakeResponse[] | FakeRouteHandler;
+export type FakeRoute = FakeRouteStep | FakeRouteStep[];
 
 /**
  * Routes keyed by `'METHOD /path'` or `'/path'` (any method). Path segments
@@ -185,13 +187,12 @@ export function createFakeFetch(
       const { response } = route;
       const index = route.calls;
       route.calls += 1;
-      if (typeof response === 'function') return response(req);
+      let step: FakeRouteStep | undefined = response as FakeRouteStep;
       if (Array.isArray(response)) {
-        const pick = response[Math.min(index, response.length - 1)];
-        if (!pick) throw new Error(`createFakeFetch: route '${route.key}' has an empty sequence`);
-        return pick;
+        step = response[Math.min(index, response.length - 1)];
+        if (!step) throw new Error(`createFakeFetch: route '${route.key}' has an empty sequence`);
       }
-      return response;
+      return typeof step === 'function' ? step(req) : step;
     }
     return jsonResponse({ detail: `No fake route for ${req.method} ${req.path}` }, { status: 404 });
   };
