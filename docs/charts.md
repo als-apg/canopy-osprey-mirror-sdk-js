@@ -31,6 +31,10 @@ const option: EChartsOption = {
 - **`useChartTheme()`** is the only helper tied to the shell store.
 - **`baseChartOption`** turns animation off and themes the background, axes,
   tooltip (with a dashed crosshair) and legend.
+- Besides the axis and tooltip colors, a theme carries semantic marker colors
+  for annotations that must not borrow a series color: `danger` (infeasible
+  points, violations), `success`, `warning` (a "best" marker), `selection` (the
+  selected point) and `highlight` (shaded `markArea` bands).
 
 ## `CanopyChart`
 

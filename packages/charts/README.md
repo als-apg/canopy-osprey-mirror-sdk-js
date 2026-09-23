@@ -30,22 +30,32 @@ ECharts draws on a canvas, so Carbon's CSS tokens can't reach it. A
 `ChartTheme` holds the resolved token values instead, and the helpers write them
 into the option object. No ECharts theme is registered.
 
-| Field           | Carbon token       | g10 (light) | g100 (dark) |
-| --------------- | ------------------ | ----------- | ----------- |
-| `bg`            | `background`       | `#f4f4f4`   | `#161616`   |
-| `axisLabel`     | `text-secondary`   | `#525252`   | `#c6c6c6`   |
-| `axisLine`      | `border-strong-01` | `#8d8d8d`   | `#6f6f6f`   |
-| `splitLine`     | `layer-accent-01`  | `#e0e0e0`   | `#393939`   |
-| `axisName`      | `text-helper`      | `#6f6f6f`   | `#a8a8a8`   |
-| `tooltipBg`     | `layer-01`         | `#ffffff`   | `#262626`   |
-| `tooltipBorder` | `border-subtle-01` | `#e0e0e0`   | `#525252`   |
-| `tooltipText`   | `text-primary`     | `#161616`   | `#f4f4f4`   |
-| `tooltipMuted`  | `text-helper`      | `#6f6f6f`   | `#a8a8a8`   |
-| `crosshair`     | `text-helper`      | `#6f6f6f`   | `#a8a8a8`   |
-| `legend`        | `text-secondary`   | `#525252`   | `#c6c6c6`   |
+| Field           | Carbon token         | g10 (light) | g100 (dark) |
+| --------------- | -------------------- | ----------- | ----------- |
+| `bg`            | `background`         | `#f4f4f4`   | `#161616`   |
+| `axisLabel`     | `text-secondary`     | `#525252`   | `#c6c6c6`   |
+| `axisLine`      | `border-strong-01`   | `#8d8d8d`   | `#6f6f6f`   |
+| `splitLine`     | `layer-accent-01`    | `#e0e0e0`   | `#393939`   |
+| `axisName`      | `text-helper`        | `#6f6f6f`   | `#a8a8a8`   |
+| `tooltipBg`     | `layer-01`           | `#ffffff`   | `#262626`   |
+| `tooltipBorder` | `border-subtle-01`   | `#e0e0e0`   | `#525252`   |
+| `tooltipText`   | `text-primary`       | `#161616`   | `#f4f4f4`   |
+| `tooltipMuted`  | `text-helper`        | `#6f6f6f`   | `#a8a8a8`   |
+| `crosshair`     | `text-helper`        | `#6f6f6f`   | `#a8a8a8`   |
+| `legend`        | `text-secondary`     | `#525252`   | `#c6c6c6`   |
+| `danger`        | `support-error`      | `#da1e28`   | `#fa4d56`   |
+| `success`       | `support-success`    | `#24a148`   | `#42be65`   |
+| `warning`       | `support-warning`    | `#f1c21b`   | `#f1c21b`   |
+| `selection`     | `border-interactive` | `#0f62fe`   | `#4589ff`   |
+| `highlight`     | `highlight`          | `#d0e2ff`   | `#001d6c`   |
 
 The values come from `@carbon/themes` 11.76. They match the page themes of
 `@slaclab/canopy-shell` (`CARBON_THEME`: g10 light, g100 dark).
+
+The last five are semantic marker colors, for data annotations that must not
+borrow a series color: `danger` for infeasible points and violations,
+`warning` for a "best" marker, `selection` for a selected point or cursor line,
+and `highlight` for a shaded band (`markArea`, usually with some opacity).
 
 - `chartThemeFor(mode)` and `CHART_THEMES` are pure lookups with no dependency
   on the shell store. Apps that keep their own color-mode state use these.

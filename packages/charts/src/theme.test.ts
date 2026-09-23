@@ -15,6 +15,11 @@ const KEYS: (keyof ChartTheme)[] = [
   'tooltipMuted',
   'crosshair',
   'legend',
+  'danger',
+  'success',
+  'warning',
+  'selection',
+  'highlight',
 ];
 
 describe('CHART_THEMES', () => {
@@ -31,6 +36,23 @@ describe('CHART_THEMES', () => {
     expect(CHART_THEMES.dark.bg).toBe('#161616');
     expect(CHART_THEMES.dark.tooltipBg).toBe('#262626');
     expect(CHART_THEMES.dark.tooltipText).toBe('#f4f4f4');
+  });
+
+  it('resolves the semantic marker colors from the Carbon support/interactive tokens', () => {
+    expect(CHART_THEMES.light).toMatchObject({
+      danger: '#da1e28', // support-error
+      success: '#24a148', // support-success
+      warning: '#f1c21b', // support-warning
+      selection: '#0f62fe', // border-interactive
+      highlight: '#d0e2ff', // highlight
+    });
+    expect(CHART_THEMES.dark).toMatchObject({
+      danger: '#fa4d56',
+      success: '#42be65',
+      warning: '#f1c21b',
+      selection: '#4589ff',
+      highlight: '#001d6c',
+    });
   });
 
   it('is frozen', () => {
