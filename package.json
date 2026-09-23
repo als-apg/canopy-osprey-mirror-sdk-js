@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "pnpm -r run build",
+    "build:watch": "pnpm -r --parallel exec tsc -p tsconfig.build.json --watch --preserveWatchOutput",
     "test": "pnpm run build && pnpm -r run test",
     "test:watch": "pnpm -r --parallel run test:watch",
     "test:coverage": "pnpm run build && pnpm -r run test:coverage",
