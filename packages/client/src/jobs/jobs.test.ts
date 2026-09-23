@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FetchLike } from '../hare/HarePVService.js';
 import type { AbortSignalLike, CanopyConnection } from '../rest/canopyFetch.js';
-import { JobFailedError, awaitJob, getJob } from './jobs.js';
+import { CanopyError } from '../rest/canopyFetch.js';
+import { JobFailedError, awaitJob, getJob, isJobNotFoundError } from './jobs.js';
 import type { JobStatusDTO } from './types.js';
 
 /**
@@ -164,5 +165,89 @@ describe('awaitJob', () => {
 
     await vi.advanceTimersByTimeAsync(10_000);
     expect(fetchFn).toHaveBeenCalledTimes(1); // no polls after the abort
+  });
+});
+
+describe('awaitJob notFoundGraceMs', () => {
+  const NOT_FOUND = { status: 404, body: { code: 'job_not_found', detail: "Job 'j' not found" } };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('by default rejects on the first job_not_found (unchanged behaviour)', async () => {
+    const { conn, fetchFn } = makeSequenceConn([NOT_FOUND, { body: makeJob() }]);
+
+    await expect(awaitJob(conn, 'job-1', { pollMs: 100 })).rejects.toMatchObject({
+      code: 'job_not_found',
+      status: 404,
+    });
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps polling through job_not_found while within the grace period', async () => {
+    const done = makeJob({ status: 'completed' });
+    const { conn, fetchFn } = makeSequenceConn([
+      NOT_FOUND, // still queued on a non-default queue
+      NOT_FOUND,
+      { body: makeJob({ status: 'running' }) },
+      { body: done },
+    ]);
+
+    const promise = awaitJob(conn, 'job-1', { pollMs: 100, notFoundGraceMs: 1000 });
+    await vi.advanceTimersByTimeAsync(300);
+
+    await expect(promise).resolves.toEqual(done);
+    expect(fetchFn).toHaveBeenCalledTimes(4);
+  });
+
+  it('rethrows the 404 once the grace period is over', async () => {
+    const { conn, fetchFn } = makeSequenceConn([NOT_FOUND]);
+
+    const promise = awaitJob(conn, 'job-1', { pollMs: 100, notFoundGraceMs: 250 });
+    promise.catch(() => {});
+    // Polls at t=0/100/200 are inside the grace; the one at t=300 is not.
+    await vi.advanceTimersByTimeAsync(300);
+
+    await expect(promise).rejects.toMatchObject({ code: 'job_not_found', status: 404 });
+    expect(fetchFn).toHaveBeenCalledTimes(4);
+  });
+
+  it('does not extend the grace to other errors (e.g. a plain 404 from a misrouted proxy)', async () => {
+    const { conn } = makeSequenceConn([{ status: 404, body: { detail: 'Not Found' } }]);
+
+    await expect(
+      awaitJob(conn, 'job-1', { pollMs: 100, notFoundGraceMs: 10_000 })
+    ).rejects.toMatchObject({ code: 'not_found', status: 404 });
+  });
+
+  it('reports a job that never appeared when timeoutMs elapses first', async () => {
+    const { conn } = makeSequenceConn([NOT_FOUND]);
+
+    const promise = awaitJob(conn, 'job-1', {
+      pollMs: 100,
+      timeoutMs: 250,
+      notFoundGraceMs: Infinity,
+    });
+    promise.catch(() => {});
+    await vi.advanceTimersByTimeAsync(250);
+
+    await expect(promise).rejects.toMatchObject({
+      code: 'job_timeout',
+      detail: 'Job job-1 still not found after 250ms',
+    });
+  });
+});
+
+describe('isJobNotFoundError', () => {
+  it('matches only a 404 CanopyError with code job_not_found', () => {
+    expect(isJobNotFoundError(new CanopyError('job_not_found', 404, 'x'))).toBe(true);
+    expect(isJobNotFoundError(new CanopyError('not_found', 404, 'x'))).toBe(false);
+    expect(isJobNotFoundError(new CanopyError('job_not_found', 500, 'x'))).toBe(false);
+    expect(isJobNotFoundError(new Error('job_not_found'))).toBe(false);
   });
 });
