@@ -6,6 +6,14 @@ icon: lucide/rocket
 
 For full documentation visit [zensical.org](https://zensical.org/docs/).
 
+<!-- ui-packages:start (canopy-shell, canopy-charts) -->
+
+## UI packages
+
+- [App shell](shell.md): `@slaclab/canopy-shell`, the SLAC header, g10/g100 color mode, layout, toasts, confirm dialogs, error boundary
+- [Charts](charts.md): `@slaclab/canopy-charts`, Carbon-themed ECharts helpers, `CanopyChart`, PNG capture, formatters
+<!-- ui-packages:end -->
+
 ## Commands
 
 - [`zensical new`][new] - Create a new project
