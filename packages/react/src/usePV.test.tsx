@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, renderHook } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { AlarmSeverity, MockPVService } from '@slaclab/canopy-client';
+import { AlarmSeverity, DISCONNECTED_PV, MockPVService } from '@slaclab/canopy-client';
+import type { PVData, PVListener, PVService } from '@slaclab/canopy-client';
 import { PVServiceProvider } from './PVServiceProvider.js';
 import { usePVService } from './pvServiceContext.js';
 import { usePV } from './usePV.js';
@@ -88,5 +89,92 @@ describe('usePVService', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     expect(() => renderHook(() => usePVService())).toThrow(/PVServiceProvider/);
     consoleError.mockRestore();
+  });
+});
+
+describe('usePV when the PV name changes', () => {
+  /** A PVService that only delivers when the test pushes (no synchronous replay). */
+  function makeManualService(snapshots: Record<string, PVData> = {}) {
+    const listeners = new Map<string, Set<PVListener>>();
+    const manual: PVService = {
+      subscribe(pvName, listener) {
+        const set = listeners.get(pvName) ?? new Set<PVListener>();
+        set.add(listener);
+        listeners.set(pvName, set);
+        return () => set.delete(listener);
+      },
+      put: vi.fn(),
+      getSnapshot: (pvName) => snapshots[pvName],
+      connect() {},
+      disconnect() {},
+      isConnected: true,
+    };
+    const push = (pvName: string, value: number) => {
+      const data: PVData = {
+        ...DISCONNECTED_PV,
+        value,
+        displayValue: String(value),
+        connected: true,
+      };
+      act(() => {
+        for (const listener of listeners.get(pvName) ?? []) listener(data);
+      });
+    };
+    return { manual, push, listeners };
+  }
+
+  function renderWith(manual: PVService, initialPv: string | undefined) {
+    const manualWrapper = ({ children }: { children: ReactNode }) => (
+      <PVServiceProvider service={manual}>{children}</PVServiceProvider>
+    );
+    return renderHook(({ pv }: { pv: string | undefined }) => usePV(pv), {
+      wrapper: manualWrapper,
+      initialProps: { pv: initialPv },
+    });
+  }
+
+  it("never shows the previous PV's value while the new one has no data yet", () => {
+    const { manual, push } = makeManualService();
+    const { result, rerender } = renderWith(manual, 'A');
+
+    push('A', 5);
+    expect(result.current).toMatchObject({ address: 'A', value: 5, connected: true });
+
+    rerender({ pv: 'B' });
+    expect(result.current).toMatchObject({
+      address: 'B',
+      value: DISCONNECTED_PV.value,
+      displayValue: '---',
+      connected: false,
+    });
+
+    push('B', 7);
+    expect(result.current).toMatchObject({ address: 'B', value: 7, connected: true });
+  });
+
+  it("shows the service's cached snapshot for the new PV immediately", () => {
+    const cached: PVData = { ...DISCONNECTED_PV, value: 42, displayValue: '42', connected: true };
+    const { manual, push } = makeManualService({ B: cached });
+    const { result, rerender } = renderWith(manual, 'A');
+    push('A', 5);
+
+    rerender({ pv: 'B' });
+    expect(result.current).toMatchObject({ address: 'B', value: 42, connected: true });
+  });
+
+  it('ignores a late update from the previous subscription and resets for undefined', () => {
+    const { manual, push, listeners } = makeManualService();
+    const { result, rerender } = renderWith(manual, 'A');
+    const staleListener = [...listeners.get('A')!][0]!;
+
+    rerender({ pv: 'B' });
+    act(() => {
+      staleListener({ ...DISCONNECTED_PV, value: 99, connected: true });
+    });
+    expect(result.current).toMatchObject({ address: 'B', connected: false });
+
+    push('B', 1);
+    rerender({ pv: undefined });
+    expect(result.current).toMatchObject({ address: '', connected: false, displayValue: '---' });
   });
 });
