@@ -1,0 +1,60 @@
+# @slaclab/canopy-vite
+
+Dev-server tooling for Canopy apps built with Vite. `canopyDevProxy()`
+returns the `server.proxy` entries that forward the Canopy API (REST and
+WebSockets) to a backend and inject the API key on the server side, so the
+key stays in a git-ignored `.env` and never reaches the browser bundle.
+Peer dependency: `vite` ^6, ^7 or ^8.
+
+The full reference is the
+[package README](https://github.com/slaclab/canopy-sdk-js/tree/main/packages/vite).
+
+## Setup
+
+```ts
+// vite.config.ts
+import { defineConfig, loadEnv } from 'vite';
+import { canopyDevProxy } from '@slaclab/canopy-vite';
+
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  return {
+    server: {
+      proxy: canopyDevProxy({
+        target: env.CANOPY_BASE_URL, // default http://localhost:8000
+        apiKey: env.CANOPY_API_KEY,
+        basePath: '/api/canopy',
+      }),
+    },
+  };
+});
+```
+
+```sh
+# .env — server-side only (no VITE_ prefix)
+CANOPY_BASE_URL=http://localhost:8000
+CANOPY_API_KEY=dev
+```
+
+The app uses the same relative prefix a production reverse proxy would
+serve, and no key:
+
+```ts
+const connection = { baseUrl: '/api/canopy' };
+const wsUrl = toWsUrl(connection.baseUrl, '/optimization/v1/ws/runs'); // from @slaclab/canopy-client
+```
+
+## What it generates
+
+- **`basePath` mode** (default `/api/canopy`): `${basePath}/*` is forwarded
+  to `${target}/*` with the prefix stripped, with `changeOrigin` and
+  `ws: true`.
+- **`modules` mode**: `modules: ['/hare', '/mole', '/fox']` forwards each
+  prefix unchanged (the react-trace / react-squirrel layout, with a
+  same-origin `baseUrl: ''`). It can be combined with `basePath`.
+- **API key**: `X-API-Key` is set on proxied requests and on WebSocket
+  upgrades, and only when a key is configured (`apiKey`, else
+  `CANOPY_API_KEY`).
+- **elog** (opt-in): `elog: { target, accessToken, path }` forwards `/elog`
+  to elog-plus with the prefix stripped and `x-vouch-idp-accesstoken`
+  injected; without a target (`ELOG_BASE_URL`) the route is left out.

@@ -16,6 +16,17 @@ export async function getJob(
   return canopyFetch<JobStatusDTO>(conn, `/jobs/v1/${encodeURIComponent(id)}`, { signal });
 }
 
+/**
+ * True for the 404 `job_not_found` error {@link getJob} throws for an
+ * unknown job id. Canopy also returns it while a job is still queued on a
+ * non-default Arq queue (e.g. optimization dial-in/reset/checkpoint jobs,
+ * which can wait minutes for a worker slot) and after its result expired,
+ * so it means "unknown", not "failed".
+ */
+export function isJobNotFoundError(error: unknown): boolean {
+  return error instanceof CanopyError && error.status === 404 && error.code === 'job_not_found';
+}
+
 /** Thrown by {@link awaitJob} when the job reaches the `failed` state. */
 export class JobFailedError extends CanopyError {
   /** The job's final status snapshot (progress, message, error, ...). */
@@ -38,6 +49,13 @@ export interface AwaitJobOptions {
   timeoutMs?: number;
   /** Abort polling; rejects with the abort reason (an `AbortError` by default). */
   signal?: AbortSignalLike;
+  /**
+   * Treat a 404 `job_not_found` (see {@link isJobNotFoundError}) as "not
+   * visible yet" and keep polling until this long after the call started;
+   * after that the 404 is thrown. Default 0: the first 404 is thrown.
+   * `Infinity` never gives up on a 404 (combine with `timeoutMs`).
+   */
+  notFoundGraceMs?: number;
 }
 
 /**
@@ -48,6 +66,8 @@ export interface AwaitJobOptions {
  * - Rejects with `CanopyError('job_timeout', 0, ...)` when `timeoutMs` elapses.
  * - Rejects with the abort reason when `signal` aborts (in-flight fetches
  *   pass their `AbortError` through; between polls the sleep is cut short).
+ * - A 404 `job_not_found` rejects immediately, unless `notFoundGraceMs`
+ *   allows waiting for the job to show up.
  */
 export async function awaitJob(
   conn: CanopyConnection,
@@ -56,18 +76,27 @@ export async function awaitJob(
 ): Promise<JobStatusDTO> {
   const pollMs = options.pollMs ?? 1000;
   const { timeoutMs, signal } = options;
-  const deadline = timeoutMs !== undefined ? Date.now() + timeoutMs : undefined;
+  const notFoundGraceMs = options.notFoundGraceMs ?? 0;
+  const startedAt = Date.now();
+  const deadline = timeoutMs !== undefined ? startedAt + timeoutMs : undefined;
 
   for (;;) {
     if (signal?.aborted) {
       throw abortReason(signal);
     }
 
-    const job = await getJob(conn, id, signal);
-    if (job.status === 'failed') {
+    let job: JobStatusDTO | undefined;
+    try {
+      job = await getJob(conn, id, signal);
+    } catch (err) {
+      if (!isJobNotFoundError(err) || Date.now() - startedAt >= notFoundGraceMs) {
+        throw err;
+      }
+    }
+    if (job?.status === 'failed') {
       throw new JobFailedError(job);
     }
-    if (isTerminalJobStatus(job.status)) {
+    if (job && isTerminalJobStatus(job.status)) {
       return job;
     }
 
@@ -79,7 +108,8 @@ export async function awaitJob(
     // the deadline instead of overshooting it by up to pollMs.
     const remainingMs = deadline - Date.now();
     if (remainingMs <= 0) {
-      throw new CanopyError('job_timeout', 0, `Job ${id} still ${job.status} after ${timeoutMs}ms`);
+      const state = job?.status ?? 'not found';
+      throw new CanopyError('job_timeout', 0, `Job ${id} still ${state} after ${timeoutMs}ms`);
     }
     await sleep(Math.min(pollMs, remainingMs), signal);
   }

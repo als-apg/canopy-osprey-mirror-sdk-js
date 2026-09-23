@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { usePVService } from './pvServiceContext.js';
-import type { PVData } from '@slaclab/canopy-client';
+import type { PVData, PVService } from '@slaclab/canopy-client';
 import { DISCONNECTED_PV } from '@slaclab/canopy-client';
 
 export interface PVHandle extends PVData {
@@ -8,30 +8,41 @@ export interface PVHandle extends PVData {
   put: (value: number | string | boolean) => void;
 }
 
+/** The last update a subscription delivered, tagged with what it was for. */
+interface Received {
+  service: PVService;
+  pvName: string;
+  data: PVData;
+}
+
 /**
  * The sole PV data access primitive.
  * Returns live PV data including value, alarm severity, connection status,
  * timestamp, units, and limits.
+ *
+ * The data is always for the current `pvName`: after the name (or the
+ * service) changes, it is the service's cached snapshot for the new PV (or
+ * the disconnected placeholder) until the new subscription delivers — never
+ * the previous PV's value.
  */
 export function usePV(pvName: string | undefined): PVHandle {
   const service = usePVService();
-  const [data, setData] = useState<PVData>(
-    pvName ? (service.getSnapshot(pvName) ?? DISCONNECTED_PV) : DISCONNECTED_PV
-  );
+  const [received, setReceived] = useState<Received | null>(null);
 
   useEffect(() => {
-    if (!pvName) {
-      // TODO: refactor so the disconnected case is derived during render
-      // rather than synchronously setting state in this effect. See
-      // react-hooks/set-state-in-effect.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setData(DISCONNECTED_PV);
-      return;
-    }
-
-    const unsubscribe = service.subscribe(pvName, setData);
-    return unsubscribe;
+    if (!pvName) return;
+    return service.subscribe(pvName, (data) => {
+      setReceived({ service, pvName, data });
+    });
   }, [pvName, service]);
+
+  let data: PVData = DISCONNECTED_PV;
+  if (pvName) {
+    data =
+      received !== null && received.service === service && received.pvName === pvName
+        ? received.data
+        : (service.getSnapshot(pvName) ?? DISCONNECTED_PV);
+  }
 
   const put = useCallback(
     (value: number | string | boolean) => {

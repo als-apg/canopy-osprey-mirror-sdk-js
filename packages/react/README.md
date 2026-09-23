@@ -1,8 +1,9 @@
 # @slaclab/canopy-react
 
-React bindings over [`@slaclab/canopy-client`](../client): a context provider for the
+React bindings over [`@slaclab/canopy-client`](../client): an app-wide
+`CanopyProvider` for the `CanopyConnection`, a context provider for the
 `PVService`, the `usePV` hook (ported from `canopy-screen-builder`), and the
-`useJob` polling hook for background jobs.
+`useJob` / `useCanopyJob` polling hooks for background jobs.
 
 Peer dependencies: `react`, `react-dom` (^19).
 
@@ -44,33 +45,80 @@ function Readback() {
 `displayValue`, alarm `severity`, `connected`, `timestamp`, `units`,
 `precision`, limits) plus `address` and a `put(value)` writer. Passing
 `undefined` as the PV name yields the disconnected placeholder, so widgets
-with unbound addresses render harmlessly.
+with unbound addresses render harmlessly. When `pvName` changes, the handle
+shows the new PV's cached snapshot (or the placeholder) until its first
+update — never the previous PV's value.
 
 `usePVService()` returns the raw `PVService` from context and throws when no
 `PVServiceProvider` is above the caller.
 
-## useJob
+## CanopyProvider
 
-`useJob(conn, jobId | null, { pollMs? })` polls a Canopy background job
-(`GET /jobs/v1/{id}`) while the component is mounted and the job is
-non-terminal, returning `{ job, error, loading }`:
+Put the app's `CanopyConnection` in context once, instead of threading
+`conn` through props:
 
 ```tsx
-import { useJob } from '@slaclab/canopy-react';
+import { CanopyProvider, useCanopyConnection } from '@slaclab/canopy-react';
 
-function RestoreProgress({ jobId }: { jobId: string | null }) {
-  const { job, error, loading } = useJob(
-    { baseUrl: 'https://canopy.example.org', apiKey: 'my-api-key' },
-    jobId
-  );
+// Behind a same-origin proxy that injects the API key (see @slaclab/canopy-vite):
+const connection = { baseUrl: '/api/canopy' };
 
-  if (loading) return <span>starting…</span>;
-  if (error) return <span>failed to poll: {error.message}</span>;
-  if (!job) return null;
-  return <progress value={job.progress} max={100} data-status={job.status} />;
+root.render(
+  <CanopyProvider connection={connection}>
+    <App />
+  </CanopyProvider>
+);
+
+function useRuns() {
+  const conn = useCanopyConnection(); // throws outside a CanopyProvider
+  // ... canopyFetch(conn, '/optimization/v1/runs') via your data layer
 }
 ```
 
-Polling stops on a terminal status (`completed`/`failed` — branch on
-`job.status`), on a fetch error (surfaced via `error`), when `jobId`
-changes, or on unmount. Pass `null` to render without a job.
+## Background jobs: useCanopyJob / useJob
+
+`useCanopyJob(jobId | null, options?)` polls a Canopy background job
+(`GET /jobs/v1/{id}`) with the provider's connection while the component is
+mounted; `useJob(conn, jobId | null, options?)` does the same with an
+explicit connection. Both return `{ job, status, error, loading }`:
+
+```tsx
+import { useCanopyJob } from '@slaclab/canopy-react';
+
+function DialInProgress({ jobId }: { jobId: string | null }) {
+  const { job, status, error } = useCanopyJob(jobId);
+
+  if (status === 'unknown') return <span>Queued: waiting for a worker slot</span>;
+  if (status === 'failed') return <span>Failed: {job?.error}</span>;
+  if (status === 'completed') return <span>Done</span>;
+  return (
+    <span>
+      {status ?? 'starting'}… {error && `(retrying: ${error.message})`}
+    </span>
+  );
+}
+```
+
+`status` is one of:
+
+| `status`                  | Meaning                                                                                                                                                                                                                                      |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `null`                    | No id, or the first answer has not arrived (`loading` is true while it is in flight).                                                                                                                                                        |
+| `'unknown'`               | The Jobs API answered `404 job_not_found`. Canopy does that while a job waits on a worker queue it cannot see (optimization dial-in/reset/checkpoint jobs can queue for minutes) and after the result expired, so it is **never** a failure. |
+| `'pending'`, `'running'`  | `job.status`; polling continues every `pollMs`.                                                                                                                                                                                              |
+| `'completed'`, `'failed'` | Terminal `job.status`; polling stops. A failed job is a status, not an `error`.                                                                                                                                                              |
+
+Polling and errors:
+
+- Every `pollMs` (default 1000) while pending/running.
+- While `unknown`, or after a **transient** failure (network error, 5xx,
+  408, 429, unparseable body), polls back off — `pollMs`, doubling, up to
+  `maxPollMs` (default 5000) — and never stop on their own. A transient
+  failure is surfaced on `error` next to the last good `job`, and cleared
+  by the next successful poll.
+- `notFoundGraceMs` (default: none) turns a job that stays `unknown` that
+  long into an `error` and stops polling.
+- Any other error (401, 403, 422, a routing 404, ...) is surfaced on
+  `error` and stops polling.
+- Changing the id or unmounting stops polling and aborts the request in
+  flight. Results are keyed by id, so a stale job never leaks through.
