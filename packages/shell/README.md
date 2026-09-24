@@ -322,8 +322,11 @@ if (
   `danger` gives a red primary button and starts focus on Cancel. In a danger
   dialog, Enter only activates the focused button and never confirms
   implicitly.
-- **Several requests.** Requests queue and are shown one at a time.
-- **Focus afterwards.** Focus returns to the element that opened the dialog.
+- **Several requests.** Requests queue and are shown one at a time. Each is
+  a fresh dialog with its own initial focus, so a queued danger dialog still
+  starts on Cancel.
+- **Focus afterwards.** Focus returns to the element that opened the dialog
+  (for a queue, the one that opened the first dialog).
 - **Unmount.** Unmounting the provider resolves pending requests with `false`.
 - **Setup.** Render `ConfirmProvider` inside `ColorModeTheme`. `useConfirm()`
   throws outside a provider.
