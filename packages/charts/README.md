@@ -11,14 +11,20 @@ ECharts helpers shared by Canopy apps, extracted from react-trace:
 
 ## Install
 
-Peer dependencies: `echarts` (^6), `echarts-for-react` (^3), `react` and
-`react-dom` (^19). The package depends on `@slaclab/canopy-shell` for
-`useChartTheme`, so the shell's peers (`@carbon/react`, `@carbon/icons-react`)
-must be installed too.
+Peer dependencies: `@slaclab/canopy-shell` (same version line as the
+charts package), `echarts` (^6), `echarts-for-react` (^3), `react` and
+`react-dom` (^19), plus the shell's own peers (`@carbon/react`,
+`@carbon/icons-react`).
 
 ```sh
-pnpm add @slaclab/canopy-charts echarts echarts-for-react
+pnpm add @slaclab/canopy-charts @slaclab/canopy-shell echarts echarts-for-react
 ```
+
+`@slaclab/canopy-shell` is a peer, not a dependency, because
+`useChartTheme` reads the shell's color-mode store, which is module state:
+the app and the charts must share one copy of the shell, or the charts
+follow a store the app never toggles. Keep both packages on the same
+version.
 
 Apps that link the SDK locally should dedupe `echarts` (Vite
 `resolve.dedupe: ['echarts', ...]`): `echarts.connect` only links charts that

@@ -5,7 +5,9 @@ icon: lucide/chart-line
 # Charts (`@slaclab/canopy-charts`)
 
 ECharts helpers extracted from react-trace and recolored to Carbon g10/g100.
-Peers: `echarts` ^6, `echarts-for-react` ^3, React 19. The full reference is the
+Peers: `@slaclab/canopy-shell` (same version; its color-mode store must be a
+single copy), `echarts` ^6, `echarts-for-react` ^3, React 19. The full
+reference is the
 [package README](https://github.com/slaclab/canopy-sdk-js/tree/main/packages/charts#readme).
 
 ## Theme the option, not the chart
