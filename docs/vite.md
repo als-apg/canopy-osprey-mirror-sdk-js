@@ -58,3 +58,19 @@ const wsUrl = toWsUrl(connection.baseUrl, '/optimization/v1/ws/runs'); // from @
 - **elog** (opt-in): `elog: { target, accessToken, path }` forwards `/elog`
   to elog-plus with the prefix stripped and `x-vouch-idp-accesstoken`
   injected; without a target (`ELOG_BASE_URL`) the route is left out.
+
+## Security
+
+The proxy adds the key, so it only serves the app's own page and non-browser
+tools:
+
+- a request whose `Origin` is not the dev server's own host and port, or that
+  has `Sec-Fetch-Site: cross-site`, is refused (`403`; a WebSocket handshake
+  gets `404`) and never forwarded. Clients without an `Origin` (curl,
+  scripts) pass, and `allowedOrigins: ['http://localhost:6006']` admits other
+  trusted pages;
+- prefixes match on a path-segment boundary (`/api/canopy-foo` is not
+  proxied), so the returned keys are `^`-anchored RegExp strings;
+- the `Cookie` header is dropped before forwarding.
+
+Keep Vite's `server.allowedHosts` check on: it is what stops DNS rebinding.

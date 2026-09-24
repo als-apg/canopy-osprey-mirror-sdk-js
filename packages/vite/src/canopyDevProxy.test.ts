@@ -1,33 +1,100 @@
 import { EventEmitter } from 'node:events';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProxyOptions } from 'vite';
 import { canopyDevProxy } from './index.js';
 
 type ProxyServer = Parameters<NonNullable<ProxyOptions['configure']>>[0];
+type Headers = Record<string, string>;
 
-/** Run an entry's `configure` against a fake proxy and emit one proxyReq + proxyReqWs. */
-function headersSetBy(entry: ProxyOptions): {
-  http: Record<string, string>;
-  ws: Record<string, string>;
-} {
+const DEV_HOST = 'localhost:5173';
+const SAME_ORIGIN: Headers = { host: DEV_HOST, origin: `http://${DEV_HOST}` };
+
+function incoming(headers: Headers): IncomingMessage {
+  return { headers } as unknown as IncomingMessage;
+}
+
+/** The entry Vite would pick for `url`: keys starting with `^` are RegExps, others prefixes. */
+function routeFor(proxy: Record<string, ProxyOptions>, url: string): ProxyOptions | undefined {
+  const key = Object.keys(proxy).find((context) =>
+    context.startsWith('^') ? new RegExp(context).test(url) : url.startsWith(context)
+  );
+  return key === undefined ? undefined : proxy[key];
+}
+
+function route(proxy: Record<string, ProxyOptions>, url: string): ProxyOptions {
+  const entry = routeFor(proxy, url);
+  if (!entry) throw new Error(`no route for ${url}`);
+  return entry;
+}
+
+/**
+ * Run an entry's `configure` against a fake proxy and emit one proxyReq and
+ * one proxyReqWs for a request with `headers`; returns the outgoing headers.
+ */
+function outgoingHeaders(
+  entry: ProxyOptions,
+  headers: Headers = SAME_ORIGIN
+): { http: Headers; ws: Headers } {
   const emitter = new EventEmitter();
   entry.configure?.(emitter as unknown as ProxyServer, entry);
   const capture = () => {
-    const headers: Record<string, string> = {};
+    // What the browser sent; the hooks may remove or add headers.
+    const out: Headers = { cookie: 'session=abc' };
     return {
-      headers,
+      out,
       proxyReq: {
         setHeader: (name: string, value: string) => {
-          headers[name] = value;
+          out[name] = value;
+        },
+        removeHeader: (name: string) => {
+          delete out[name];
         },
       },
     };
   };
   const http = capture();
   const ws = capture();
-  emitter.emit('proxyReq', http.proxyReq, {}, {}, {});
-  emitter.emit('proxyReqWs', ws.proxyReq, {}, {}, {}, undefined);
-  return { http: http.headers, ws: ws.headers };
+  emitter.emit('proxyReq', http.proxyReq, incoming(headers), {}, {});
+  emitter.emit('proxyReqWs', ws.proxyReq, incoming(headers), {}, {}, undefined);
+  return { http: http.out, ws: ws.out };
+}
+
+interface FakeResponse {
+  statusCode: number;
+  headers: Headers;
+  body: string;
+  ended: boolean;
+}
+
+/** Call an entry's `bypass` like Vite does: with a response for HTTP, without one for a WebSocket upgrade. */
+async function bypass(
+  entry: ProxyOptions,
+  headers: Headers,
+  kind: 'http' | 'ws' = 'http'
+): Promise<{ result: unknown; res: FakeResponse }> {
+  const res: FakeResponse = { statusCode: 200, headers: {}, body: '', ended: false };
+  const fakeRes = {
+    set statusCode(code: number) {
+      res.statusCode = code;
+    },
+    get statusCode() {
+      return res.statusCode;
+    },
+    setHeader(name: string, value: string) {
+      res.headers[name.toLowerCase()] = value;
+    },
+    end(body?: string) {
+      res.body += body ?? '';
+      res.ended = true;
+    },
+  } as unknown as ServerResponse;
+  const result = await entry.bypass!(
+    incoming(headers),
+    kind === 'http' ? fakeRes : undefined,
+    entry
+  );
+  return { result, res };
 }
 
 describe('canopyDevProxy', () => {
@@ -47,8 +114,8 @@ describe('canopyDevProxy', () => {
     it('forwards the prefix to the target with the prefix stripped, WebSockets included', () => {
       const proxy = canopyDevProxy({ target: 'http://canopy:8000', basePath: '/api/canopy' });
 
-      expect(Object.keys(proxy)).toEqual(['/api/canopy']);
-      const entry = proxy['/api/canopy']!;
+      expect(Object.keys(proxy)).toHaveLength(1);
+      const entry = route(proxy, '/api/canopy/optimization/v1/runs');
       expect(entry).toMatchObject({ target: 'http://canopy:8000', changeOrigin: true, ws: true });
 
       const rewrite = entry.rewrite!;
@@ -61,20 +128,40 @@ describe('canopyDevProxy', () => {
       expect(rewrite('/api/canopyfoo/x')).toBe('/api/canopyfoo/x'); // not under the prefix
     });
 
+    it('matches the prefix only on a path-segment boundary', () => {
+      const proxy = canopyDevProxy({ basePath: '/api/canopy' });
+
+      expect(Object.keys(proxy)).toEqual(['^/api/canopy(?=[/?#]|$)']);
+      for (const url of ['/api/canopy', '/api/canopy/', '/api/canopy/x/y', '/api/canopy?x=1']) {
+        expect(routeFor(proxy, url), url).toBeDefined();
+      }
+      for (const url of ['/api/canopy-foo', '/api/canopyfoo/x', '/api', '/x/api/canopy/y']) {
+        expect(routeFor(proxy, url), url).toBeUndefined();
+      }
+    });
+
+    it('escapes RegExp metacharacters in the prefix', () => {
+      const proxy = canopyDevProxy({ basePath: '/api/v1.2' });
+      expect(routeFor(proxy, '/api/v1.2/runs')).toBeDefined();
+      expect(routeFor(proxy, '/api/v1x2/runs')).toBeUndefined();
+    });
+
     it('defaults to /api/canopy and the CANOPY_BASE_URL env var, else localhost:8000', () => {
-      expect(canopyDevProxy()['/api/canopy']?.target).toBe('http://localhost:8000');
+      expect(route(canopyDevProxy(), '/api/canopy/x').target).toBe('http://localhost:8000');
 
       vi.stubEnv('CANOPY_BASE_URL', 'http://from-env:9000');
-      expect(canopyDevProxy()['/api/canopy']?.target).toBe('http://from-env:9000');
+      expect(route(canopyDevProxy(), '/api/canopy/x').target).toBe('http://from-env:9000');
       // An explicit (non-empty) target wins over the env; an empty one does not.
-      expect(canopyDevProxy({ target: 'http://explicit' })['/api/canopy']?.target).toBe(
+      expect(route(canopyDevProxy({ target: 'http://explicit' }), '/api/canopy').target).toBe(
         'http://explicit'
       );
-      expect(canopyDevProxy({ target: '' })['/api/canopy']?.target).toBe('http://from-env:9000');
+      expect(route(canopyDevProxy({ target: '' }), '/api/canopy').target).toBe(
+        'http://from-env:9000'
+      );
     });
 
     it('normalizes the prefix and rejects the root', () => {
-      expect(Object.keys(canopyDevProxy({ basePath: 'api/canopy/' }))).toEqual(['/api/canopy']);
+      expect(routeFor(canopyDevProxy({ basePath: 'api/canopy/' }), '/api/canopy/x')).toBeDefined();
       expect(() => canopyDevProxy({ basePath: '/' })).toThrow(/non-root path/);
     });
   });
@@ -82,8 +169,9 @@ describe('canopyDevProxy', () => {
   describe('API key injection', () => {
     it('sets X-API-Key on proxied requests and WebSocket upgrades when a key is set', () => {
       const proxy = canopyDevProxy({ apiKey: 'dev', modules: ['/hare'], basePath: '/api/canopy' });
+      expect(Object.keys(proxy)).toHaveLength(2);
       for (const entry of Object.values(proxy)) {
-        expect(headersSetBy(entry)).toEqual({
+        expect(outgoingHeaders(entry)).toEqual({
           http: { 'X-API-Key': 'dev' },
           ws: { 'X-API-Key': 'dev' },
         });
@@ -92,13 +180,143 @@ describe('canopyDevProxy', () => {
 
     it('falls back to CANOPY_API_KEY, and injects nothing without a key', () => {
       vi.stubEnv('CANOPY_API_KEY', 'env-key');
-      expect(headersSetBy(canopyDevProxy()['/api/canopy']!).ws).toEqual({ 'X-API-Key': 'env-key' });
+      expect(outgoingHeaders(route(canopyDevProxy(), '/api/canopy')).ws).toEqual({
+        'X-API-Key': 'env-key',
+      });
 
-      // An explicit empty key overrides the env var: no header, no configure hook.
-      const keyless = canopyDevProxy({ apiKey: '' })['/api/canopy']!;
-      expect(keyless.configure).toBeUndefined();
+      // An explicit empty key overrides the env var: no header.
+      expect(outgoingHeaders(route(canopyDevProxy({ apiKey: '' }), '/api/canopy'))).toEqual({
+        http: {},
+        ws: {},
+      });
       vi.stubEnv('CANOPY_API_KEY', '');
-      expect(canopyDevProxy()['/api/canopy']!.configure).toBeUndefined();
+      expect(outgoingHeaders(route(canopyDevProxy(), '/api/canopy'))).toEqual({ http: {}, ws: {} });
+    });
+
+    it('strips the Cookie header on every route, with or without a key', () => {
+      const proxy = canopyDevProxy({
+        modules: ['/hare'],
+        basePath: '/api/canopy',
+        elog: { target: 'http://elog' },
+      });
+      for (const entry of Object.values(proxy)) {
+        const { http, ws } = outgoingHeaders(entry);
+        expect(http.cookie).toBeUndefined();
+        if (entry.ws) expect(ws.cookie).toBeUndefined();
+      }
+    });
+
+    it('never adds the key to a request the origin check refuses', () => {
+      const entry = route(canopyDevProxy({ apiKey: 'dev' }), '/api/canopy');
+      expect(outgoingHeaders(entry, { host: DEV_HOST, origin: 'https://evil.example' })).toEqual({
+        http: {},
+        ws: {},
+      });
+    });
+  });
+
+  describe('cross-origin requests', () => {
+    const entry = () => route(canopyDevProxy({ apiKey: 'dev' }), '/api/canopy');
+
+    it('lets same-origin browser requests and WebSocket upgrades through', async () => {
+      for (const headers of [
+        SAME_ORIGIN,
+        { ...SAME_ORIGIN, 'sec-fetch-site': 'same-origin' },
+        // Same-origin GETs carry no Origin, only Sec-Fetch-Site.
+        { host: DEV_HOST, 'sec-fetch-site': 'same-origin' },
+        // Typed into the address bar.
+        { host: DEV_HOST, 'sec-fetch-site': 'none' },
+        // Explicit default port on one side only.
+        { host: 'localhost:80', origin: 'http://localhost' },
+        { host: 'LocalHost:5173', origin: 'http://localhost:5173' },
+        { host: '[::1]:5173', origin: 'http://[::1]:5173' },
+      ]) {
+        expect((await bypass(entry(), headers, 'http')).result, JSON.stringify(headers)).toBe(
+          undefined
+        );
+        expect((await bypass(entry(), headers, 'ws')).result, JSON.stringify(headers)).toBe(
+          undefined
+        );
+      }
+    });
+
+    it('lets non-browser clients (no Origin, no Sec-Fetch-Site) through', async () => {
+      expect((await bypass(entry(), { host: DEV_HOST })).result).toBeUndefined();
+      expect((await bypass(entry(), { host: DEV_HOST }, 'ws')).result).toBeUndefined();
+    });
+
+    it('refuses an HTTP request from another origin with 403', async () => {
+      const { result, res } = await bypass(entry(), {
+        host: DEV_HOST,
+        origin: 'https://evil.example',
+        'sec-fetch-site': 'cross-site',
+      });
+      expect(result).toBe(false);
+      expect(res).toMatchObject({ statusCode: 403, ended: true });
+      expect(res.headers['content-type']).toMatch(/^text\/plain/);
+      expect(res.body).toContain('https://evil.example');
+    });
+
+    it('refuses a WebSocket upgrade from another origin', async () => {
+      const { result, res } = await bypass(
+        entry(),
+        { host: DEV_HOST, origin: 'https://evil.example' },
+        'ws'
+      );
+      expect(result).toBe(false); // Vite then ends the socket with a 404 status line
+      expect(res.ended).toBe(false);
+    });
+
+    it('refuses other hosts and ports, opaque and malformed origins', async () => {
+      for (const origin of [
+        'http://localhost:6006', // same site, other origin
+        'http://127.0.0.1:5173', // same server, but a page on another origin
+        'chrome-extension://abcdefghijklmnop',
+        'null',
+        'not a url',
+        'http://localhost:5173, http://evil.example',
+      ]) {
+        expect((await bypass(entry(), { host: DEV_HOST, origin }, 'ws')).result, origin).toBe(
+          false
+        );
+      }
+      // An Origin with no Host to compare against.
+      expect((await bypass(entry(), { origin: `http://${DEV_HOST}` })).result).toBe(false);
+    });
+
+    it('refuses a cross-site request that carries no Origin (a no-cors GET)', async () => {
+      const { result, res } = await bypass(entry(), {
+        host: DEV_HOST,
+        'sec-fetch-site': 'cross-site',
+      });
+      expect(result).toBe(false);
+      expect(res.statusCode).toBe(403);
+    });
+
+    it('allows the origins listed in allowedOrigins', async () => {
+      const proxy = canopyDevProxy({ allowedOrigins: ['http://LOCALHOST:6006/'] });
+      const storybook = { host: DEV_HOST, origin: 'http://localhost:6006' };
+      expect((await bypass(route(proxy, '/api/canopy'), storybook, 'ws')).result).toBeUndefined();
+      const other = { host: DEV_HOST, origin: 'http://localhost:6007' };
+      expect((await bypass(route(proxy, '/api/canopy'), other, 'ws')).result).toBe(false);
+
+      expect(() => canopyDevProxy({ allowedOrigins: ['localhost:6006'] })).toThrow(
+        /allowedOrigins/
+      );
+    });
+
+    it('guards every route: modules and elog too', async () => {
+      const proxy = canopyDevProxy({
+        modules: ['/hare'],
+        basePath: '/api/canopy',
+        elog: { target: 'http://elog' },
+      });
+      expect(Object.keys(proxy)).toHaveLength(3);
+      for (const route of Object.values(proxy)) {
+        const cross = { host: DEV_HOST, origin: 'https://evil.example' };
+        expect((await bypass(route, cross)).result).toBe(false);
+        expect((await bypass(route, SAME_ORIGIN)).result).toBeUndefined();
+      }
     });
   });
 
@@ -106,17 +324,25 @@ describe('canopyDevProxy', () => {
     it('forwards each module prefix unchanged (no rewrite) with ws enabled', () => {
       const proxy = canopyDevProxy({ target: 'http://t', modules: ['/hare', 'mole', '/fox/'] });
 
-      expect(Object.keys(proxy)).toEqual(['/hare', '/mole', '/fox']);
+      expect(Object.keys(proxy)).toEqual([
+        '^/hare(?=[/?#]|$)',
+        '^/mole(?=[/?#]|$)',
+        '^/fox(?=[/?#]|$)',
+      ]);
       for (const entry of Object.values(proxy)) {
-        expect(entry).toEqual({ target: 'http://t', changeOrigin: true, ws: true });
+        expect(entry).toMatchObject({ target: 'http://t', changeOrigin: true, ws: true });
+        expect(entry.rewrite).toBeUndefined();
       }
+      expect(routeFor(proxy, '/hare/v1/ws/pvs')).toBeDefined();
+      expect(routeFor(proxy, '/hare-foo/v1')).toBeUndefined();
+      expect(routeFor(proxy, '/foxes')).toBeUndefined();
     });
 
     it('can be combined with an explicit basePath', () => {
-      expect(Object.keys(canopyDevProxy({ basePath: '/api', modules: ['/hare'] }))).toEqual([
-        '/api',
-        '/hare',
-      ]);
+      const proxy = canopyDevProxy({ basePath: '/api', modules: ['/hare'] });
+      expect(Object.keys(proxy)).toHaveLength(2);
+      expect(route(proxy, '/api/x').rewrite).toBeDefined();
+      expect(route(proxy, '/hare/x').rewrite).toBeUndefined();
     });
   });
 
@@ -126,30 +352,35 @@ describe('canopyDevProxy', () => {
         elog: { target: 'https://elog.example.org', accessToken: 'tok' },
       });
 
-      const entry = proxy['/elog']!;
+      const entry = route(proxy, '/elog/v2/entries');
       expect(entry).toMatchObject({ target: 'https://elog.example.org', changeOrigin: true });
       expect(entry.ws).toBeUndefined();
       expect(entry.rewrite!('/elog/v2/entries')).toBe('/v2/entries');
       expect(entry.rewrite!('/elog/v1/logbooks?x=1')).toBe('/v1/logbooks?x=1');
-      // Only HTTP requests carry the token; the elog route has no WebSockets.
-      expect(headersSetBy(entry)).toEqual({ http: { 'x-vouch-idp-accesstoken': 'tok' }, ws: {} });
+      expect(routeFor(proxy, '/elogger')).toBeUndefined();
+      // Only HTTP requests carry the token; the elog route has no WebSockets
+      // (so no proxyReqWs hook: the fake upgrade keeps its cookie).
+      expect(outgoingHeaders(entry)).toEqual({
+        http: { 'x-vouch-idp-accesstoken': 'tok' },
+        ws: { cookie: 'session=abc' },
+      });
       // The Canopy route never gets the elog token (and vice versa).
-      expect(proxy['/api/canopy']!.configure).toBeUndefined();
+      expect(outgoingHeaders(route(proxy, '/api/canopy')).http).toEqual({});
     });
 
     it('reads ELOG_BASE_URL / ELOG_API_KEY, honours a custom path, and is omitted without a target', () => {
-      expect(Object.keys(canopyDevProxy({ elog: {} }))).toEqual(['/api/canopy']);
+      expect(Object.keys(canopyDevProxy({ elog: {} }))).toHaveLength(1);
 
       vi.stubEnv('ELOG_BASE_URL', 'http://elog:8080');
       vi.stubEnv('ELOG_API_KEY', 'env-tok');
-      const entry = canopyDevProxy({ elog: { path: '/logbook' } })['/logbook']!;
+      const entry = route(canopyDevProxy({ elog: { path: '/logbook' } }), '/logbook/v1');
       expect(entry.target).toBe('http://elog:8080');
       expect(entry.rewrite!('/logbook/v1/logbooks')).toBe('/v1/logbooks');
-      expect(headersSetBy(entry).http).toEqual({ 'x-vouch-idp-accesstoken': 'env-tok' });
+      expect(outgoingHeaders(entry).http).toEqual({ 'x-vouch-idp-accesstoken': 'env-tok' });
 
       // No token: forwarded without the header.
       vi.stubEnv('ELOG_API_KEY', '');
-      expect(canopyDevProxy({ elog: {} })['/elog']!.configure).toBeUndefined();
+      expect(outgoingHeaders(route(canopyDevProxy({ elog: {} }), '/elog/x')).http).toEqual({});
     });
   });
 });
