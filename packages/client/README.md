@@ -331,3 +331,25 @@ serializes snake_case to camelCase on the wire):
 - `src/pv/` — the `PVService` abstraction and its local implementations
   (`MockPVService`, `LocalPVService` for `loc://name?type=&init=` PVs,
   `RoutedPVService` for scheme-prefix routing)
+
+## Migrating from 0.1
+
+**`FetchLike`'s `init.body` is wider.** In 0.1 it was
+`body: string`; in 0.2 it is `body?: string | FormData` (absent for
+requests without a body, and a `FormData` passed through untouched for
+multipart uploads). The global `fetch` and `createFakeFetch` still fit. A
+hand-typed fetch wrapper that declares `body: string` no longer type-checks
+as a `FetchLike` under `strictFunctionTypes` (part of `strict`); widen its
+parameter, most simply to the SDK's own type:
+
+```ts
+import type { FetchLike } from '@slaclab/canopy-client';
+
+// Before: (url: string, init: { method: string; headers: Record<string, string>; body: string })
+function loggingFetch(url: string, init: Parameters<FetchLike>[1]) {
+  console.debug(init.method, url);
+  return fetch(url, init);
+}
+
+const conn = { baseUrl: '/api/canopy', fetch: loggingFetch };
+```
