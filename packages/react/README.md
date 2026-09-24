@@ -89,7 +89,8 @@ import { useCanopyJob } from '@slaclab/canopy-react';
 function DialInProgress({ jobId }: { jobId: string | null }) {
   const { job, status, error } = useCanopyJob(jobId);
 
-  if (status === 'unknown') return <span>Queued: waiting for a worker slot</span>;
+  if (status === 'unknown' && error) return <span>Job not found</span>; // grace ran out
+  if (status === 'unknown') return <span>Looking for the job…</span>;
   if (status === 'failed') return <span>Failed: {job?.error}</span>;
   if (status === 'completed') return <span>Done</span>;
   return (
@@ -102,12 +103,12 @@ function DialInProgress({ jobId }: { jobId: string | null }) {
 
 `status` is one of:
 
-| `status`                  | Meaning                                                                                                                                                                                                                                      |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `null`                    | No id, or the first answer has not arrived (`loading` is true while it is in flight).                                                                                                                                                        |
-| `'unknown'`               | The Jobs API answered `404 job_not_found`. Canopy does that while a job waits on a worker queue it cannot see (optimization dial-in/reset/checkpoint jobs can queue for minutes) and after the result expired, so it is **never** a failure. |
-| `'pending'`, `'running'`  | `job.status`; polling continues every `pollMs`.                                                                                                                                                                                              |
-| `'completed'`, `'failed'` | Terminal `job.status`; polling stops. A failed job is a status, not an `error`.                                                                                                                                                              |
+| `status`                  | Meaning                                                                                                                                                                                                                                                  |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `null`                    | No id, or the first answer has not arrived (`loading` is true while it is in flight).                                                                                                                                                                    |
+| `'unknown'`               | The Jobs API answered `404 job_not_found`: Canopy has no record of the id (mistyped, another deployment's) or the result expired (after the worker's `keep_result_s`, 1 h by default). Not a failure. A queued job, on any worker queue, is `'pending'`. |
+| `'pending'`, `'running'`  | `job.status`; polling continues every `pollMs`.                                                                                                                                                                                                          |
+| `'completed'`, `'failed'` | Terminal `job.status`; polling stops. A failed job is a status, not an `error`.                                                                                                                                                                          |
 
 Polling and errors:
 
@@ -117,9 +118,28 @@ Polling and errors:
   `maxPollMs` (default 5000) — and never stop on their own. A transient
   failure is surfaced on `error` next to the last good `job`, and cleared
   by the next successful poll.
-- `notFoundGraceMs` (default: none) turns a job that stays `unknown` that
-  long into an `error` and stops polling.
+- `notFoundGraceMs` (default 30000) turns a job that stays `unknown` that
+  long (from the first poll) into an `error` (the 404 `CanopyError`) and
+  stops polling. `0` surfaces the first 404; `Infinity` never gives up.
 - Any other error (401, 403, 422, a routing 404, ...) is surfaced on
-  `error` and stops polling.
+  `error` and stops polling. So does an error that is not a `CanopyError`,
+  such as a missing `fetch` implementation: retrying cannot fix it.
 - Changing the id or unmounting stops polling and aborts the request in
   flight. Results are keyed by id, so a stale job never leaks through.
+
+## Migrating from 0.1
+
+`useJob(conn, id, { pollMs })` still works unchanged; `maxPollMs`,
+`notFoundGraceMs`, the `status` field and `useCanopyJob` are new. What
+changed in behaviour:
+
+| 0.1                                               | 0.2                                                                                                                                   |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| A 404 was surfaced on `error` and polling stopped | A 404 `job_not_found` is `status: 'unknown'`, polled with backoff; after `notFoundGraceMs` (30 s) it is surfaced on `error` and stops |
+| Every failed poll stopped polling                 | Transient failures (network, 5xx, 408, 429, bad JSON) keep polling with backoff up to `maxPollMs`; others stop                        |
+| —                                                 | `status` (`'unknown'` or `job.status`) next to `job`, `error` and `loading`                                                           |
+
+To keep the 0.1 handling of a 404, pass `{ notFoundGraceMs: 0 }` (Badger
+does). Code that treated any `error` as final should now check `status`
+too: an `error` next to `'pending'`/`'running'` is a transient failure
+that the next poll may clear.
