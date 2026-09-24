@@ -47,7 +47,8 @@ function Readback() {
 `undefined` as the PV name yields the disconnected placeholder, so widgets
 with unbound addresses render harmlessly. When `pvName` changes, the handle
 shows the new PV's cached snapshot (or the placeholder) until its first
-update — never the previous PV's value.
+update — never the previous PV's value, nor (after switching back, e.g.
+A → B → A) what an earlier subscription to the same PV delivered.
 
 `usePVService()` returns the raw `PVService` from context and throws when no
 `PVServiceProvider` is above the caller.

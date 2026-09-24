@@ -162,6 +162,51 @@ describe('usePV when the PV name changes', () => {
     expect(result.current).toMatchObject({ address: 'B', value: 42, connected: true });
   });
 
+  it("going A -> B -> A does not bring back A's value from before the switch", () => {
+    const { manual, push } = makeManualService();
+    const { result, rerender } = renderWith(manual, 'A');
+    push('A', 5);
+    expect(result.current).toMatchObject({ address: 'A', value: 5, connected: true });
+
+    rerender({ pv: 'B' });
+    rerender({ pv: 'A' }); // before B (or the new A subscription) delivers anything
+    expect(result.current).toMatchObject({
+      address: 'A',
+      value: DISCONNECTED_PV.value,
+      displayValue: '---',
+      connected: false,
+    });
+
+    push('A', 6);
+    expect(result.current).toMatchObject({ address: 'A', value: 6, connected: true });
+  });
+
+  it("going A -> B -> A shows the service's current snapshot for A, not the old delivery", () => {
+    const snapshots: Record<string, PVData> = {};
+    const { manual, push } = makeManualService(snapshots);
+    const { result, rerender } = renderWith(manual, 'A');
+    push('A', 5);
+
+    rerender({ pv: 'B' });
+    // Meanwhile the service learned that A disconnected.
+    snapshots.A = { ...DISCONNECTED_PV, value: 5, displayValue: '5', connected: false };
+    rerender({ pv: 'A' });
+    expect(result.current).toMatchObject({ address: 'A', connected: false });
+  });
+
+  it('drops an update from a torn-down subscription to the same PV', () => {
+    const { manual, listeners } = makeManualService();
+    const { result, rerender } = renderWith(manual, 'A');
+    const staleListener = [...listeners.get('A')!][0]!;
+
+    rerender({ pv: 'B' });
+    rerender({ pv: 'A' });
+    act(() => {
+      staleListener({ ...DISCONNECTED_PV, value: 99, connected: true });
+    });
+    expect(result.current).toMatchObject({ address: 'A', connected: false });
+  });
+
   it('ignores a late update from the previous subscription and resets for undefined', () => {
     const { manual, push, listeners } = makeManualService();
     const { result, rerender } = renderWith(manual, 'A');

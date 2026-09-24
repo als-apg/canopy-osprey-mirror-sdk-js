@@ -23,7 +23,8 @@ interface Received {
  * The data is always for the current `pvName`: after the name (or the
  * service) changes, it is the service's cached snapshot for the new PV (or
  * the disconnected placeholder) until the new subscription delivers — never
- * the previous PV's value.
+ * the previous PV's value, nor what an earlier subscription to the same PV
+ * delivered (A -> B -> A).
  */
 export function usePV(pvName: string | undefined): PVHandle {
   const service = usePVService();
@@ -31,9 +32,19 @@ export function usePV(pvName: string | undefined): PVHandle {
 
   useEffect(() => {
     if (!pvName) return;
-    return service.subscribe(pvName, (data) => {
-      setReceived({ service, pvName, data });
+    let active = true;
+    const unsubscribe = service.subscribe(pvName, (data) => {
+      // A late update from a subscription already torn down is dropped.
+      if (active) setReceived({ service, pvName, data });
     });
+    return () => {
+      active = false;
+      unsubscribe();
+      // Forget what this subscription delivered: going A -> B -> A must not
+      // bring back A's old value and connection state before A's new
+      // subscription delivers.
+      setReceived(null);
+    };
   }, [pvName, service]);
 
   let data: PVData = DISCONNECTED_PV;

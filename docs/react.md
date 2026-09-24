@@ -76,4 +76,4 @@ function Readback() {
 
 When the PV name changes, `usePV` shows the new PV's cached snapshot (or the
 disconnected placeholder) until its first update — never the previous PV's
-value.
+value, nor what an earlier subscription to the same PV delivered (A → B → A).
