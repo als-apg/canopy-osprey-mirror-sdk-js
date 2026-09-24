@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react';
+import { StrictMode, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { Theme } from '@carbon/react';
 import { ToastProvider, useToast } from './toast.js';
@@ -31,6 +32,7 @@ function renderToasts(props: { defaultTimeoutMs?: number; lowContrast?: boolean 
 }
 
 const stack = () => document.body.querySelector('.canopy-toasts');
+const toastCount = () => document.body.querySelectorAll('.cds--toast-notification').length;
 
 describe('ToastProvider / useToast', () => {
   it('shows a toast portaled to <body> with title, subtitle and caption', () => {
@@ -41,7 +43,7 @@ describe('ToastProvider / useToast', () => {
     expect(screen.getByText('Saved')).toBeDefined();
     expect(screen.getByText('Routine saved')).toBeDefined();
     expect(screen.getByText('now')).toBeDefined();
-    const toast = screen.getByRole('status');
+    const toast = screen.getByText('Saved').closest('.cds--toast-notification')!;
     expect(toast.classList.contains('cds--toast-notification--success')).toBe(true);
     // Portaled outside the render container, into the themed stack.
     expect(container.contains(toast)).toBe(false);
@@ -49,12 +51,42 @@ describe('ToastProvider / useToast', () => {
     expect(stack()?.classList.contains('cds--g100')).toBe(true);
   });
 
-  it('uses role=alert for errors', () => {
+  it('renders both live regions, empty, before the first toast', () => {
+    renderToasts();
+    expect(toastCount()).toBe(0);
+    const alert = document.body.querySelector('.canopy-toasts [role="alert"]');
+    const status = document.body.querySelector('.canopy-toasts [role="status"]');
+    expect(alert?.getAttribute('aria-live')).toBe('assertive');
+    expect(status?.getAttribute('aria-live')).toBe('polite');
+    // Only additions are read, not the whole stack again.
+    expect(alert?.getAttribute('aria-atomic')).toBe('false');
+    expect(status?.getAttribute('aria-atomic')).toBe('false');
+    expect(alert?.childElementCount).toBe(0);
+    expect(status?.childElementCount).toBe(0);
+  });
+
+  it('puts errors in the assertive region and the other kinds in the polite one', () => {
     const { api } = renderToasts();
+    const alert = document.body.querySelector('.canopy-toasts [role="alert"]')!;
+    const status = document.body.querySelector('.canopy-toasts [role="status"]')!;
     act(() => {
+      api().show({ kind: 'info', title: 'Note' });
       api().show({ kind: 'error', title: 'Failed' });
     });
-    expect(screen.getByRole('alert').textContent).toContain('Failed');
+    // The same region elements, now holding the toasts (so they are announced).
+    expect(alert.isConnected && status.isConnected).toBe(true);
+    expect(alert.textContent).toContain('Failed');
+    expect(alert.textContent).not.toContain('Note');
+    expect(status.textContent).toContain('Note');
+    // The toasts themselves are not a second live region.
+    for (const toast of document.body.querySelectorAll('.cds--toast-notification')) {
+      expect(toast.getAttribute('aria-live')).toBe('off');
+    }
+    // Errors stack above the other kinds.
+    const titles = [...document.body.querySelectorAll('.cds--toast-notification__title')].map(
+      (e) => e.textContent
+    );
+    expect(titles).toEqual(['Failed', 'Note']);
   });
 
   it('stacks toasts in order and returns distinct ids', () => {
@@ -85,7 +117,56 @@ describe('ToastProvider / useToast', () => {
       vi.advanceTimersByTime(1);
     });
     expect(screen.queryByText('Hello')).toBeNull();
-    expect(stack()).toBeNull();
+    expect(toastCount()).toBe(0);
+    // The (empty) regions stay mounted for the next toast.
+    expect(stack()).not.toBeNull();
+  });
+
+  it('keeps error toasts until dismissed, unless they set a timeout', () => {
+    const { api } = renderToasts({ defaultTimeoutMs: 1000 });
+    act(() => {
+      api().show({ kind: 'error', title: 'Sticky error' });
+      api().show({ kind: 'error', title: 'Timed error', timeoutMs: 2000 });
+    });
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(screen.queryByText('Timed error')).toBeNull();
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(screen.queryByText('Sticky error')).not.toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Close notification' }));
+    expect(screen.queryByText('Sticky error')).toBeNull();
+  });
+
+  it('dismisses on time under StrictMode, even for a toast shown while mounting', () => {
+    let api!: ToastApi;
+    function ShowOnMount() {
+      api = useToast();
+      const { show } = api;
+      useEffect(() => {
+        show({ kind: 'info', title: 'Welcome' });
+      }, [show]);
+      return null;
+    }
+    render(
+      <StrictMode>
+        <ToastProvider>
+          <ShowOnMount />
+        </ToastProvider>
+      </StrictMode>
+    );
+    // StrictMode runs the mount effect twice, so there are two.
+    expect(screen.getAllByText('Welcome')).toHaveLength(2);
+    act(() => {
+      api.show({ kind: 'success', title: 'Later' });
+    });
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+    expect(screen.queryByText('Welcome')).toBeNull();
+    expect(screen.queryByText('Later')).toBeNull();
   });
 
   it('honours per-toast and provider timeouts; 0 is sticky', () => {

@@ -23,6 +23,8 @@ export interface ConfirmOptions {
 export type ConfirmFn = (options: ConfirmOptions) => Promise<boolean>;
 
 interface ConfirmRequest extends ConfirmOptions {
+  /** Keys the dialog, so each request mounts a fresh Modal with its own initial focus. */
+  id: number;
   resolve: (ok: boolean) => void;
   settled: boolean;
   returnFocus: HTMLElement | null;
@@ -42,7 +44,11 @@ export interface ConfirmProviderProps {
 export function ConfirmProvider({ children }: ConfirmProviderProps) {
   const [queue, setQueue] = useState<ConfirmRequest[]>([]);
   const queueRef = useRef(queue);
-  const focusAfterClose = useRef<HTMLElement | null>(null);
+  const nextId = useRef(0);
+  // Where focus goes once the queue drains: the element that opened the first
+  // dialog of this run (undefined while no dialog has been answered yet).
+  // Later requests captured focus inside an earlier dialog, which is gone.
+  const focusAfterRun = useRef<HTMLElement | null | undefined>(undefined);
   const current = queue[0] ?? null;
 
   useEffect(() => {
@@ -53,10 +59,13 @@ export function ConfirmProvider({ children }: ConfirmProviderProps) {
     (options) =>
       new Promise<boolean>((resolve) => {
         const active = typeof document !== 'undefined' ? document.activeElement : null;
+        nextId.current += 1;
+        const id = nextId.current;
         setQueue((q) => [
           ...q,
           {
             ...options,
+            id,
             resolve,
             settled: false,
             returnFocus: active instanceof HTMLElement ? active : null,
@@ -72,16 +81,17 @@ export function ConfirmProvider({ children }: ConfirmProviderProps) {
     if (request.settled) return;
     request.settled = true;
     request.resolve(ok);
-    focusAfterClose.current = request.returnFocus;
+    if (focusAfterRun.current === undefined) focusAfterRun.current = request.returnFocus;
     setQueue((q) => q.filter((r) => r !== request));
   }, []);
 
-  // Give focus back to whatever opened the dialog once it has unmounted.
+  // Once the last queued dialog has unmounted, give focus back to whatever
+  // opened the first one.
   useEffect(() => {
-    if (current || !focusAfterClose.current) return;
-    const target = focusAfterClose.current;
-    focusAfterClose.current = null;
-    if (target.isConnected) target.focus();
+    if (current || focusAfterRun.current === undefined) return;
+    const target = focusAfterRun.current;
+    focusAfterRun.current = undefined;
+    if (target?.isConnected) target.focus();
   }, [current]);
 
   // Unmounting with dialogs pending answers them all with false.
@@ -102,6 +112,9 @@ export function ConfirmProvider({ children }: ConfirmProviderProps) {
       {children}
       {current && (
         <Modal
+          // A new Modal per request: reusing one would keep focus on the
+          // previous dialog's button (a danger dialog must start on Cancel).
+          key={current.id}
           open
           className="canopy-confirm"
           modalHeading={current.heading}

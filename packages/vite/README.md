@@ -53,16 +53,23 @@ const runsWs = toWsUrl(connection.baseUrl, '/optimization/v1/ws/runs'); // ws(s)
 
 ## Options
 
-| Option     | Default                                         | Meaning                                                                                                                              |
-| ---------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `target`   | `CANOPY_BASE_URL`, else `http://localhost:8000` | The Canopy backend. An empty string counts as unset.                                                                                 |
-| `apiKey`   | `CANOPY_API_KEY`                                | Sent as `X-API-Key` on proxied requests **and** WebSocket upgrades (`proxyReq` + `proxyReqWs`). Empty or unset: no header is added.  |
-| `basePath` | `'/api/canopy'` (when `modules` is not given)   | Single-prefix mode: `${basePath}/*` is forwarded to `${target}/*` with the prefix stripped, with `ws: true`.                         |
-| `modules`  | —                                               | Per-module mode (the react-trace/react-squirrel layout): each prefix (`'/hare'`, `'/mole'`, ...) is forwarded unchanged, `ws: true`. |
-| `elog`     | off                                             | `{ path?, target?, accessToken? }`: forwards `path` (default `/elog`) to elog-plus with the prefix stripped.                         |
+| Option           | Default                                         | Meaning                                                                                                                              |
+| ---------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `target`         | `CANOPY_BASE_URL`, else `http://localhost:8000` | The Canopy backend. An empty string counts as unset.                                                                                 |
+| `apiKey`         | `CANOPY_API_KEY`                                | Sent as `X-API-Key` on proxied requests **and** WebSocket upgrades (`proxyReq` + `proxyReqWs`). Empty or unset: no header is added.  |
+| `basePath`       | `'/api/canopy'` (when `modules` is not given)   | Single-prefix mode: `${basePath}/*` is forwarded to `${target}/*` with the prefix stripped, with `ws: true`.                         |
+| `modules`        | —                                               | Per-module mode (the react-trace/react-squirrel layout): each prefix (`'/hare'`, `'/mole'`, ...) is forwarded unchanged, `ws: true`. |
+| `elog`           | off                                             | `{ path?, target?, accessToken? }`: forwards `path` (default `/elog`) to elog-plus with the prefix stripped.                         |
+| `allowedOrigins` | —                                               | Browser origins besides the dev server's own that may use the proxy, e.g. `['http://localhost:6006']` (see [Security](#security)).   |
 
 Every Canopy route uses `changeOrigin: true`. `basePath` and `modules` can
 be combined. Defaults read `process.env` at call time.
+
+Each prefix matches only on a path-segment boundary: `/api/canopy` covers
+`/api/canopy`, `/api/canopy/...` and `/api/canopy?...`, but not
+`/api/canopy-foo`. The returned keys are therefore `^`-anchored RegExp
+strings (`'^/api/canopy(?=[/?#]|$)'`), which Vite supports; pass the object
+to `server.proxy` as a whole rather than looking entries up by path.
 
 ### elog
 
@@ -92,3 +99,25 @@ canopyDevProxy({
   elog: { target: env.ELOG_BASE_URL, accessToken: env.ELOG_API_KEY },
 });
 ```
+
+## Security
+
+The proxy adds credentials, so it serves only the app's own page and
+non-browser tools. Without that, any website open in the developer's browser
+could call `http://localhost:5173/api/canopy/...`, or open a WebSocket (which
+has no CORS), and have the key added for it.
+
+- **Cross-origin requests are refused.** A request whose `Origin` does not
+  match the dev server's host and port (the `Host` header), or that has
+  `Sec-Fetch-Site: cross-site`, is answered `403` and never forwarded; a
+  WebSocket handshake is refused (Vite answers `404`). Same-origin requests
+  from the app, and clients that send no `Origin` (curl, scripts, tests),
+  pass. List other trusted origins, such as a Storybook on another port, in
+  `allowedOrigins`.
+- **Cookies are dropped.** The `Cookie` header is removed before forwarding,
+  so `localhost` cookies from other apps never reach the target.
+- **Keep Vite's host check.** DNS rebinding (a hostile name resolving to
+  your machine, so its `Origin` and `Host` agree) is blocked by Vite's
+  `server.allowedHosts` (Vite 6.0.9 and later); don't set it to `true`. With `server.host`
+  (listening on the LAN) anyone who can reach the port can use the key, as
+  with any dev proxy; prefer a key with limited rights.

@@ -65,7 +65,7 @@ configureColorMode({ storageKey: 'myapp.theme', defaultMode: 'light' });
 | `CARBON_THEME`, `ColorModeTheme`     | `{ light: 'g10', dark: 'g100' }` and the matching `<Theme>` root; `<html>` gets `data-theme` + `cds--g*`   |
 | `AppShell`                           | Fixed header, optional rail, `<main id="main-content">` offset by header and rail, banners, scrolling body |
 | `SideNavRail`, `NavItem`             | 256/48px collapsible rail of plain links; `onNavigate` for client-side routing                             |
-| `ToastProvider`, `useToast`          | Stacked toasts top-right under the header; 5 s default, `0` = sticky                                       |
+| `ToastProvider`, `useToast`          | Stacked toasts top-right under the header; 5 s default, `0` = sticky; errors sticky unless timed           |
 | `ConfirmProvider`, `useConfirm`      | `await confirm({ heading, body, danger })` returning a boolean                                             |
 | `ErrorBoundary`, `ErrorFallback`     | Render-error fallback with "Try again" and "Reload"                                                        |
 

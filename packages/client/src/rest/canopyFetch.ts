@@ -141,6 +141,20 @@ function isFormData(value: unknown): boolean {
   return Object.prototype.toString.call(value) === '[object FormData]';
 }
 
+/**
+ * A failure while fetching or reading the response: an abort passes through
+ * unchanged, anything else becomes `CanopyError('network_error', 0, ...)`.
+ */
+function networkFailure(err: unknown): unknown {
+  const error = err as { name?: unknown; message?: unknown } | null | undefined;
+  if (error?.name === 'AbortError') return err;
+  return new CanopyError(
+    'network_error',
+    0,
+    typeof error?.message === 'string' ? error.message : 'network failure'
+  );
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -237,7 +251,9 @@ function errorFromResponse(status: number, text: string): CanopyError {
  *   (structured entries on `issues`), a bare `{"detail": "..."}` becomes
  *   `not_found` (404) or `http_error`. A non-JSON body gives `unknown_error`
  *   with the raw text.
- * - Network-level failures are normalized to `CanopyError('network_error', 0, ...)`.
+ * - Network-level failures, including a body that fails mid-read, are
+ *   normalized to `CanopyError('network_error', 0, ...)`. Only a misuse
+ *   (such as no `fetch` implementation) throws something else.
  * - Aborts pass through unchanged (`err.name === 'AbortError'`), so callers
  *   can distinguish cancellation from failure.
  * - An empty 2xx body resolves to `undefined` (e.g. 204 responses).
@@ -291,11 +307,16 @@ export async function canopyFetch<T>(
     // and test fakes accept both, so cast here instead of widening the type.
     res = await fetchFn(url, init as Parameters<FetchLike>[1]);
   } catch (err) {
-    if ((err as { name?: string }).name === 'AbortError') throw err;
-    throw new CanopyError('network_error', 0, (err as Error).message ?? 'network failure');
+    throw networkFailure(err);
   }
 
-  const text = await res.text();
+  let text: string;
+  try {
+    text = await res.text();
+  } catch (err) {
+    // The connection dropped while the body was streaming in.
+    throw networkFailure(err);
+  }
 
   if (!res.ok) {
     throw errorFromResponse(res.status, text);

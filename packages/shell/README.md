@@ -149,7 +149,7 @@ How the store behaves:
 | `nameAs`                       | `<a>`             | Router link component for the name (Carbon `as`); see [Router links](#router-links)                                           |
 | `theme`                        | `'inherit'`       | Follows the surrounding `<Theme>`. `'white' \| 'g10' \| 'g90' \| 'g100'` wraps the bar in that theme                          |
 | `fixed`                        | `false`           | `true` = Carbon's fixed header (content needs a 3rem offset; `AppShell` handles it). `false` = in-flow (`position: relative`) |
-| `skipToContent`                | `'#main-content'` | Skip-link target, or `false`. `AppShell`'s `<main>` has that id                                                               |
+| `skipToContent`                | `'#main-content'` | Skip-link target, or `false`. `AppShell`'s `<main>` has that id; without `AppShell`, render one or pass `false`               |
 | `menu`                         | —                 | `{ open, onToggle, openLabel?, closeLabel? }` renders an always-visible hamburger ("Open menu" / "Close menu")                |
 | `actions`                      | —                 | App `HeaderGlobalAction`s, rendered before the standard actions                                                               |
 | `themeToggle`                  | `false`           | `true` or `{ shortcut: 'Alt+T' }` (appends " (Alt+T)" to the label; the app binds the key)                                    |
@@ -281,16 +281,22 @@ const NAV_ITEMS: NavItem[] = [
 ```tsx
 const toast = useToast();
 const id = toast.show({ kind: 'success', title: 'Run launched', subtitle: routine.name });
-toast.show({ kind: 'error', title: 'Dial-in failed', subtitle: message, timeoutMs: 0 }); // sticky
+toast.show({ kind: 'error', title: 'Dial-in failed', subtitle: message }); // sticky: errors stay
 toast.dismiss(id);
 ```
 
 - **Stack.** Toasts are Carbon `ToastNotification`s portaled to `<body>` and
-  stacked top-right, just under the header. The stack sits above modals.
-- **`timeoutMs`.** Defaults to 5000, or `ToastProvider defaultTimeoutMs`.
-  `0` makes the toast sticky.
+  stacked top-right, just under the header. Errors stack above the other
+  kinds. The stack sits above modals.
+- **`timeoutMs`.** Error toasts are sticky by default: they stay until the
+  user closes them or you call `dismiss(id)`, so nobody misses a failure.
+  The other kinds default to 5000 ms, or `ToastProvider defaultTimeoutMs`.
+  A `timeoutMs` on the toast overrides both; `0` makes any toast sticky.
 - **Closing.** The close button dismisses the toast.
-- **Roles.** Errors get `role="alert"`; other kinds get `role="status"`.
+- **Screen readers.** The stack's two live regions are mounted with the
+  provider, before any toast, so every toast is announced: errors in an
+  assertive `role="alert"` region, the other kinds in a polite
+  `role="status"` region. The toasts themselves are not live regions.
 - **Contrast.** Toasts use Carbon's high-contrast style by default. Set
   `ToastProvider lowContrast` for theme-following toasts.
 - **Theme.** The stack takes the theme of the nearest Carbon `<Theme>`. Render
@@ -322,8 +328,11 @@ if (
   `danger` gives a red primary button and starts focus on Cancel. In a danger
   dialog, Enter only activates the focused button and never confirms
   implicitly.
-- **Several requests.** Requests queue and are shown one at a time.
-- **Focus afterwards.** Focus returns to the element that opened the dialog.
+- **Several requests.** Requests queue and are shown one at a time. Each is
+  a fresh dialog with its own initial focus, so a queued danger dialog still
+  starts on Cancel.
+- **Focus afterwards.** Focus returns to the element that opened the dialog
+  (for a queue, the one that opened the first dialog).
 - **Unmount.** Unmounting the provider resolves pending requests with `false`.
 - **Setup.** Render `ConfirmProvider` inside `ColorModeTheme`. `useConfirm()`
   throws outside a provider.
@@ -358,6 +367,8 @@ if (
 | Hand-rolled toggle (`Light`/`Asleep`, "Toggle theme") | `themeToggle`: Sun/Moon, "Switch to light/dark mode"                                  |
 | Store read `localStorage` at import, unguarded        | Lazy and guarded; key/default configurable; `<html>` also gets `cds--g10`/`cds--g100` |
 | `useColorMode()` → `{ colorMode, toggle }`            | Adds `setColorMode` and `carbonTheme` (existing fields unchanged)                     |
+| Error toasts auto-dismiss after 5 s                   | Error toasts are sticky unless they set `timeoutMs`                                   |
+| No skip link                                          | `AppHeader` renders a "Skip to main content" link to `#main-content` (see below)      |
 
 **To keep the 0.1 look** (an always-dark bar with no prefix), for example in
 the screen viewer, pass `theme="g100" prefix=""`:
@@ -365,6 +376,14 @@ the screen viewer, pass `theme="g100" prefix=""`:
 ```tsx
 <AppHeader title="Canopy Screens" theme="g100" prefix="" />
 ```
+
+**The skip link needs a target.** `AppHeader` now renders Carbon's "Skip to
+main content" link pointing at `#main-content`. `AppShell` provides that id on
+its `<main>`. An app that renders `AppHeader` without `AppShell` (react-trace
+style) must either give its main content element `id="main-content"` (and
+`tabIndex={-1}`, so it can take focus), point the link elsewhere with
+`skipToContent="#my-content"`, or pass `skipToContent={false}`; otherwise
+the link goes nowhere.
 
 **To adopt the standard**, do three things:
 

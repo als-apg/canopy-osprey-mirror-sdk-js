@@ -88,15 +88,16 @@ import { awaitJob, JobFailedError } from '@slaclab/canopy-client';
 const done = await awaitJob(conn, jobId, {
   pollMs: 1000,
   timeoutMs: 10 * 60_000,
-  notFoundGraceMs: Infinity,
 });
 ```
 
-Canopy answers `404 job_not_found` while a job waits on a queue the Jobs API
-cannot see (optimization dial-in, reset and checkpoint jobs can queue for
-minutes) and after its result expired. `awaitJob` rejects on that 404 by
-default; `notFoundGraceMs` keeps polling through it. React apps get the same
-model from [`useCanopyJob`](react.md).
+Canopy answers `404 job_not_found` for an id it has no record of: a
+mistyped or foreign id, or a job whose result expired (after the worker's
+`keep_result_s`, one hour by default). A job still queued, on any worker
+queue, reports `pending`. `awaitJob` rejects on that 404 by default;
+`notFoundGraceMs` keeps polling through it (useful against older backends,
+which answered 404 while a job was queued on a non-default queue). React
+apps get the same model from [`useCanopyJob`](react.md).
 
 ## Testing
 

@@ -37,10 +37,6 @@ importers:
         version: 8.59.3(eslint@10.3.0)(typescript@6.0.3)
 
   packages/charts:
-    dependencies:
-      '@slaclab/canopy-shell':
-        specifier: workspace:^
-        version: link:../shell
     devDependencies:
       '@carbon/icons-react':
         specifier: ^11.81.0
@@ -48,6 +44,9 @@ importers:
       '@carbon/react':
         specifier: ^1.108.0
         version: 1.111.0(react-dom@19.2.6(react@19.2.6))(react-is@18.2.0)(react@19.2.6)(sass@1.101.0)
+      '@slaclab/canopy-shell':
+        specifier: workspace:^
+        version: link:../shell
       '@testing-library/dom':
         specifier: ^10.4.1
         version: 10.4.1

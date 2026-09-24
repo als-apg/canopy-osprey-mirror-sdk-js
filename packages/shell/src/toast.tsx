@@ -1,12 +1,4 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Theme, ToastNotification, useTheme } from '@carbon/react';
@@ -18,7 +10,11 @@ export interface ToastOptions {
   title: string;
   subtitle?: string;
   caption?: string;
-  /** Auto-dismiss delay in ms. Default: the provider's `defaultTimeoutMs` (5000). 0 = sticky. */
+  /**
+   * Auto-dismiss delay in ms; 0 = sticky. Default: sticky for `error`
+   * toasts, which stay until the user closes them (or `dismiss(id)`), and
+   * the provider's `defaultTimeoutMs` (5000) for the other kinds.
+   */
   timeoutMs?: number;
 }
 
@@ -31,7 +27,10 @@ export interface ToastApi {
 
 export interface ToastProviderProps {
   children: ReactNode;
-  /** Timeout for toasts that don't set `timeoutMs`. Default 5000; 0 = sticky. */
+  /**
+   * Timeout for non-error toasts that don't set `timeoutMs`. Default 5000;
+   * 0 = sticky. Error toasts are sticky unless they set `timeoutMs`.
+   */
   defaultTimeoutMs?: number;
   /** Use Carbon's low-contrast (theme-following) toasts instead of the high-contrast default. */
   lowContrast?: boolean;
@@ -39,16 +38,63 @@ export interface ToastProviderProps {
 
 interface ToastEntry extends ToastOptions {
   id: string;
+  /** Resolved auto-dismiss delay; 0 = sticky. */
+  timeoutMs: number;
 }
 
 const ToastContext = createContext<ToastApi | null>(null);
 
 let nextToastId = 0;
 
+interface ToastItemProps {
+  toast: ToastEntry;
+  lowContrast: boolean;
+  dismiss: (id: string) => void;
+}
+
+/**
+ * One toast. It owns its auto-dismiss timer, armed in an effect, so a
+ * remount (React StrictMode, Fast Refresh) re-arms the timer instead of
+ * losing it.
+ */
+function ToastItem({ toast, lowContrast, dismiss }: ToastItemProps) {
+  const { id, timeoutMs } = toast;
+  useEffect(() => {
+    if (timeoutMs <= 0) return;
+    const timer = setTimeout(() => dismiss(id), timeoutMs);
+    return () => clearTimeout(timer);
+  }, [id, timeoutMs, dismiss]);
+
+  return (
+    <ToastNotification
+      kind={toast.kind}
+      title={toast.title}
+      subtitle={toast.subtitle}
+      caption={toast.caption}
+      // The surrounding region announces the toast; the toast itself is not a
+      // second live region (which could read it twice).
+      role="status"
+      aria-live="off"
+      aria-label="Close notification"
+      lowContrast={lowContrast}
+      onClose={() => {
+        dismiss(id);
+        // The provider owns removal; keep Carbon from also hiding it internally.
+        return false;
+      }}
+    />
+  );
+}
+
 /**
  * Stacked Carbon ToastNotifications, portaled to <body> and pinned top-right
  * under the header. Render it inside the app's <ColorModeTheme> so the toasts
  * pick up the page theme.
+ *
+ * The stack's live regions are rendered, empty, from the provider's first
+ * render, so screen readers already watch them when a toast arrives: errors
+ * go into an assertive `role="alert"` region, the other kinds into a polite
+ * `role="status"` one. Errors stack above the other kinds.
  */
 export function ToastProvider({
   children,
@@ -56,15 +102,9 @@ export function ToastProvider({
   lowContrast = false,
 }: ToastProviderProps) {
   const [toasts, setToasts] = useState<ToastEntry[]>([]);
-  const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const { theme } = useTheme();
 
   const dismiss = useCallback((id: string) => {
-    const timer = timers.current.get(id);
-    if (timer !== undefined) {
-      clearTimeout(timer);
-      timers.current.delete(id);
-    }
     setToasts((list) => (list.some((t) => t.id === id) ? list.filter((t) => t.id !== id) : list));
   }, []);
 
@@ -72,57 +112,37 @@ export function ToastProvider({
     (toast: ToastOptions) => {
       nextToastId += 1;
       const id = `canopy-toast-${nextToastId}`;
-      setToasts((list) => [...list, { ...toast, id }]);
-      const timeout = toast.timeoutMs ?? defaultTimeoutMs;
-      if (timeout > 0) {
-        timers.current.set(
-          id,
-          setTimeout(() => dismiss(id), timeout)
-        );
-      }
+      const timeoutMs = toast.timeoutMs ?? (toast.kind === 'error' ? 0 : defaultTimeoutMs);
+      setToasts((list) => [...list, { ...toast, id, timeoutMs }]);
       return id;
     },
-    [defaultTimeoutMs, dismiss]
+    [defaultTimeoutMs]
   );
-
-  useEffect(() => {
-    const pending = timers.current;
-    return () => {
-      for (const timer of pending.values()) clearTimeout(timer);
-      pending.clear();
-    };
-  }, []);
 
   const api = useMemo<ToastApi>(() => ({ show, dismiss }), [show, dismiss]);
 
+  const toastsOf = (errors: boolean) =>
+    toasts
+      .filter((t) => (t.kind === 'error') === errors)
+      .map((t) => <ToastItem key={t.id} toast={t} lowContrast={lowContrast} dismiss={dismiss} />);
+
+  // Rendered even when empty: a live region that appears together with its
+  // first message is often not announced.
   const stack = (
     <Theme theme={theme} className="canopy-toasts">
-      {toasts.map((t) => (
-        <ToastNotification
-          key={t.id}
-          kind={t.kind}
-          title={t.title}
-          subtitle={t.subtitle}
-          caption={t.caption}
-          role={t.kind === 'error' ? 'alert' : 'status'}
-          aria-label="Close notification"
-          lowContrast={lowContrast}
-          onClose={() => {
-            dismiss(t.id);
-            // The provider owns removal; keep Carbon from also hiding it internally.
-            return false;
-          }}
-        />
-      ))}
+      <div className="canopy-toasts__region" role="alert" aria-live="assertive" aria-atomic="false">
+        {toastsOf(true)}
+      </div>
+      <div className="canopy-toasts__region" role="status" aria-live="polite" aria-atomic="false">
+        {toastsOf(false)}
+      </div>
     </Theme>
   );
 
   return (
     <ToastContext.Provider value={api}>
       {children}
-      {typeof document !== 'undefined' && toasts.length > 0
-        ? createPortal(stack, document.body)
-        : null}
+      {typeof document !== 'undefined' ? createPortal(stack, document.body) : null}
     </ToastContext.Provider>
   );
 }

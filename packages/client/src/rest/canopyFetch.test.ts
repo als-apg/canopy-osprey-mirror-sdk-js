@@ -100,6 +100,27 @@ describe('canopyFetch', () => {
     });
   });
 
+  it('normalizes a body that fails mid-read to network_error, but passes an abort through', async () => {
+    const failingBody = (error: Error): FetchLike =>
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        text: async () => {
+          throw error;
+        },
+      }));
+
+    await expect(
+      canopyFetch({ baseUrl: BASE_URL, fetch: failingBody(new TypeError('terminated')) }, '/x')
+    ).rejects.toMatchObject({ name: 'CanopyError', code: 'network_error', status: 0 });
+
+    const abort = new Error('The operation was aborted');
+    abort.name = 'AbortError';
+    await expect(canopyFetch({ baseUrl: BASE_URL, fetch: failingBody(abort) }, '/x')).rejects.toBe(
+      abort
+    );
+  });
+
   it('passes AbortError through unchanged instead of wrapping it', async () => {
     const abortError = new Error('The operation was aborted');
     abortError.name = 'AbortError';

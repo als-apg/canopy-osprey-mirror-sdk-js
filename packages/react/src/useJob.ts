@@ -11,10 +11,11 @@ import { useCanopyConnection } from './canopyContext.js';
 /**
  * What is known about a job:
  *
- * - `unknown`: the Jobs API answered 404 `job_not_found`. Canopy does that
- *   while a job waits on a non-default worker queue (optimization
- *   dial-in/reset/checkpoint jobs can queue for minutes) and after its
- *   result expired — so it never means `failed`.
+ * - `unknown`: the Jobs API answered 404 `job_not_found`: Canopy has no
+ *   record of the id (mistyped, or from another deployment), or the job's
+ *   result expired (after the worker's `keep_result_s`, one hour by
+ *   default). It never means `failed`. A queued job, on any worker queue,
+ *   is `pending`.
  * - `pending` / `running` / `completed` / `failed`: the job's own status.
  */
 export type JobState = 'unknown' | JobStatus;
@@ -29,8 +30,10 @@ export interface UseJobOptions {
   maxPollMs?: number;
   /**
    * After this long (from the first poll) with the job still `unknown`,
-   * surface the 404 on `error` and stop polling. Default: never — keep
-   * polling, since a queued job can legitimately stay invisible for minutes.
+   * surface the 404 on `error` and stop polling. Default 30000 (30 s), a
+   * margin for a job that is not visible yet; `0` surfaces the first 404
+   * (the 0.1 behaviour), `Infinity` polls for as long as the component is
+   * mounted.
    */
   notFoundGraceMs?: number;
 }
@@ -41,7 +44,8 @@ export interface UseJobResult {
   /**
    * The last poll's error (usually a `CanopyError`), cleared by the next
    * successful poll. Transient failures (network, 5xx, 408, 429) keep
-   * polling; any other error stops it.
+   * polling; any other error stops it, including a non-Canopy error such as
+   * a missing `fetch` implementation.
    */
   error: Error | null;
   /** True while the first response for the current id is still in flight. */
@@ -60,10 +64,16 @@ interface FetchedState {
 
 const DEFAULT_POLL_MS = 1000;
 const DEFAULT_MAX_POLL_MS = 5000;
+const DEFAULT_NOT_FOUND_GRACE_MS = 30_000;
 
-/** Failures worth retrying: no response, a server-side error, or a garbled body. */
+/**
+ * Failures worth retrying: no response, a server-side error, or a garbled
+ * body. Anything that is not a `CanopyError` is a misuse (no `fetch`, a bad
+ * id) that retrying cannot fix: `canopyFetch` turns every network-level
+ * failure into a `CanopyError`.
+ */
 function isTransient(error: unknown): boolean {
-  if (!(error instanceof CanopyError)) return true;
+  if (!(error instanceof CanopyError)) return false;
   if (error.code === 'invalid_json') return true;
   const { status } = error;
   return status === 0 || status >= 500 || status === 408 || status === 429;
@@ -79,11 +89,13 @@ function toError(error: unknown): Error {
  * Re-fetches every `pollMs` until the job reaches a terminal state
  * (`completed` / `failed`), the id changes, or the component unmounts; the
  * in-flight request is aborted on unmount and id change. A 404
- * `job_not_found` is reported as `status: 'unknown'` (never an error unless
- * `notFoundGraceMs` runs out) and polling continues with backoff; transient
+ * `job_not_found` (unknown id, or the result expired) is reported as
+ * `status: 'unknown'` and polled with backoff for `notFoundGraceMs`
+ * (default 30 s), then surfaced on `error` and polling stops; transient
  * failures surface on `error`, keep the last `job`, and keep polling with
- * backoff; other errors (401, 403, 422, ...) stop polling. Pass `id: null`
- * to render without a job (returns the idle state).
+ * backoff; other errors (401, 403, 422, a non-Canopy error, ...) stop
+ * polling. Pass `id: null` to render without a job (returns the idle
+ * state).
  */
 export function useJob(
   conn: CanopyConnection,
@@ -92,7 +104,7 @@ export function useJob(
 ): UseJobResult {
   const pollMs = options.pollMs ?? DEFAULT_POLL_MS;
   const maxPollMs = Math.max(options.maxPollMs ?? DEFAULT_MAX_POLL_MS, pollMs);
-  const { notFoundGraceMs } = options;
+  const notFoundGraceMs = options.notFoundGraceMs ?? DEFAULT_NOT_FOUND_GRACE_MS;
   // Depend on the connection's fields, not its identity, so an inline
   // `conn={{...}}` object literal does not restart polling every render.
   const { baseUrl, apiKey, fetch: fetchFn } = conn;
@@ -129,8 +141,7 @@ export function useJob(
       } catch (err) {
         if (cancelled) return;
         if (isJobNotFoundError(err)) {
-          const expired =
-            notFoundGraceMs !== undefined && Date.now() - startedAt >= notFoundGraceMs;
+          const expired = Date.now() - startedAt >= notFoundGraceMs;
           setFetched((previous) => ({
             forId: id,
             job: previousJob(previous),

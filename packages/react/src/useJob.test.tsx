@@ -178,7 +178,7 @@ describe('useJob status model', () => {
     expect(result.current.job?.error).toBe('boom');
   });
 
-  it('reports a 404 job_not_found as unknown (never an error) and keeps polling with backoff to 5 s', async () => {
+  it('reports a 404 job_not_found as unknown (not an error) and polls with backoff to 5 s', async () => {
     const fetch = createFakeFetch({
       'GET /jobs/v1/:id': [
         NOT_FOUND,
@@ -213,6 +213,34 @@ describe('useJob status model', () => {
     expect(result.current.status).toBe('running');
     await flush(1000); // back to the normal poll interval
     expect(result.current.status).toBe('completed');
+  });
+
+  it('by default turns an unknown lasting 30 s into an error, then stops', async () => {
+    const fetch = createFakeFetch({ 'GET /jobs/v1/:id': NOT_FOUND });
+    const { result } = renderHook(() => useJob({ baseUrl: 'http://host', fetch }, 'job-1'));
+
+    // Polls at 0, 1, 3, 7, 12, 17, 22, 27 s: still inside the grace.
+    await flush(29_000);
+    expect(result.current).toMatchObject({ status: 'unknown', error: null });
+    expect(fetch.calls).toHaveLength(8);
+
+    await flush(3_000); // the poll at 32 s is past it
+    expect(result.current.status).toBe('unknown');
+    expect(result.current.error).toMatchObject({ name: 'CanopyError', code: 'job_not_found' });
+
+    await flush(60_000);
+    expect(fetch.calls).toHaveLength(9);
+  });
+
+  it('notFoundGraceMs: Infinity keeps polling an unknown job while mounted', async () => {
+    const fetch = createFakeFetch({ 'GET /jobs/v1/:id': NOT_FOUND });
+    const { result } = renderHook(() =>
+      useJob({ baseUrl: 'http://host', fetch }, 'job-1', { notFoundGraceMs: Infinity })
+    );
+
+    await flush(10 * 60_000);
+    expect(result.current).toMatchObject({ status: 'unknown', error: null });
+    expect(fetch.calls.length).toBeGreaterThan(100);
   });
 
   it('turns a lasting unknown into an error after notFoundGraceMs, then stops', async () => {
@@ -263,6 +291,26 @@ describe('useJob status model', () => {
     await flush(200); // backoff 200 -> recovered
     expect(result.current).toMatchObject({ error: null, status: 'running', job: { progress: 60 } });
     expect(fetch.calls).toHaveLength(4);
+  });
+
+  it('stops on an error that is not a CanopyError (no fetch implementation)', async () => {
+    vi.stubGlobal('fetch', undefined);
+    try {
+      const { result } = renderHook(() =>
+        useJob({ baseUrl: 'http://host' }, 'job-1', { pollMs: 100 })
+      );
+      await flush();
+      expect(result.current.error?.message).toMatch(/no fetch implementation/);
+      expect(result.current).toMatchObject({ status: null, job: null, loading: false });
+
+      // Retrying cannot help: no further poll, even once a fetch exists.
+      const fetchFn = vi.fn<FetchLike>();
+      vi.stubGlobal('fetch', fetchFn);
+      await flush(60_000);
+      expect(fetchFn).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('aborts the in-flight request on unmount and on id change', async () => {

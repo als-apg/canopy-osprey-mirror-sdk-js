@@ -17,11 +17,14 @@ export async function getJob(
 }
 
 /**
- * True for the 404 `job_not_found` error {@link getJob} throws for an
- * unknown job id. Canopy also returns it while a job is still queued on a
- * non-default Arq queue (e.g. optimization dial-in/reset/checkpoint jobs,
- * which can wait minutes for a worker slot) and after its result expired,
- * so it means "unknown", not "failed".
+ * True for the 404 `job_not_found` error {@link getJob} throws when Canopy
+ * has no record of the id: it was never enqueued there (mistyped, or from
+ * another deployment), or the job finished and its result expired (results
+ * are kept for the worker's `keep_result_s`, one hour by default). It means
+ * "unknown", not "failed". A job waiting on any worker queue, the
+ * optimization worker's included, reports `pending` instead; only Canopy
+ * versions before commit daa584d answered 404 for a job queued on a
+ * non-default queue.
  */
 export function isJobNotFoundError(error: unknown): boolean {
   return error instanceof CanopyError && error.status === 404 && error.code === 'job_not_found';
@@ -50,10 +53,12 @@ export interface AwaitJobOptions {
   /** Abort polling; rejects with the abort reason (an `AbortError` by default). */
   signal?: AbortSignalLike;
   /**
-   * Treat a 404 `job_not_found` (see {@link isJobNotFoundError}) as "not
-   * visible yet" and keep polling until this long after the call started;
-   * after that the 404 is thrown. Default 0: the first 404 is thrown.
-   * `Infinity` never gives up on a 404 (combine with `timeoutMs`).
+   * Keep polling through a 404 `job_not_found` (see {@link isJobNotFoundError})
+   * until this long after the call started; after that the 404 is thrown.
+   * Default 0: the first 404 is thrown, since current Canopy answers 404 only
+   * for an unknown or expired job. A grace helps with older backends that
+   * answered 404 while a job was still queued. `Infinity` never gives up on a
+   * 404 (combine with `timeoutMs`).
    */
   notFoundGraceMs?: number;
 }
@@ -66,8 +71,9 @@ export interface AwaitJobOptions {
  * - Rejects with `CanopyError('job_timeout', 0, ...)` when `timeoutMs` elapses.
  * - Rejects with the abort reason when `signal` aborts (in-flight fetches
  *   pass their `AbortError` through; between polls the sleep is cut short).
- * - A 404 `job_not_found` rejects immediately, unless `notFoundGraceMs`
- *   allows waiting for the job to show up.
+ * - A 404 `job_not_found` (unknown id, or the result expired) rejects
+ *   immediately, unless `notFoundGraceMs` allows waiting for the job to
+ *   show up.
  */
 export async function awaitJob(
   conn: CanopyConnection,

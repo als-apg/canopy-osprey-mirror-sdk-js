@@ -50,7 +50,7 @@ a string):
 | FastAPI validation `422 {"detail": [{loc, msg, type}, ...]}`       | `validation_error`               | `"body.bounds: Value error, ...; ..."` |
 | Framework error without a code, e.g. `404 {"detail": "Not Found"}` | `not_found` (404) / `http_error` | the `detail` text                      |
 | Non-JSON body (e.g. a proxy's `502 Bad Gateway`)                   | `unknown_error`                  | the raw body, or `HTTP <status>`       |
-| No response (DNS, refused, CORS)                                   | `network_error` (status 0)       | the fetch error message                |
+| No response (DNS, refused, CORS), or the body cut off mid-read     | `network_error` (status 0)       | the fetch error message                |
 
 A `validation_error` also carries the structured entries on `issues`
 (`{ loc, msg, type, input?, ctx? }[]`), so forms can map them onto fields.
@@ -256,12 +256,15 @@ try {
 `failed`, `CanopyError('job_timeout')` on timeout, and the abort reason when
 its `signal` aborts.
 
-Canopy's Jobs API answers `404 job_not_found` while a job is still queued
-on a worker queue it cannot see (optimization dial-in/reset/checkpoint jobs
-can wait minutes for a worker slot) and after the result expired. By
-default `awaitJob` rejects on that 404; pass `notFoundGraceMs` to keep
-polling through it for that long (`Infinity` together with `timeoutMs` for
-"until the deadline"). `isJobNotFoundError(err)` identifies the 404.
+Canopy's Jobs API answers `404 job_not_found` when it has no record of the
+id: it is mistyped or from another deployment, or the job finished and its
+result expired (after the worker's `keep_result_s`, one hour by default). A
+job still waiting on a worker queue, the optimization worker's included,
+reports `pending`. (Canopy before commit daa584d answered 404 for a job
+queued on a non-default queue.) By default `awaitJob` rejects on the 404;
+pass `notFoundGraceMs` to keep polling through it for that long (`Infinity`
+together with `timeoutMs` for "until the deadline"), e.g. against an older
+backend. `isJobNotFoundError(err)` identifies the 404.
 
 ## Time helpers
 
@@ -328,3 +331,25 @@ serializes snake_case to camelCase on the wire):
 - `src/pv/` — the `PVService` abstraction and its local implementations
   (`MockPVService`, `LocalPVService` for `loc://name?type=&init=` PVs,
   `RoutedPVService` for scheme-prefix routing)
+
+## Migrating from 0.1
+
+**`FetchLike`'s `init.body` is wider.** In 0.1 it was
+`body: string`; in 0.2 it is `body?: string | FormData` (absent for
+requests without a body, and a `FormData` passed through untouched for
+multipart uploads). The global `fetch` and `createFakeFetch` still fit. A
+hand-typed fetch wrapper that declares `body: string` no longer type-checks
+as a `FetchLike` under `strictFunctionTypes` (part of `strict`); widen its
+parameter, most simply to the SDK's own type:
+
+```ts
+import type { FetchLike } from '@slaclab/canopy-client';
+
+// Before: (url: string, init: { method: string; headers: Record<string, string>; body: string })
+function loggingFetch(url: string, init: Parameters<FetchLike>[1]) {
+  console.debug(init.method, url);
+  return fetch(url, init);
+}
+
+const conn = { baseUrl: '/api/canopy', fetch: loggingFetch };
+```
