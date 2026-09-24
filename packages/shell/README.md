@@ -149,7 +149,7 @@ How the store behaves:
 | `nameAs`                       | `<a>`             | Router link component for the name (Carbon `as`); see [Router links](#router-links)                                           |
 | `theme`                        | `'inherit'`       | Follows the surrounding `<Theme>`. `'white' \| 'g10' \| 'g90' \| 'g100'` wraps the bar in that theme                          |
 | `fixed`                        | `false`           | `true` = Carbon's fixed header (content needs a 3rem offset; `AppShell` handles it). `false` = in-flow (`position: relative`) |
-| `skipToContent`                | `'#main-content'` | Skip-link target, or `false`. `AppShell`'s `<main>` has that id                                                               |
+| `skipToContent`                | `'#main-content'` | Skip-link target, or `false`. `AppShell`'s `<main>` has that id; without `AppShell`, render one or pass `false`               |
 | `menu`                         | —                 | `{ open, onToggle, openLabel?, closeLabel? }` renders an always-visible hamburger ("Open menu" / "Close menu")                |
 | `actions`                      | —                 | App `HeaderGlobalAction`s, rendered before the standard actions                                                               |
 | `themeToggle`                  | `false`           | `true` or `{ shortcut: 'Alt+T' }` (appends " (Alt+T)" to the label; the app binds the key)                                    |
@@ -368,6 +368,7 @@ if (
 | Store read `localStorage` at import, unguarded        | Lazy and guarded; key/default configurable; `<html>` also gets `cds--g10`/`cds--g100` |
 | `useColorMode()` → `{ colorMode, toggle }`            | Adds `setColorMode` and `carbonTheme` (existing fields unchanged)                     |
 | Error toasts auto-dismiss after 5 s                   | Error toasts are sticky unless they set `timeoutMs`                                   |
+| No skip link                                          | `AppHeader` renders a "Skip to main content" link to `#main-content` (see below)      |
 
 **To keep the 0.1 look** (an always-dark bar with no prefix), for example in
 the screen viewer, pass `theme="g100" prefix=""`:
@@ -375,6 +376,14 @@ the screen viewer, pass `theme="g100" prefix=""`:
 ```tsx
 <AppHeader title="Canopy Screens" theme="g100" prefix="" />
 ```
+
+**The skip link needs a target.** `AppHeader` now renders Carbon's "Skip to
+main content" link pointing at `#main-content`. `AppShell` provides that id on
+its `<main>`. An app that renders `AppHeader` without `AppShell` (react-trace
+style) must either give its main content element `id="main-content"` (and
+`tabIndex={-1}`, so it can take focus), point the link elsewhere with
+`skipToContent="#my-content"`, or pass `skipToContent={false}`; otherwise
+the link goes nowhere.
 
 **To adopt the standard**, do three things:
 
