@@ -10,17 +10,16 @@
   --canopy-brand: #901515;
 }
 
-/*
- * DECISION NEEDED: #901515 on the g100 header background (#161616) is about
- * 2.0:1, which fails WCAG AA (about 8:1 on g10). react-squirrel ships it as-is,
- * so this package matches it. A dark-mode override such as Carbon red-40
- * (about 7.6:1) would look like:
- *
- * .cds--g90 .canopy-header,
- * .cds--g100 .canopy-header {
- *   --canopy-brand: #ff8389;
- * }
- */
+/* On a dark header #901515 is about 2:1 against #161616 (fails WCAG AA; it is
+   about 8:1 on g10), so dark themes use Carbon red-40 (about 7.6:1). Matches
+   both a dark app theme (ColorModeTheme / <html class="cds--g100">) and the
+   legacy always-dark bar (`theme="g100"`). */
+.cds--g90 .canopy-header,
+.cds--g100 .canopy-header,
+.canopy-header.cds--g90,
+.canopy-header.cds--g100 {
+  --canopy-brand: #ff8389;
+}
 
 /* ---------------------------------------------------------------- Header -- */
 

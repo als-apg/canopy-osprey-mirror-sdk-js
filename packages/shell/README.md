@@ -169,23 +169,14 @@ as `ThemeToggleAction` for custom bars.
 
 **Branding.**
 
-- The prefix and name use `var(--canopy-brand)`, which is `#901515` (the same
-  value as squirrel).
+- The prefix and name use `var(--canopy-brand)`: SLAC red `#901515` (the same
+  value as squirrel) on light headers, and Carbon red-40 `#ff8389` on dark
+  (g90/g100) headers. `#901515` would be only about 2:1 against the g100 header
+  background, which fails WCAG AA; red-40 is about 7.6:1. An app can override
+  `--canopy-brand` itself.
 - Header icon buttons drop their focus ring after a mouse click. Keyboard focus
   rings stay.
 - Header tooltips use Carbon's inverse tokens.
-
-> **Contrast.** `#901515` on the g100 header background (`#161616`) is about
-> 2:1, which fails WCAG AA. It is about 8:1 on g10. The package ships
-> squirrel's value unchanged. `styles.css` contains a commented-out dark-mode
-> override (Carbon red-40 `#ff8389`, about 7.6:1). An app can apply it itself:
->
-> ```css
-> .cds--g90 .canopy-header,
-> .cds--g100 .canopy-header {
->   --canopy-brand: #ff8389;
-> }
-> ```
 
 ### Router links
 
@@ -361,7 +352,7 @@ if (
 | ----------------------------------------------------- | ------------------------------------------------------------------------------------- |
 | `<AppHeader title="X" toolbar={…}>`                   | Still compiles (deprecated). Prefer `productName` and `actions`                       |
 | Header always dark (forced `g100` wrapper)            | Follows the page theme (`theme="inherit"`)                                            |
-| No prefix                                             | `SLAC` prefix; name and prefix in `#901515`                                           |
+| No prefix                                             | `SLAC` prefix; name and prefix in SLAC red (`#901515`; `#ff8389` on dark headers)     |
 | `.canopy-header__name { letter-spacing: 0.04em }`     | Removed (squirrel). Apps that want it (trace) keep it in their own CSS                |
 | Body themes `g90` / `g10` in the README               | `g100` / `g10` via `CARBON_THEME` / `ColorModeTheme`                                  |
 | Hand-rolled toggle (`Light`/`Asleep`, "Toggle theme") | `themeToggle`: Sun/Moon, "Switch to light/dark mode"                                  |

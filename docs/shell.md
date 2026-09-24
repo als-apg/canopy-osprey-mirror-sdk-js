@@ -8,7 +8,7 @@ The standard chrome for Canopy web apps: the SLAC-branded header, the light/dark
 color mode, the page layout, and the feedback primitives every app needs. The
 look follows react-squirrel after PR #181:
 
-- a **"SLAC"** prefix and product name in SLAC red (`#901515`)
+- a **"SLAC"** prefix and product name in SLAC red (`#901515`; Carbon red-40 `#ff8389` on dark headers, for contrast)
 - a header that **follows the page theme**
 - Carbon **g10** (light) and **g100** (dark)
 - trailing actions in the order **app actions → theme → report bug → help**
@@ -101,9 +101,9 @@ changed:
 
 To keep the old always-dark bar, pass `theme="g100" prefix=""`.
 
-!!! warning "Brand contrast"
+!!! note "Brand contrast"
 
-    SLAC red on the g100 header background is about 2:1, below WCAG AA. The
-    shell ships react-squirrel's value unchanged. `styles.css` contains a
-    commented-out dark-mode override (`--canopy-brand: #ff8389`) for apps that
-    want AA contrast.
+    SLAC red `#901515` is about 2:1 against the g100 header background, below
+    WCAG AA, so dark (g90/g100) headers use Carbon red-40 `#ff8389` (about
+    7.6:1). Light headers keep `#901515` (about 8:1). Override
+    `--canopy-brand` to change it.
