@@ -28,6 +28,9 @@ export type {
 } from './widget.js';
 export { isAction, readActions } from './widget.js';
 
-export type { Rule, RulePvBinding, RuleCondition } from './rules.js';
+export type { Rule, RulePvBinding, RuleCondition, RuleScalar, RuleValue } from './rules.js';
+
+export type { ColorRole } from './colorRole.js';
+export { isColorRole } from './colorRole.js';
 
 export { validate } from './validate.js';
