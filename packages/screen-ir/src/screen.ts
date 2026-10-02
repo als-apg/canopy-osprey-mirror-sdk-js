@@ -1,10 +1,16 @@
 import type { FormulaDeclaration } from './formula.js';
 import type { MacroDeclaration } from './macros.js';
+import type { SUPPORTED_SCHEMA_VERSIONS } from './schemaVersion.js';
 import type { WidgetNode } from './widget.js';
 
-/** Bump on breaking change; minor bump on additive. */
+/**
+ * The base Screen IR version. Bump on breaking change; minor bump on additive.
+ * Stays `'1.0'` for existing importers; writers that may emit color roles stamp
+ * with `stampSchemaVersion()` instead.
+ */
 export const SCHEMA_VERSION = '1.0' as const;
-export type SchemaVersion = typeof SCHEMA_VERSION;
+/** Any version in `SUPPORTED_SCHEMA_VERSIONS`. */
+export type SchemaVersion = (typeof SUPPORTED_SCHEMA_VERSIONS)[number];
 
 /**
  * `"screen"` is a directly-renderable screen. `"template"` is a parameterized

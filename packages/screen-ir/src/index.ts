@@ -1,6 +1,11 @@
 // @slaclab/canopy-screen-ir public surface.
 
 export { SCHEMA_VERSION } from './screen.js';
+export {
+  SUPPORTED_SCHEMA_VERSIONS,
+  isSupportedSchemaVersion,
+  stampSchemaVersion,
+} from './schemaVersion.js';
 export type {
   SchemaVersion,
   ScreenKind,

@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://controls.slac.stanford.edu/schemas/screen-ir/1.0/schema.json",
+  "$id": "https://controls.slac.stanford.edu/schemas/screen-ir/1.1/schema.json",
   "title": "Canopy Screen IR",
   "description": "Canonical Canopy screen Intermediate Representation. Owned by @canopy/screen-ir; mirrors the TypeScript types in src/. This file is the structural subset of the contract; cross-field rules (macro defaults, the Rule union arm, fox:// resolution) are enforced by validate()'s semantic layer.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "kind", "id", "metadata", "macros", "root"],
   "properties": {
-    "schemaVersion": { "const": "1.0" },
+    "schemaVersion": { "enum": ["1.0", "1.1"] },
     "kind": { "enum": ["screen", "template"] },
     "id": { "type": "string" },
     "metadata": { "$ref": "#/$defs/ScreenMetadata" },
