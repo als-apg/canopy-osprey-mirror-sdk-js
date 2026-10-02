@@ -40,5 +40,6 @@ export { isColorRole } from './colorRole.js';
 
 export type { FlatScheme, SchemeMeta, SchemeError } from './flatScheme.js';
 export { parseFlatScheme, isServerFallback, CANOPY_DEFAULT_SCHEME_ID } from './flatScheme.js';
+export { canopyDefaultFlat } from './canopyDefault.js';
 
 export { validate } from './validate.js';

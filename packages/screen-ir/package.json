@@ -24,7 +24,8 @@
   },
   "files": [
     "dist",
-    "schema"
+    "schema",
+    "data"
   ],
   "sideEffects": false,
   "scripts": {
