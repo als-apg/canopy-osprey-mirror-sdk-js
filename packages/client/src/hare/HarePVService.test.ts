@@ -49,6 +49,11 @@ function initialFrame(
   return { type: 'initial', data, meta, count: Object.keys(data).length };
 }
 
+/** Let the service's end-of-tick subscribe/unsubscribe flush run. */
+async function flushSends(): Promise<void> {
+  await Promise.resolve();
+}
+
 function diffFrame(data: Record<string, PVValueDTO>): HareDiffFrame {
   return { type: 'diff', data, count: Object.keys(data).length, timestamp: 0 };
 }
@@ -461,7 +466,7 @@ describe('HarePVService', () => {
   // ── Unsubscribe ───────────────────────────────────────────────────────────
 
   describe('unsubscribe', () => {
-    it('sends nothing while other listeners remain, and unsubscribes + drops the snapshot when the last one leaves', () => {
+    it('sends nothing while other listeners remain, and unsubscribes + drops the snapshot when the last one leaves', async () => {
       const { factory, instances } = createFakeWebSocketFactory();
       const service = new HarePVService({ url: BASE_URL, webSocketFactory: factory });
       service.connect();
@@ -474,14 +479,183 @@ describe('HarePVService', () => {
       const unsub2 = service.subscribe('PV1', listener2);
       socket.message(initialFrame({ PV1: makeValue({ pv: 'PV1', value: 1 }) }));
 
+      await flushSends();
       socket.sent.length = 0;
       unsub1();
+      await flushSends();
       expect(socket.sent).toHaveLength(0);
       expect(service.getSnapshot('PV1')).toBeDefined();
 
       unsub2();
-      expect(socket.parsedSent()).toEqual([{ type: 'unsubscribe', pvNames: ['PV1'] }]);
+      // The snapshot goes at once; the frame follows at the end of the tick.
       expect(service.getSnapshot('PV1')).toBeUndefined();
+      await flushSends();
+      expect(socket.parsedSent()).toEqual([{ type: 'unsubscribe', pvNames: ['PV1'] }]);
+    });
+  });
+
+  // ── Frame batching ──────────────────────────────────────────────────────
+
+  describe('subscribe/unsubscribe batching', () => {
+    function openService() {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new HarePVService({ url: BASE_URL, webSocketFactory: factory });
+      service.connect();
+      const socket = instances[0]!;
+      socket.open();
+      return { service, socket, instances };
+    }
+
+    it('coalesces N synchronous subscribes into one frame with N names', async () => {
+      const { service, socket } = openService();
+      const names = Array.from({ length: 200 }, (_, i) => `PV${i}`);
+      for (const name of names) service.subscribe(name, vi.fn());
+
+      expect(socket.sent).toHaveLength(0); // nothing until the end of the tick
+      await flushSends();
+      expect(socket.parsedSent()).toEqual([{ type: 'subscribe', pvNames: names }]);
+    });
+
+    it('a second listener on a pending PV adds no name, and later ticks get their own frame', async () => {
+      const { service, socket } = openService();
+      service.subscribe('A', vi.fn());
+      service.subscribe('A', vi.fn());
+      service.subscribe('B', vi.fn());
+      await flushSends();
+      service.subscribe('C', vi.fn());
+      await flushSends();
+      expect(socket.parsedSent()).toEqual([
+        { type: 'subscribe', pvNames: ['A', 'B'] },
+        { type: 'subscribe', pvNames: ['C'] },
+      ]);
+    });
+
+    it('splits a batch larger than the per-frame cap into several frames', async () => {
+      const { service, socket } = openService();
+      const names = Array.from({ length: 2500 }, (_, i) => `PV${i}`);
+      for (const name of names) service.subscribe(name, vi.fn());
+      await flushSends();
+      const frames = socket.parsedSent() as { type: string; pvNames: string[] }[];
+      expect(frames.map((f) => f.pvNames.length)).toEqual([1000, 1000, 500]);
+      expect(frames.every((f) => f.type === 'subscribe')).toBe(true);
+      expect(frames.flatMap((f) => f.pvNames)).toEqual(names);
+    });
+
+    it('keeps mixed subscribe/unsubscribe order as consecutive runs', async () => {
+      const { service, socket } = openService();
+      const unsubA = service.subscribe('A', vi.fn());
+      const unsubB = service.subscribe('B', vi.fn());
+      await flushSends();
+      socket.sent.length = 0;
+
+      service.subscribe('C', vi.fn());
+      service.subscribe('D', vi.fn());
+      unsubA();
+      unsubB();
+      service.subscribe('E', vi.fn());
+      await flushSends();
+
+      expect(socket.parsedSent()).toEqual([
+        { type: 'subscribe', pvNames: ['C', 'D'] },
+        { type: 'unsubscribe', pvNames: ['A', 'B'] },
+        { type: 'subscribe', pvNames: ['E'] },
+      ]);
+    });
+
+    it('re-subscribing a PV unsubscribed in the same tick sends both frames in order, so the server re-seeds it', async () => {
+      const { service, socket } = openService();
+      const unsub = service.subscribe('A', vi.fn());
+      await flushSends();
+      socket.sent.length = 0;
+
+      unsub();
+      service.subscribe('A', vi.fn());
+      await flushSends();
+
+      expect(socket.parsedSent()).toEqual([
+        { type: 'unsubscribe', pvNames: ['A'] },
+        { type: 'subscribe', pvNames: ['A'] },
+      ]);
+    });
+
+    it('a subscribe undone in the same tick sends nothing and leaves no subscription behind', async () => {
+      const { service, socket, instances } = openService();
+      const unsub = service.subscribe('A', vi.fn());
+      service.subscribe('B', vi.fn());
+      unsub();
+      await flushSends();
+
+      expect(socket.parsedSent()).toEqual([{ type: 'subscribe', pvNames: ['B'] }]);
+
+      // A StrictMode-style mount/unmount/mount nets to one subscribe.
+      socket.sent.length = 0;
+      const unsubC = service.subscribe('C', vi.fn());
+      unsubC();
+      const listenerC = vi.fn();
+      service.subscribe('C', listenerC);
+      await flushSends();
+      expect(socket.parsedSent()).toEqual([{ type: 'subscribe', pvNames: ['C'] }]);
+
+      // Net frames on the wire: subscribe B, subscribe C -- exactly the PVs
+      // with listeners, which is also what a reconnect resubscribes. A stray
+      // frame for A is ignored rather than cached.
+      socket.message(initialFrame({ A: makeValue({ pv: 'A' }) }, { A: makeMeta({ pv: 'A' }) }));
+      expect(service.getSnapshot('A')).toBeUndefined();
+      expect(service.getMeta('A')).toBeUndefined();
+
+      socket.close();
+      vi.advanceTimersByTime(1000);
+      instances[1]!.open();
+      expect(instances[1]!.parsedSent()).toEqual([{ type: 'subscribe', pvNames: ['B', 'C'] }]);
+    });
+
+    it('reconnect resubscribes every listened PV in one frame and drops ops queued for the dead socket', async () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new HarePVService({ url: BASE_URL, webSocketFactory: factory });
+      service.connect();
+      const socket1 = instances[0]!;
+      socket1.open();
+      const unsubA = service.subscribe('A', vi.fn());
+      service.subscribe('B', vi.fn());
+      await flushSends();
+      socket1.sent.length = 0;
+
+      // Queued while open, but the socket dies before the tick ends.
+      service.subscribe('C', vi.fn());
+      unsubA();
+      socket1.close();
+      await flushSends();
+      expect(socket1.sent).toHaveLength(0);
+
+      vi.advanceTimersByTime(1000);
+      const socket2 = instances[1]!;
+      socket2.open();
+      await flushSends();
+      expect(socket2.parsedSent()).toEqual([{ type: 'subscribe', pvNames: ['B', 'C'] }]);
+    });
+
+    it('sends nothing while the socket is not open', async () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new HarePVService({ url: BASE_URL, webSocketFactory: factory });
+      service.connect();
+      const socket = instances[0]!;
+      const unsub = service.subscribe('A', vi.fn());
+      service.subscribe('B', vi.fn());
+      unsub();
+      await flushSends();
+      expect(socket.sent).toHaveLength(0);
+
+      socket.open();
+      await flushSends();
+      expect(socket.parsedSent()).toEqual([{ type: 'subscribe', pvNames: ['B'] }]);
+    });
+
+    it('drops queued ops on disconnect()', async () => {
+      const { service, socket } = openService();
+      service.subscribe('A', vi.fn());
+      service.disconnect();
+      await flushSends();
+      expect(socket.sent).toHaveLength(0);
     });
   });
 

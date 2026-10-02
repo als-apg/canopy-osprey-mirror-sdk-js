@@ -80,6 +80,32 @@ const DEFAULT_RECONNECT_DELAYS_MS = [1000, 2000, 4000, 8000, 15000];
 const DEFAULT_PING_INTERVAL_MS = 15000;
 const DEFAULT_PONG_TIMEOUT_MS = 10000;
 
+/**
+ * Most PV names put in one subscribe/unsubscribe frame. Hare silently
+ * truncates a subscribe frame past its `max_pvs_per_message` (5000 by
+ * default), so larger batches are split well below that.
+ */
+const MAX_PVS_PER_FRAME = 1000;
+
+type PendingOpType = 'subscribe' | 'unsubscribe';
+
+interface PendingOp {
+  type: PendingOpType;
+  pvName: string;
+  /** Cleared when a later unsubscribe cancels this subscribe before it was sent. */
+  live: boolean;
+}
+
+/** Run `fn` after the current synchronous work, before any timer or I/O callback. */
+function scheduleMicrotask(fn: () => void): void {
+  const qm = (globalThis as { queueMicrotask?: (cb: () => void) => void }).queueMicrotask;
+  if (typeof qm === 'function') {
+    qm(fn);
+  } else {
+    void Promise.resolve().then(fn);
+  }
+}
+
 const SEVERITY_MAP: Record<HareAlarmSeverity, AlarmSeverity> = {
   NO_ALARM: AlarmSeverity.NO_ALARM,
   MINOR: AlarmSeverity.MINOR,
@@ -141,6 +167,14 @@ export class HarePVService implements PVService {
   private pingTimer: number | undefined;
   private pongTimer: number | undefined;
 
+  // Subscribe/unsubscribe ops issued while the socket is open, in call order,
+  // flushed as few frames as possible at the end of the current tick (a screen
+  // mounting hundreds of widgets in one commit sends one frame, not hundreds).
+  // `pendingByName` holds each name's latest pending op.
+  private pendingOps: PendingOp[] = [];
+  private pendingByName = new Map<string, PendingOp>();
+  private flushScheduled = false;
+
   constructor(options: HarePVServiceOptions) {
     this.url = options.url;
     this.apiKey = options.apiKey;
@@ -182,6 +216,7 @@ export class HarePVService implements PVService {
     this.stopHeartbeat();
     const socket = this.socket;
     this.socket = null;
+    this.clearPending();
     if (socket) {
       socket.onopen = null;
       socket.onmessage = null;
@@ -210,7 +245,7 @@ export class HarePVService implements PVService {
     }
 
     if (isFirstListener && this.socket && this.socket.readyState === WS_OPEN) {
-      this.sendSubscribe([pvName]);
+      this.enqueue('subscribe', pvName);
     }
 
     return () => {
@@ -222,7 +257,7 @@ export class HarePVService implements PVService {
         this.snapshots.delete(pvName);
         this.metas.delete(pvName);
         if (this.socket && this.socket.readyState === WS_OPEN) {
-          this.sendUnsubscribe([pvName]);
+          this.enqueue('unsubscribe', pvName);
         }
       }
     };
@@ -280,6 +315,9 @@ export class HarePVService implements PVService {
     }
 
     this.setStatus('connecting');
+    // Ops queued for a previous socket are void: the new socket's open
+    // resubscribes every PV that still has listeners.
+    this.clearPending();
 
     const wsUrl = this.apiKey
       ? `${this.url}${this.url.includes('?') ? '&' : '?'}api_key=${encodeURIComponent(this.apiKey)}`
@@ -330,6 +368,7 @@ export class HarePVService implements PVService {
 
   private handleSocketClose(): void {
     this.socket = null;
+    this.clearPending();
     this.stopHeartbeat();
     this.setStatus('disconnected');
     this.markAllDisconnected();
@@ -508,12 +547,76 @@ export class HarePVService implements PVService {
 
   // ── Outbound messages ───────────────────────────────────────────────────
 
-  private sendSubscribe(pvNames: string[]): void {
-    this.socket?.send(JSON.stringify({ type: 'subscribe', pvNames }));
+  private enqueue(type: PendingOpType, pvName: string): void {
+    const latest = this.pendingByName.get(pvName);
+    if (type === 'unsubscribe' && latest?.type === 'subscribe') {
+      // A subscribe is only issued when the PV had no listeners, so the server
+      // does not hold it; dropping the unsent subscribe together with this
+      // unsubscribe leaves the server exactly where both frames would.
+      latest.live = false;
+      this.pendingByName.delete(pvName);
+      return;
+    }
+    const op: PendingOp = { type, pvName, live: true };
+    this.pendingOps.push(op);
+    this.pendingByName.set(pvName, op);
+    if (!this.flushScheduled) {
+      this.flushScheduled = true;
+      scheduleMicrotask(() => this.flushPending());
+    }
   }
 
-  private sendUnsubscribe(pvNames: string[]): void {
-    this.socket?.send(JSON.stringify({ type: 'unsubscribe', pvNames }));
+  private clearPending(): void {
+    this.pendingOps = [];
+    this.pendingByName.clear();
+  }
+
+  /**
+   * Send the pending ops in call order, one frame per run of consecutive
+   * same-type ops (Hare applies frames strictly in arrival order, so a run
+   * never crosses an op of the other type).
+   */
+  private flushPending(): void {
+    this.flushScheduled = false;
+    const ops = this.pendingOps;
+    this.clearPending();
+    const socket = this.socket;
+    // Not open (closed or replaced since enqueue): the reconnect's
+    // resubscribeAll covers every PV that still has listeners.
+    if (!socket || socket.readyState !== WS_OPEN) return;
+
+    let runType: PendingOpType | null = null;
+    let run: string[] = [];
+    let seen = new Set<string>();
+    const emit = () => {
+      if (runType && run.length > 0) this.sendFrames(runType, run);
+    };
+    for (const op of ops) {
+      if (!op.live) continue;
+      if (op.type !== runType) {
+        emit();
+        runType = op.type;
+        run = [];
+        seen = new Set();
+      }
+      if (!seen.has(op.pvName)) {
+        seen.add(op.pvName);
+        run.push(op.pvName);
+      }
+    }
+    emit();
+  }
+
+  private sendSubscribe(pvNames: string[]): void {
+    this.sendFrames('subscribe', pvNames);
+  }
+
+  private sendFrames(type: PendingOpType, pvNames: string[]): void {
+    const socket = this.socket;
+    if (!socket) return;
+    for (let i = 0; i < pvNames.length; i += MAX_PVS_PER_FRAME) {
+      socket.send(JSON.stringify({ type, pvNames: pvNames.slice(i, i + MAX_PVS_PER_FRAME) }));
+    }
   }
 
   // ── Status / error reporting ────────────────────────────────────────────
