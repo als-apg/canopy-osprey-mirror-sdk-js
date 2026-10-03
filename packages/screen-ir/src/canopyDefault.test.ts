@@ -3,7 +3,7 @@ import pkg from '../package.json' with { type: 'json' };
 import { CANOPY_DEFAULT_SCHEME_ID, canopyDefaultFlat, parseFlatScheme } from './index.js';
 
 /** sha256 of the canonical canopy-default.json the flat file was generated from. */
-const PACKAGED_SHA256 = '36e765dc007f378c468baa41173cee4973a123c16e936e30b5becf9e187b4683';
+const PACKAGED_SHA256 = 'f05a3580268d2fa2673665a257deb13803f3a5a265da998f851b852960f82bea';
 
 const BUILDER_DEFAULTS = ['Text', 'Read_Background', 'Background', 'On', 'Off'];
 const D5_DEFAULTS = ['Text', 'Read_Background', 'Display_Background'];
@@ -15,6 +15,8 @@ const CONTRAST_PAIRS = [
   'Header_Background',
   'Button_Background',
 ];
+/** Grid splits by use: line colour (`Grid`) and the filled background (`Grid_Fill`). */
+const GRID_ROLES = ['Grid', 'Grid_Fill'];
 
 describe('canopyDefaultFlat', () => {
   it.each([
@@ -22,6 +24,7 @@ describe('canopyDefaultFlat', () => {
     ['D5 defaults', D5_DEFAULTS],
     ['alarm roles', ALARM_ROLES],
     ['contrast pairs', CONTRAST_PAIRS],
+    ['grid roles', GRID_ROLES],
   ])('contains every role named by the %s', (_label, roles) => {
     for (const role of roles) expect(canopyDefaultFlat.roles).toContain(role);
   });
