@@ -115,6 +115,7 @@ export class LocalPVService implements PVService {
         ...pv.data,
         value,
         displayValue: String(value),
+        valueKind: typeof value === 'number' ? 'scalar' : 'string',
         connected: true,
         timestamp: Date.now(),
       };
@@ -140,6 +141,7 @@ export class LocalPVService implements PVService {
       ...pv.data,
       value: stored,
       displayValue: String(stored),
+      valueKind: typeof stored === 'number' ? 'scalar' : 'string',
       connected: true,
       timestamp: Date.now(),
     };

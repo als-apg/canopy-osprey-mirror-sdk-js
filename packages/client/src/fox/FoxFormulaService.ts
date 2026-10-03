@@ -1,11 +1,17 @@
 import type { WebSocketFactory, WebSocketLike } from '../hare/HarePVService.js';
-import type { FormulaResultDTO, FormulaSpec, FoxServerFrame } from './types.js';
+import type { FormulaResultDTO, FormulaSpec, FoxServerFrame, TableInputDTO } from './types.js';
 
 export type FoxConnectionStatus = 'idle' | 'connecting' | 'connected' | 'disconnected';
 
 export interface FoxError {
   code: string;
   message: string;
+  /**
+   * True when the condition is transient and the subscription stays live
+   * (the server keeps evaluating, or the service reconnects); false for a
+   * terminal reject. A server frame without the flag reads as false.
+   */
+  retryable: boolean;
 }
 
 export interface FoxFormulaServiceOptions {
@@ -253,6 +259,8 @@ export class FoxFormulaService {
       this.reportError({
         code: 'ws_connect_failed',
         message: `Could not open formula connection: ${errorMessage(err)}`,
+        // The service schedules a reconnect while connection is desired.
+        retryable: true,
       });
       if (this.desiredConnected) {
         this.scheduleReconnect();
@@ -406,7 +414,7 @@ export class FoxFormulaService {
       case 'result': {
         const sub = this.byServerId.get(frame.id);
         // Unknown id: a frame that raced our unsubscribe. Drop it.
-        sub?.onResult(frame.data);
+        sub?.onResult(normalizeResult(frame.data));
         break;
       }
       case 'completed':
@@ -414,7 +422,11 @@ export class FoxFormulaService {
         // subscription stays held until the caller unsubscribes.
         break;
       case 'error':
-        this.handleErrorFrame(frame.id, { code: frame.code, message: frame.message });
+        this.handleErrorFrame(frame.id, {
+          code: frame.code,
+          message: frame.message,
+          retryable: frame.retryable ?? false,
+        });
         break;
       case 'pong':
         // Liveness only; already handled above.
@@ -510,4 +522,18 @@ export class FoxFormulaService {
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * Fill wire defaults the server may omit: a `'table'` input without
+ * `lateAfterFinal` reads as `false`. Other kinds pass through untouched.
+ */
+function normalizeResult(data: FormulaResultDTO): FormulaResultDTO {
+  const table = data.table;
+  if (!table?.inputs) return data;
+  const inputs: Record<string, TableInputDTO> = {};
+  for (const [binding, input] of Object.entries(table.inputs)) {
+    inputs[binding] = { ...input, lateAfterFinal: input.lateAfterFinal ?? false };
+  }
+  return { ...data, table: { ...table, inputs } };
 }

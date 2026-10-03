@@ -282,6 +282,7 @@ describe('FoxFormulaService', () => {
       expect(onErrorA).toHaveBeenCalledExactlyOnceWith({
         code: 'evaluation_failed',
         message: 'boom',
+        retryable: false,
       });
       expect(serviceOnError).not.toHaveBeenCalled();
 
@@ -313,6 +314,7 @@ describe('FoxFormulaService', () => {
       expect(onErrorBad).toHaveBeenCalledExactlyOnceWith({
         code: 'invalid_spec',
         message: 'invalid spec: )(',
+        retryable: false,
       });
       socket.message({ type: 'result', id: 'srv-b', data: makeResult(2) });
       expect(onResultGood).toHaveBeenCalledTimes(1);
@@ -344,6 +346,7 @@ describe('FoxFormulaService', () => {
       expect(serviceOnError).toHaveBeenCalledExactlyOnceWith({
         code: 'invalid_message',
         message: 'unknown message type',
+        retryable: false,
       });
     });
   });

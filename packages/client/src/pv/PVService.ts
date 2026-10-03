@@ -1,5 +1,5 @@
 import type { AlarmSeverity } from '../alarm.js';
-import type { TableValue } from '../hare/types.js';
+import type { TableValue, ValueKind } from '../hare/types.js';
 
 // ── PV Data Types ───────────────────────────────────────────────────────────
 
@@ -17,6 +17,13 @@ export interface PVData {
   upperLimit: number;
   /** Enum state labels (mbbo/bo choices) when the PV is enum-kind; undefined otherwise. */
   enumChoices?: string[];
+  /**
+   * The value's kind as last reported by the source (a Hare diff/initial, or
+   * the type a local/mock service stored). Absent when no value has arrived:
+   * `DISCONNECTED_PV` and disconnected copies of it never carry one, so a
+   * missing kind is "unknown", never an implied `'scalar'`.
+   */
+  valueKind?: ValueKind;
 }
 
 export type PVListener = (data: PVData) => void;
