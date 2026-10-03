@@ -57,7 +57,7 @@
     "#161616",
     "#262626",
     "#001d6c",
-    "#787878",
+    "#6a6a6a",
     "#757575",
     "#2e2e2e",
     "#161616",
@@ -70,8 +70,8 @@
   ],
   "meta": {
     "id": "canopy-default",
-    "sha256": "f05a3580268d2fa2673665a257deb13803f3a5a265da998f851b852960f82bea",
-    "flatHash": "8a449d518604ade529912d55b2a1668352fbee691730ce87010215eee0452c91",
+    "sha256": "0a8f403e70f0b9a5dc2eb9679da24f72f54209e19a8a9043d3de636e49ce810d",
+    "flatHash": "570b18da90319ef309645f8450a4a5a420c39fdc98046bdd2f142d1c74072b93",
     "served": "canopy-default",
     "errors": []
   }

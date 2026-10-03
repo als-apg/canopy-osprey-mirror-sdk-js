@@ -3,7 +3,7 @@ import pkg from '../package.json' with { type: 'json' };
 import { CANOPY_DEFAULT_SCHEME_ID, canopyDefaultFlat, parseFlatScheme } from './index.js';
 
 /** sha256 of the canonical canopy-default.json the flat file was generated from. */
-const PACKAGED_SHA256 = 'f05a3580268d2fa2673665a257deb13803f3a5a265da998f851b852960f82bea';
+const PACKAGED_SHA256 = '0a8f403e70f0b9a5dc2eb9679da24f72f54209e19a8a9043d3de636e49ce810d';
 
 const BUILDER_DEFAULTS = ['Text', 'Read_Background', 'Background', 'On', 'Off'];
 const D5_DEFAULTS = ['Text', 'Read_Background', 'Display_Background'];
