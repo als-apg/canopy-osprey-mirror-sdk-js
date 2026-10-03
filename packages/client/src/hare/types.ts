@@ -42,7 +42,12 @@ export interface PVValueDTO {
   error: string | null;
 }
 
-/** Static per-channel metadata, sent once on the initial frame. All fields nullable. */
+/**
+ * Static per-channel metadata, carried by `initial` frames. All fields
+ * nullable. A PV described before it connected gets a second `initial` with
+ * its real meta once its first sample arrives (the late-connect re-describe);
+ * the newest `initial` wins.
+ */
 export interface PVMetaDTO {
   pv: string;
   valueKind: ValueKind;

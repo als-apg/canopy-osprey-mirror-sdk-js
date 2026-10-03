@@ -151,6 +151,7 @@ describe('HarePVService', () => {
         precision: 2,
         lowerLimit: 0,
         upperLimit: 10,
+        valueKind: 'scalar',
       });
 
       expect(service.getSnapshot('PV1')).toEqual(data);

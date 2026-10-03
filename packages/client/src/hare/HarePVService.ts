@@ -531,6 +531,7 @@ export class HarePVService implements PVService {
       lowerLimit: meta?.displayLow ?? 0,
       upperLimit: meta?.displayHigh ?? 0,
       enumChoices: meta?.enumChoices ?? undefined,
+      valueKind: dto.valueKind,
     };
 
     this.snapshots.set(pvName, data);
