@@ -32,6 +32,26 @@ const accepted: [string, unknown][] = [
   ],
   ['empty import', { id: 'x', import: {} }],
   ['64-character import names', { id: 'x', import: { phoebus: { [n64]: n64 } } }],
+  [
+    'role with phoebus source',
+    { id: 'x', roles: { Grid: { light: '#c6c6c6', phoebus: '#C8C8C8' } } },
+  ],
+  ['role with phoebus source only', { id: 'x', roles: { Grid: { phoebus: '#fff' } } }],
+  [
+    'slot-aware import object',
+    { id: 'x', import: { phoebus: { Grid: { role: 'Grid', background_color: 'Grid_Fill' } } } },
+  ],
+  [
+    'slot-aware import object with role only',
+    { id: 'x', import: { edm: { Grid: { role: 'Grid' } } } },
+  ],
+  [
+    'string, null and slot imports together',
+    {
+      id: 'x',
+      import: { phoebus: { OK: 'ok', Foo: null, Grid: { role: 'Grid', line_color: 'Grid_Line' } } },
+    },
+  ],
 ];
 
 const rejected: [string, unknown][] = [
@@ -57,6 +77,26 @@ const rejected: [string, unknown][] = [
   ['65-character import target', { id: 'x', import: { edm: { a: n65 } } }],
   ['empty import target', { id: 'x', import: { edm: { a: '' } } }],
   ['non-string import target', { id: 'x', import: { phoebus: { a: 3 } } }],
+  ['bad phoebus hex', { id: 'x', roles: { Grid: { phoebus: '#c6c6' } } }],
+  ['phoebus alias', { id: 'x', roles: { Grid: { phoebus: '@Other' } } }],
+  ['unknown role-object key', { id: 'x', roles: { Grid: { light: '#000', edm: '#fff' } } }],
+  [
+    'slot object without role',
+    { id: 'x', import: { phoebus: { Grid: { background_color: 'Grid_Fill' } } } },
+  ],
+  ['slot object with empty role', { id: 'x', import: { phoebus: { Grid: { role: '' } } } }],
+  [
+    'slot object with null slot',
+    { id: 'x', import: { phoebus: { Grid: { role: 'Grid', background_color: null } } } },
+  ],
+  [
+    'slot object with 65-character slot role',
+    { id: 'x', import: { phoebus: { Grid: { role: 'Grid', background_color: n65 } } } },
+  ],
+  [
+    'slot object with empty slot name',
+    { id: 'x', import: { phoebus: { Grid: { role: 'Grid', '': 'Grid_Fill' } } } },
+  ],
 ];
 
 describe('canopy-color-scheme/1 schema', () => {
