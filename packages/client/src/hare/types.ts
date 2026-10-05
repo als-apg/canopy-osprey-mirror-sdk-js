@@ -83,10 +83,33 @@ export interface HareDiffFrame {
   timestamp: number;
 }
 
+/**
+ * Why the server cannot serve its bound control target as configured:
+ * `fallback` (no control target record, served from the fallback) or
+ * `unservable` (the target cannot be served). `null` when bound normally.
+ */
+export type HareBackendNotice = 'fallback' | 'unservable' | null;
+
 export interface HareHeartbeatFrame {
   type: 'heartbeat';
   timestamp: number;
   backend: string | null;
+  /** Display name of the bound control target; null when the server has none. */
+  label: string | null;
+  notice: HareBackendNotice;
+  /** Binding id (`<target>@<generation>`, or the binding state name); null when unbound. */
+  binding: string | null;
+}
+
+/**
+ * Backend identity reported by the last heartbeat, as returned by
+ * `HarePVService.getBackend()` and passed to `onBackendChange`.
+ */
+export interface HareBackend {
+  name: string | null;
+  label: string | null;
+  notice: HareBackendNotice;
+  binding: string | null;
 }
 
 export interface HarePongFrame {

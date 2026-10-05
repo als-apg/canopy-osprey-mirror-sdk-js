@@ -4,6 +4,8 @@ import { DISCONNECTED_PV } from '../pv/PVService.js';
 import { canopyFetch } from '../rest/canopyFetch.js';
 import type {
   HareAlarmSeverity,
+  HareBackend,
+  HareHeartbeatFrame,
   HareServerFrame,
   PVMetaDTO,
   PVValueDTO,
@@ -62,6 +64,8 @@ export interface HarePVServiceOptions {
   fetchFn?: FetchLike;
   onError?: (error: HareError) => void;
   onStatusChange?: (status: HareConnectionStatus) => void;
+  /** Fired when a heartbeat reports a backend identity different from the last one (the first heartbeat counts). */
+  onBackendChange?: (backend: HareBackend) => void;
 }
 
 /** Options accepted by {@link HarePVService.write}. */
@@ -153,6 +157,7 @@ export class HarePVService implements PVService {
   private readonly fetchFn: FetchLike | undefined;
   private readonly onErrorCallback: ((error: HareError) => void) | undefined;
   private readonly onStatusChangeCallback: ((status: HareConnectionStatus) => void) | undefined;
+  private readonly onBackendChangeCallback: ((backend: HareBackend) => void) | undefined;
 
   private listeners = new Map<string, Set<PVListener>>();
   private snapshots = new Map<string, PVData>();
@@ -161,6 +166,9 @@ export class HarePVService implements PVService {
   private socket: WebSocketLike | null = null;
   private desiredConnected = false;
   private _status: HareConnectionStatus = 'idle';
+  // Identity from the last heartbeat; kept across disconnects (the link
+  // state is reported separately through status).
+  private backend: HareBackend | null = null;
   private reconnectAttempt = 0;
 
   private reconnectTimer: number | undefined;
@@ -186,6 +194,7 @@ export class HarePVService implements PVService {
     this.fetchFn = options.fetchFn ?? defaultFetchFn();
     this.onErrorCallback = options.onError;
     this.onStatusChangeCallback = options.onStatusChange;
+    this.onBackendChangeCallback = options.onBackendChange;
   }
 
   // ── PVService lifecycle ────────────────────────────────────────────────
@@ -269,6 +278,11 @@ export class HarePVService implements PVService {
 
   getMeta(pvName: string): PVMetaDTO | undefined {
     return this.metas.get(pvName);
+  }
+
+  /** Backend identity of the last heartbeat received, or null before the first one. */
+  getBackend(): HareBackend | null {
+    return this.backend ? { ...this.backend } : null;
   }
 
   // ── Writes ──────────────────────────────────────────────────────────────
@@ -500,10 +514,34 @@ export class HarePVService implements PVService {
         this.reportError({ code: frame.code, message: frame.message });
         break;
       case 'heartbeat':
+        this.applyHeartbeat(frame);
+        break;
       case 'pong':
         // Liveness only; already handled above.
         break;
     }
+  }
+
+  private applyHeartbeat(frame: HareHeartbeatFrame): void {
+    // Older servers send only `backend`; their missing fields read as null.
+    const next: HareBackend = {
+      name: frame.backend ?? null,
+      label: frame.label ?? null,
+      notice: frame.notice ?? null,
+      binding: frame.binding ?? null,
+    };
+    const prev = this.backend;
+    if (
+      prev &&
+      prev.name === next.name &&
+      prev.label === next.label &&
+      prev.notice === next.notice &&
+      prev.binding === next.binding
+    ) {
+      return;
+    }
+    this.backend = next;
+    this.onBackendChangeCallback?.({ ...next });
   }
 
   private applyValue(pvName: string, dto: PVValueDTO): void {

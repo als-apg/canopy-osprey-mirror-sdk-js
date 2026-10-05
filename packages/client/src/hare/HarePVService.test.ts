@@ -3,7 +3,14 @@ import { AlarmSeverity } from '../alarm.js';
 import { createFakeWebSocketFactory } from '../testing/fakeWebSocket.js';
 import { HarePVService } from './HarePVService.js';
 import type { HareError, FetchLike } from './HarePVService.js';
-import type { HareInitialFrame, HareDiffFrame, PVMetaDTO, PVValueDTO } from './types.js';
+import type {
+  HareBackend,
+  HareInitialFrame,
+  HareDiffFrame,
+  HareHeartbeatFrame,
+  PVMetaDTO,
+  PVValueDTO,
+} from './types.js';
 
 const BASE_URL = 'ws://host/hare/v1/ws/pvs';
 
@@ -460,6 +467,173 @@ describe('HarePVService', () => {
       socket.message({ type: 'heartbeat', timestamp: 0, backend: 'simulation' });
       vi.advanceTimersByTime(500);
 
+      expect(socket.readyState).toBe(1);
+    });
+  });
+
+  // ── Backend identity (heartbeat label / notice / binding) ─────────────────
+
+  describe('backend identity', () => {
+    function heartbeat(fields: Partial<HareHeartbeatFrame> = {}): HareHeartbeatFrame {
+      return {
+        type: 'heartbeat',
+        timestamp: 0,
+        backend: 'osprey',
+        label: 'Simulator',
+        notice: null,
+        binding: 'va@1',
+        ...fields,
+      };
+    }
+
+    function connected(onBackendChange?: (backend: HareBackend) => void) {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new HarePVService({
+        url: BASE_URL,
+        webSocketFactory: factory,
+        ...(onBackendChange ? { onBackendChange } : {}),
+      });
+      service.connect();
+      const socket = instances[0]!;
+      socket.open();
+      return { service, socket, instances };
+    }
+
+    it('getBackend() is null before the first heartbeat', () => {
+      const { service, socket } = connected();
+      expect(service.getBackend()).toBeNull();
+      // A pong is liveness only and carries no backend.
+      socket.message({ type: 'pong', timestamp: 0 });
+      expect(service.getBackend()).toBeNull();
+    });
+
+    it('getBackend() returns name, label, notice and binding of the last heartbeat', () => {
+      const { service, socket } = connected();
+      socket.message(heartbeat());
+      const expected: HareBackend = {
+        name: 'osprey',
+        label: 'Simulator',
+        notice: null,
+        binding: 'va@1',
+      };
+      expect(service.getBackend()).toEqual(expected);
+
+      socket.message(heartbeat({ label: 'Rehearsal', notice: 'fallback', binding: 'standin@2' }));
+      expect(service.getBackend()).toEqual({
+        name: 'osprey',
+        label: 'Rehearsal',
+        notice: 'fallback',
+        binding: 'standin@2',
+      });
+    });
+
+    it('carries the unservable token and a state-name binding through', () => {
+      const { service, socket } = connected();
+      socket.message(heartbeat({ label: 'Machine', notice: 'unservable', binding: 'unservable' }));
+      expect(service.getBackend()).toEqual({
+        name: 'osprey',
+        label: 'Machine',
+        notice: 'unservable',
+        binding: 'unservable',
+      });
+    });
+
+    it('treats fields missing from an older server heartbeat as null', () => {
+      const { service, socket } = connected();
+      socket.message({ type: 'heartbeat', timestamp: 0, backend: 'simulation' });
+      expect(service.getBackend()).toEqual({
+        name: 'simulation',
+        label: null,
+        notice: null,
+        binding: null,
+      });
+    });
+
+    it('fires onBackendChange on change only', () => {
+      const onBackendChange = vi.fn();
+      const { socket } = connected(onBackendChange);
+
+      socket.message(heartbeat());
+      socket.message(heartbeat({ timestamp: 5 })); // timestamp alone is not a change
+      socket.message(heartbeat());
+      expect(onBackendChange.mock.calls).toEqual([
+        [{ name: 'osprey', label: 'Simulator', notice: null, binding: 'va@1' }],
+      ]);
+
+      socket.message(heartbeat({ binding: 'va@2' }));
+      socket.message(heartbeat({ binding: 'va@2' }));
+      socket.message(heartbeat({ binding: 'va@2', notice: 'fallback' }));
+      socket.message(heartbeat({ binding: 'va@2', notice: 'fallback', label: 'Rehearsal' }));
+      socket.message(
+        heartbeat({ binding: 'va@2', notice: 'fallback', label: 'Rehearsal', backend: null })
+      );
+      expect(onBackendChange.mock.calls.map((c: unknown[]) => c[0])).toEqual([
+        { name: 'osprey', label: 'Simulator', notice: null, binding: 'va@1' },
+        { name: 'osprey', label: 'Simulator', notice: null, binding: 'va@2' },
+        { name: 'osprey', label: 'Simulator', notice: 'fallback', binding: 'va@2' },
+        { name: 'osprey', label: 'Rehearsal', notice: 'fallback', binding: 'va@2' },
+        { name: null, label: 'Rehearsal', notice: 'fallback', binding: 'va@2' },
+      ]);
+    });
+
+    it('fires onBackendChange when identity goes all-null after a bound one', () => {
+      const onBackendChange = vi.fn();
+      const { service, socket } = connected(onBackendChange);
+      socket.message(heartbeat());
+      socket.message(heartbeat({ label: null, notice: null, binding: null }));
+      expect(onBackendChange).toHaveBeenCalledTimes(2);
+      expect(service.getBackend()).toEqual({
+        name: 'osprey',
+        label: null,
+        notice: null,
+        binding: null,
+      });
+    });
+
+    it('keeps the last backend across a reconnect and does not re-fire for an identical heartbeat', () => {
+      const onBackendChange = vi.fn();
+      const { service, socket, instances } = connected(onBackendChange);
+      socket.message(heartbeat());
+      socket.close();
+      expect(service.getBackend()).toEqual({
+        name: 'osprey',
+        label: 'Simulator',
+        notice: null,
+        binding: 'va@1',
+      });
+
+      vi.advanceTimersByTime(1000);
+      instances[1]!.open();
+      instances[1]!.message(heartbeat());
+      expect(onBackendChange).toHaveBeenCalledTimes(1);
+
+      instances[1]!.message(heartbeat({ binding: 'va@3' }));
+      expect(onBackendChange).toHaveBeenCalledTimes(2);
+    });
+
+    it('a returned backend is a copy the caller cannot use to mutate service state', () => {
+      const { service, socket } = connected();
+      socket.message(heartbeat());
+      const first = service.getBackend()!;
+      first.label = 'tampered';
+      expect(service.getBackend()!.label).toBe('Simulator');
+    });
+
+    it('a heartbeat carrying identity still counts as liveness', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new HarePVService({
+        url: BASE_URL,
+        webSocketFactory: factory,
+        pingIntervalMs: 1000,
+        pongTimeoutMs: 500,
+        onBackendChange: () => {},
+      });
+      service.connect();
+      const socket = instances[0]!;
+      socket.open();
+      vi.advanceTimersByTime(1000);
+      socket.message(heartbeat());
+      vi.advanceTimersByTime(500);
       expect(socket.readyState).toBe(1);
     });
   });
