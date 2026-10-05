@@ -248,7 +248,13 @@ export class HarePVService implements PVService {
     }
     set.add(listener);
 
-    const snapshot = this.snapshots.get(pvName);
+    let snapshot = this.snapshots.get(pvName);
+    if (!snapshot && this._status === 'disconnected') {
+      // The link is down: say so at once instead of leaving the PV silent
+      // until the next connect.
+      snapshot = disconnectedCopy(DISCONNECTED_PV, undefined);
+      this.snapshots.set(pvName, snapshot);
+    }
     if (snapshot) {
       listener(snapshot);
     }
@@ -422,13 +428,11 @@ export class HarePVService implements PVService {
   }
 
   private markAllDisconnected(): void {
+    // The server re-describes every PV on the next subscribe.
+    this.metas.clear();
     for (const pvName of this.listeners.keys()) {
       const previous = this.snapshots.get(pvName);
-      const data: PVData = {
-        ...(previous ?? DISCONNECTED_PV),
-        connected: false,
-        severity: AlarmSeverity.DISCONNECTED,
-      };
+      const data = disconnectedCopy(previous ?? DISCONNECTED_PV, previous?.valueKind);
       this.snapshots.set(pvName, data);
       this.notify(pvName, data);
     }
@@ -558,7 +562,7 @@ export class HarePVService implements PVService {
       ? (SEVERITY_MAP[dto.severity] ?? AlarmSeverity.INVALID)
       : AlarmSeverity.DISCONNECTED;
 
-    const data: PVData = {
+    const fresh: PVData = {
       value: toPVDataValue(dto.value),
       displayValue: formatDisplayValue(dto, meta),
       severity,
@@ -571,6 +575,9 @@ export class HarePVService implements PVService {
       enumChoices: meta?.enumChoices ?? undefined,
       valueKind: dto.valueKind,
     };
+    const data = connected
+      ? fresh
+      : disconnectedCopy(fresh, this.snapshots.get(pvName)?.valueKind ?? dto.valueKind);
 
     this.snapshots.set(pvName, data);
     this.notify(pvName, data);
@@ -677,6 +684,43 @@ export class HarePVService implements PVService {
 
 // ── Value / display formatting helpers ──────────────────────────────────────
 
+/**
+ * A disconnected copy of `base`: `connected: false`, DISCONNECTED severity,
+ * `displayValue` `''` and the empty value of `kind` (waveform `[]`, string
+ * `''`, table with no labels or columns, anything else `0`). The last value is
+ * never carried over. `kind` becomes the copy's `valueKind`; when it is
+ * undefined the copy has no `valueKind` key at all ("unknown"). Other fields
+ * (units, limits, timestamp …) come from `base`.
+ */
+function disconnectedCopy(base: PVData, kind: ValueKind | undefined): PVData {
+  const copy: PVData = {
+    ...base,
+    value: emptyValueOf(kind),
+    displayValue: '',
+    connected: false,
+    severity: AlarmSeverity.DISCONNECTED,
+  };
+  if (kind === undefined) {
+    delete copy.valueKind;
+  } else {
+    copy.valueKind = kind;
+  }
+  return copy;
+}
+
+function emptyValueOf(kind: ValueKind | undefined): PVData['value'] {
+  switch (kind) {
+    case ValueKind.WAVEFORM:
+      return [];
+    case ValueKind.STRING:
+      return '';
+    case ValueKind.TABLE:
+      return { labels: [], columns: [] };
+    default:
+      return 0;
+  }
+}
+
 function toPVDataValue(value: PVValueDTO['value']): PVData['value'] {
   if (value === null) return 0;
   return value as PVData['value'];
@@ -697,7 +741,8 @@ function isTableValue(
 function formatDisplayValue(dto: PVValueDTO, meta: PVMetaDTO | undefined): string {
   const { value } = dto;
 
-  if (value === null || dto.connected === false) {
+  // connected:false frames never get here: applyValue makes a disconnected copy.
+  if (value === null) {
     return '---';
   }
 

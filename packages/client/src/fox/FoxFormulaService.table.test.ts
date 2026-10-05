@@ -399,6 +399,9 @@ describe('Hare PVData.valueKind', () => {
     const snap = service.getSnapshot('Q');
     expect(snap?.connected).toBe(false);
     expect(snap?.valueKind).toBeUndefined();
+    expect(snap).not.toHaveProperty('valueKind');
+    expect(snap?.value).toBe(0);
+    expect(snap?.displayValue).toBe('');
   });
 
   it('keeps the prior kind on a disconnected copy', () => {
@@ -409,6 +412,8 @@ describe('Hare PVData.valueKind', () => {
     const snap = service.getSnapshot('S');
     expect(snap?.connected).toBe(false);
     expect(snap?.valueKind).toBe('string');
+    expect(snap?.value).toBe('');
+    expect(snap?.displayValue).toBe('');
   });
 
   it('updates getMeta() from an initial that arrives after the PV first one', () => {

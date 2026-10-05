@@ -309,7 +309,10 @@ describe('HarePVService', () => {
       const data = listener.mock.calls.at(-1)![0];
       expect(data.connected).toBe(false);
       expect(data.severity).toBe(AlarmSeverity.DISCONNECTED);
-      expect(data.displayValue).toBe('---');
+      // A disconnected copy: the frame's kind, the empty value of that kind.
+      expect(data.displayValue).toBe('');
+      expect(data.value).toBe(0);
+      expect(data.valueKind).toBe('scalar');
     });
   });
 
@@ -342,6 +345,9 @@ describe('HarePVService', () => {
       expect(listenerA.mock.calls[0]![0].connected).toBe(false);
       expect(listenerA.mock.calls[0]![0].severity).toBe(AlarmSeverity.DISCONNECTED);
       expect(listenerB.mock.calls[0]![0].connected).toBe(false);
+      // The last value is not carried into the disconnected copy.
+      expect(listenerA.mock.calls[0]![0]).toMatchObject({ value: 0, displayValue: '' });
+      expect(listenerB.mock.calls[0]![0]).toMatchObject({ value: 0, displayValue: '' });
 
       // First backoff delay is 1000ms.
       expect(instances).toHaveLength(1);
@@ -932,7 +938,12 @@ describe('HarePVService', () => {
 
       expect(socket.readyState).toBe(3); // CLOSED
       expect(listener).toHaveBeenCalledTimes(1);
-      expect(listener.mock.calls[0]![0].connected).toBe(false);
+      expect(listener.mock.calls[0]![0]).toMatchObject({
+        connected: false,
+        value: 0,
+        displayValue: '',
+        valueKind: 'scalar',
+      });
       expect(service.isConnected).toBe(false);
 
       vi.advanceTimersByTime(60_000);
@@ -943,6 +954,142 @@ describe('HarePVService', () => {
 
       instances[1]!.open();
       expect(instances[1]!.parsedSent()).toEqual([{ type: 'subscribe', pvNames: ['PV1'] }]);
+    });
+  });
+
+  // ── Disconnected copies ───────────────────────────────────────────────────
+
+  describe('disconnected copies', () => {
+    function waveformService() {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new HarePVService({ url: BASE_URL, webSocketFactory: factory });
+      service.connect();
+      const socket = instances[0]!;
+      socket.open();
+      return { service, socket, instances };
+    }
+
+    it('disconnected copy keeps the waveform kind', () => {
+      const { service, socket } = waveformService();
+      const listener = vi.fn();
+      service.subscribe('W', listener);
+      socket.message(
+        initialFrame(
+          { W: makeValue({ pv: 'W', value: [1, 2, 3], valueKind: 'waveform' }) },
+          { W: makeMeta({ pv: 'W', valueKind: 'waveform' }) }
+        )
+      );
+      expect(listener.mock.calls.at(-1)![0].value).toEqual([1, 2, 3]);
+
+      socket.close();
+
+      const data = listener.mock.calls.at(-1)![0];
+      expect(data).toMatchObject({
+        connected: false,
+        severity: AlarmSeverity.DISCONNECTED,
+        valueKind: 'waveform',
+        displayValue: '',
+      });
+      expect(data.value).toEqual([]);
+      expect(service.getMeta('W')).toBeUndefined();
+
+      // A browser opening during an outage: no prior snapshot, the frame's
+      // kind decides the empty value.
+      const fresh = waveformService();
+      const freshListener = vi.fn();
+      fresh.service.subscribe('W2', freshListener);
+      fresh.socket.message(
+        initialFrame({
+          W2: makeValue({ pv: 'W2', value: null, valueKind: 'waveform', connected: false }),
+        })
+      );
+      const copy = freshListener.mock.calls.at(-1)![0];
+      expect(copy).toMatchObject({ connected: false, valueKind: 'waveform', displayValue: '' });
+      expect(copy.value).toEqual([]);
+    });
+
+    it('keeps the previous snapshot kind over the frame kind', () => {
+      const { service, socket } = waveformService();
+      const listener = vi.fn();
+      service.subscribe('W', listener);
+      socket.message(
+        initialFrame({ W: makeValue({ pv: 'W', value: [4, 5], valueKind: 'waveform' }) })
+      );
+      socket.message(
+        diffFrame({ W: makeValue({ pv: 'W', value: null, valueKind: 'scalar', connected: false }) })
+      );
+      const data = listener.mock.calls.at(-1)![0];
+      expect(data.valueKind).toBe('waveform');
+      expect(data.value).toEqual([]);
+      expect(data.displayValue).toBe('');
+    });
+
+    it('uses an empty table and an empty string for those kinds', () => {
+      const { service, socket } = waveformService();
+      const tableListener = vi.fn();
+      const stringListener = vi.fn();
+      service.subscribe('T', tableListener);
+      service.subscribe('S', stringListener);
+      socket.message(
+        initialFrame({
+          T: makeValue({
+            pv: 'T',
+            value: { labels: ['a'], columns: [[1, 2]] },
+            valueKind: 'table',
+          }),
+          S: makeValue({ pv: 'S', value: 'on', valueKind: 'string' }),
+        })
+      );
+      socket.close();
+      expect(tableListener.mock.calls.at(-1)![0].value).toEqual({ labels: [], columns: [] });
+      expect(stringListener.mock.calls.at(-1)![0].value).toBe('');
+    });
+
+    it('clears metas on socket close', () => {
+      const { service, socket } = waveformService();
+      service.subscribe('PV1', vi.fn());
+      socket.message(
+        initialFrame(
+          { PV1: makeValue({ pv: 'PV1', value: 1 }) },
+          { PV1: makeMeta({ pv: 'PV1', units: 'mm' }) }
+        )
+      );
+      expect(service.getMeta('PV1')?.units).toBe('mm');
+      socket.close();
+      expect(service.getMeta('PV1')).toBeUndefined();
+    });
+
+    it('delivers a disconnected snapshot at once to a subscribe while disconnected', () => {
+      const { service, socket } = waveformService();
+      socket.close();
+      expect(service.status).toBe('disconnected');
+
+      const listener = vi.fn();
+      service.subscribe('LATE', listener);
+
+      expect(listener).toHaveBeenCalledTimes(1);
+      const data = listener.mock.calls[0]![0];
+      expect(data).toMatchObject({
+        connected: false,
+        severity: AlarmSeverity.DISCONNECTED,
+        value: 0,
+        displayValue: '',
+      });
+      expect(data).not.toHaveProperty('valueKind');
+      expect(service.getSnapshot('LATE')).toEqual(data);
+    });
+
+    it('delivers nothing on subscribe before the first connection', () => {
+      const { factory } = createFakeWebSocketFactory();
+      const service = new HarePVService({ url: BASE_URL, webSocketFactory: factory });
+      const idleListener = vi.fn();
+      service.subscribe('A', idleListener);
+      expect(idleListener).not.toHaveBeenCalled();
+
+      service.connect();
+      const connectingListener = vi.fn();
+      service.subscribe('B', connectingListener);
+      expect(connectingListener).not.toHaveBeenCalled();
     });
   });
 

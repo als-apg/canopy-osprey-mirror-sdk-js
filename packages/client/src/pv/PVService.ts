@@ -19,8 +19,11 @@ export interface PVData {
   enumChoices?: string[];
   /**
    * The value's kind as last reported by the source (a Hare diff/initial, or
-   * the type a local/mock service stored). Absent when no value has arrived:
-   * `DISCONNECTED_PV` and disconnected copies of it never carry one, so a
+   * the type a local/mock service stored). A disconnected copy keeps the
+   * previous snapshot's kind, else the kind of the frame that reported the
+   * disconnect, and holds the empty value of that kind (waveform `[]`, string
+   * `''`, table with no labels or columns, anything else `0`). Absent when
+   * neither is known — `DISCONNECTED_PV` itself never carries one — so a
    * missing kind is "unknown", never an implied `'scalar'`.
    */
   valueKind?: ValueKind;
