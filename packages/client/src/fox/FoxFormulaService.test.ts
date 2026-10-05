@@ -255,6 +255,140 @@ describe('FoxFormulaService', () => {
     });
   });
 
+  // ── Socket loss ───────────────────────────────────────────────────────────
+
+  describe('ws_disconnected', () => {
+    const WS_DISCONNECTED = {
+      code: 'ws_disconnected',
+      message: expect.any(String),
+      retryable: true,
+    };
+
+    it('dispatches a retryable ws_disconnected error to every held subscription when the socket closes', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const serviceOnError = vi.fn<(error: FoxError) => void>();
+      const service = new FoxFormulaService({
+        baseUrl: BASE_URL,
+        webSocketFactory: factory,
+        onError: serviceOnError,
+      });
+      service.connect();
+      const socket = instances[0]!;
+      socket.open();
+
+      const onErrorA = vi.fn<(error: FoxError) => void>();
+      const onErrorB = vi.fn<(error: FoxError) => void>();
+      service.subscribe(makeSpec({ expression: 'A' }), { onResult: vi.fn(), onError: onErrorA });
+      service.subscribe(makeSpec({ expression: 'B' }), { onResult: vi.fn(), onError: onErrorB });
+      socket.message({ type: 'subscribed', id: 'srv-a' });
+      // B's subscribe is still in flight when the socket drops: it is held all the same.
+
+      socket.close();
+
+      expect(onErrorA).toHaveBeenCalledExactlyOnceWith(WS_DISCONNECTED);
+      expect(onErrorB).toHaveBeenCalledExactlyOnceWith(WS_DISCONNECTED);
+      expect(serviceOnError).not.toHaveBeenCalled();
+      expect(service.status).toBe('disconnected');
+    });
+
+    it('falls back to the service-level onError for a subscription without its own onError', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const serviceOnError = vi.fn<(error: FoxError) => void>();
+      const service = new FoxFormulaService({
+        baseUrl: BASE_URL,
+        webSocketFactory: factory,
+        onError: serviceOnError,
+      });
+      service.connect();
+      const socket = instances[0]!;
+      socket.open();
+
+      const onErrorA = vi.fn<(error: FoxError) => void>();
+      service.subscribe(makeSpec({ expression: 'A' }), { onResult: vi.fn(), onError: onErrorA });
+      service.subscribe(makeSpec({ expression: 'B' }), { onResult: vi.fn() });
+      socket.message({ type: 'subscribed', id: 'srv-a' });
+      socket.message({ type: 'subscribed', id: 'srv-b' });
+
+      socket.close();
+
+      expect(onErrorA).toHaveBeenCalledExactlyOnceWith(WS_DISCONNECTED);
+      expect(serviceOnError).toHaveBeenCalledExactlyOnceWith(WS_DISCONNECTED);
+    });
+
+    it('skips unsubscribed subscriptions and keeps the held ones live across the reconnect', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new FoxFormulaService({ baseUrl: BASE_URL, webSocketFactory: factory });
+      service.connect();
+      const socket1 = instances[0]!;
+      socket1.open();
+
+      const onErrorA = vi.fn<(error: FoxError) => void>();
+      const onResultA = vi.fn();
+      const onErrorB = vi.fn<(error: FoxError) => void>();
+      service.subscribe(makeSpec({ expression: 'A' }), { onResult: onResultA, onError: onErrorA });
+      const unsubscribeB = service.subscribe(makeSpec({ expression: 'B' }), {
+        onResult: vi.fn(),
+        onError: onErrorB,
+      });
+      socket1.message({ type: 'subscribed', id: 'srv-a' });
+      socket1.message({ type: 'subscribed', id: 'srv-b' });
+      unsubscribeB();
+
+      socket1.close();
+
+      expect(onErrorA).toHaveBeenCalledExactlyOnceWith(WS_DISCONNECTED);
+      expect(onErrorB).not.toHaveBeenCalled();
+
+      // The error is retryable: the subscription is re-sent on the next socket.
+      vi.advanceTimersByTime(1000);
+      const socket2 = instances[1]!;
+      socket2.open();
+      expect(socket2.parsedSent()).toEqual([
+        { type: 'subscribe', spec: makeSpec({ expression: 'A' }) },
+      ]);
+      socket2.message({ type: 'subscribed', id: 'srv-a2' });
+      socket2.message({ type: 'result', id: 'srv-a2', data: makeResult(7) });
+      expect(onResultA).toHaveBeenCalledExactlyOnceWith(makeResult(7));
+    });
+
+    it('also fires when a socket closes before it ever opened', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new FoxFormulaService({ baseUrl: BASE_URL, webSocketFactory: factory });
+      const onError = vi.fn<(error: FoxError) => void>();
+      service.subscribe(makeSpec(), { onResult: vi.fn(), onError });
+      service.connect();
+
+      instances[0]!.close();
+
+      expect(onError).toHaveBeenCalledExactlyOnceWith(WS_DISCONNECTED);
+    });
+
+    it('stays silent with no held subscription and on dispose()', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const serviceOnError = vi.fn<(error: FoxError) => void>();
+      const service = new FoxFormulaService({
+        baseUrl: BASE_URL,
+        webSocketFactory: factory,
+        onError: serviceOnError,
+      });
+      service.connect();
+      instances[0]!.open();
+      instances[0]!.close();
+      expect(serviceOnError).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(1000);
+      const socket2 = instances[1]!;
+      socket2.open();
+      const onError = vi.fn<(error: FoxError) => void>();
+      service.subscribe(makeSpec(), { onResult: vi.fn(), onError });
+      socket2.message({ type: 'subscribed', id: 'srv-1' });
+
+      service.dispose();
+      expect(onError).not.toHaveBeenCalled();
+      expect(serviceOnError).not.toHaveBeenCalled();
+    });
+  });
+
   // ── Error frames ──────────────────────────────────────────────────────────
 
   describe('error frames', () => {

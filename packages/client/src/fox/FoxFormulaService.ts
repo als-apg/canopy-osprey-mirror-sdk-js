@@ -302,6 +302,20 @@ export class FoxFormulaService {
     this.resetServerCorrelation();
     this.setStatus('disconnected');
 
+    // Every held subscription loses its live evaluation with the socket. Tell
+    // each one, so a consumer stops presenting its last result as current;
+    // retryable because the subscription is kept and re-sent on reconnect.
+    // dispose() detaches onclose first, so a deliberate close stays silent.
+    // Iterate a copy: a callback may unsubscribe.
+    for (const sub of [...this.subscriptions]) {
+      if (!this.subscriptions.has(sub)) continue;
+      this.dispatchSubscriptionError(sub, {
+        code: 'ws_disconnected',
+        message: 'Formula connection lost.',
+        retryable: true,
+      });
+    }
+
     if (this.desiredConnected) {
       this.scheduleReconnect();
     }
