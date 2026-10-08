@@ -6,14 +6,19 @@ import type {
   HareAlarmSeverity,
   HareBackend,
   HareHeartbeatFrame,
+  HareHeartbeatState,
   HareServerFrame,
   PVMetaDTO,
   PVValueDTO,
+  PVWriteOrigin,
   PVWriteRequestDTO,
   PVWriteResultDTO,
   PVWriteValue,
+  SubmitOptions,
+  WriteOutcome,
 } from './types.js';
 import { ValueKind } from './types.js';
+import { clientOutcome, outcomeFromResponse } from './writeOutcome.js';
 
 // ── Environment-agnostic structural types ───────────────────────────────────
 //
@@ -66,6 +71,14 @@ export interface HarePVServiceOptions {
   onStatusChange?: (status: HareConnectionStatus) => void;
   /** Fired when a heartbeat reports a backend identity different from the last one (the first heartbeat counts). */
   onBackendChange?: (backend: HareBackend) => void;
+  /**
+   * Fired whenever `heartbeat()` changes: the current socket's first
+   * heartbeat (even when the backend identity is unchanged), a new binding,
+   * or the socket closing.
+   */
+  onHeartbeat?: (state: HareHeartbeatState) => void;
+  /** Time budget of one `submit()` request, from the send; past it the outcome is `unknown`. Default 35000. */
+  putTimeoutMs?: number;
 }
 
 /** Options accepted by {@link HarePVService.write}. */
@@ -83,6 +96,7 @@ const WS_OPEN = 1;
 const DEFAULT_RECONNECT_DELAYS_MS = [1000, 2000, 4000, 8000, 15000];
 const DEFAULT_PING_INTERVAL_MS = 15000;
 const DEFAULT_PONG_TIMEOUT_MS = 10000;
+const DEFAULT_PUT_TIMEOUT_MS = 35000;
 
 /**
  * Most PV names put in one subscribe/unsubscribe frame. Hare silently
@@ -98,6 +112,33 @@ interface PendingOp {
   pvName: string;
   /** Cleared when a later unsubscribe cancels this subscribe before it was sent. */
   live: boolean;
+}
+
+/** One `submit()` call waiting for, or holding, its PV's write slot. */
+interface QueuedWrite {
+  value: PVWriteValue;
+  /** Binding sent with the request (null: omitted). */
+  binding: string | null;
+  origin: PVWriteOrigin | undefined;
+  timeoutS: number | undefined;
+  /** The socket and its heartbeat binding at call time: a pending write is dropped when either changed. */
+  socket: WebSocketLike;
+  heartbeatBinding: string | null;
+  resolve: (outcome: WriteOutcome) => void;
+  /** Earlier pending calls this one superseded; they resolve with its outcome, coalesced. */
+  superseded: Array<(outcome: WriteOutcome) => void>;
+}
+
+/** A PV's write slot: present while one request is in flight; `pending` is the latest value waiting. */
+interface WriteSlot {
+  pending: QueuedWrite | null;
+}
+
+function settleWrite(entry: QueuedWrite, outcome: WriteOutcome): void {
+  entry.resolve(outcome);
+  for (const resolve of entry.superseded) {
+    resolve({ ...outcome, coalesced: true });
+  }
 }
 
 /** Run `fn` after the current synchronous work, before any timer or I/O callback. */
@@ -158,6 +199,8 @@ export class HarePVService implements PVService {
   private readonly onErrorCallback: ((error: HareError) => void) | undefined;
   private readonly onStatusChangeCallback: ((status: HareConnectionStatus) => void) | undefined;
   private readonly onBackendChangeCallback: ((backend: HareBackend) => void) | undefined;
+  private readonly onHeartbeatCallback: ((state: HareHeartbeatState) => void) | undefined;
+  private readonly putTimeoutMs: number;
 
   private listeners = new Map<string, Set<PVListener>>();
   private snapshots = new Map<string, PVData>();
@@ -170,6 +213,12 @@ export class HarePVService implements PVService {
   // state is reported separately through status).
   private backend: HareBackend | null = null;
   private reconnectAttempt = 0;
+  // The socket that delivered the last heartbeat, and that heartbeat's
+  // binding: `heartbeat()` is "seen" only while it is the current open socket.
+  private heartbeatSocket: WebSocketLike | null = null;
+  private heartbeatBinding: string | null = null;
+  // One write slot per PV with a submit() request in flight.
+  private writeSlots = new Map<string, WriteSlot>();
 
   private reconnectTimer: number | undefined;
   private pingTimer: number | undefined;
@@ -195,6 +244,8 @@ export class HarePVService implements PVService {
     this.onErrorCallback = options.onError;
     this.onStatusChangeCallback = options.onStatusChange;
     this.onBackendChangeCallback = options.onBackendChange;
+    this.onHeartbeatCallback = options.onHeartbeat;
+    this.putTimeoutMs = options.putTimeoutMs ?? DEFAULT_PUT_TIMEOUT_MS;
   }
 
   // ── PVService lifecycle ────────────────────────────────────────────────
@@ -234,6 +285,7 @@ export class HarePVService implements PVService {
       socket.close();
     }
     this.setStatus('disconnected');
+    this.forgetHeartbeat();
     this.markAllDisconnected();
   }
 
@@ -291,6 +343,19 @@ export class HarePVService implements PVService {
     return this.backend ? { ...this.backend } : null;
   }
 
+  /**
+   * Heartbeat state of the current socket: `seen` once it is open and has
+   * delivered a heartbeat, with that heartbeat's binding. Resets on every
+   * close. Changes are reported through `onHeartbeat` (a binding change also
+   * through `onBackendChange`, a close through `onStatusChange`).
+   */
+  heartbeat(): HareHeartbeatState {
+    const socket = this.socket;
+    const seen =
+      socket !== null && socket.readyState === WS_OPEN && this.heartbeatSocket === socket;
+    return { seen, binding: seen ? this.heartbeatBinding : null };
+  }
+
   // ── Writes ──────────────────────────────────────────────────────────────
 
   put(pvName: string, value: number | string | boolean): void {
@@ -324,6 +389,125 @@ export class HarePVService implements PVService {
     );
   }
 
+  /**
+   * Write one value with WC6's client discipline; never rejects.
+   *
+   * - Answers row 16 (`target_changed`) with no request unless the current
+   *   socket is open and has delivered a heartbeat.
+   * - Sends `options.binding`, or else the current heartbeat binding at call
+   *   time; a null binding is omitted from the body.
+   * - One request in flight per PV. A value submitted meanwhile waits; a newer
+   *   one supersedes it, and the superseded call resolves with the newer one's
+   *   outcome and `coalesced: true`. A waiting value whose socket closed or
+   *   whose heartbeat binding changed resolves row 16 with no request.
+   * - Never retries. No reply within `putTimeoutMs` of the send resolves row 15
+   *   (`unknown`); the PV's slot stays held until that request settles.
+   */
+  submit(pvName: string, value: PVWriteValue, options: SubmitOptions = {}): Promise<WriteOutcome> {
+    const hb = this.heartbeat();
+    const socket = this.socket;
+    if (!hb.seen || socket === null) {
+      return Promise.resolve(clientOutcome('16'));
+    }
+    return new Promise<WriteOutcome>((resolve) => {
+      const entry: QueuedWrite = {
+        value,
+        binding: options.binding !== undefined ? options.binding : hb.binding,
+        origin: options.origin,
+        timeoutS: options.timeoutS,
+        socket,
+        heartbeatBinding: hb.binding,
+        resolve,
+        superseded: [],
+      };
+      const slot = this.writeSlots.get(pvName);
+      if (!slot) {
+        this.writeSlots.set(pvName, { pending: null });
+        this.dispatchWrite(pvName, entry);
+        return;
+      }
+      const previous = slot.pending;
+      if (previous) {
+        entry.superseded = [...previous.superseded, previous.resolve];
+      }
+      slot.pending = entry;
+    });
+  }
+
+  /** Send `entry` now (its PV's slot is held) and settle it on reply or timeout. */
+  private dispatchWrite(pvName: string, entry: QueuedWrite): void {
+    let settled = false;
+    const finish = (outcome: WriteOutcome) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      settleWrite(entry, outcome);
+    };
+    const timer = setTimeout(() => finish(clientOutcome('15')), this.putTimeoutMs);
+    void this.sendWriteRequest(pvName, entry).then((outcome) => {
+      finish(outcome);
+      this.releaseWriteSlot(pvName);
+    });
+  }
+
+  /** The request settled: send the PV's pending value, if it is still valid, or free the slot. */
+  private releaseWriteSlot(pvName: string): void {
+    const slot = this.writeSlots.get(pvName);
+    if (!slot) return;
+    const next = slot.pending;
+    slot.pending = null;
+    if (!next) {
+      this.writeSlots.delete(pvName);
+      return;
+    }
+    const hb = this.heartbeat();
+    if (!hb.seen || this.socket !== next.socket || hb.binding !== next.heartbeatBinding) {
+      this.writeSlots.delete(pvName);
+      settleWrite(next, clientOutcome('16'));
+      return;
+    }
+    this.dispatchWrite(pvName, next);
+  }
+
+  /** Resolve every waiting value row 16 (its socket closed or its binding changed); in-flight requests run on. */
+  private dropPendingWrites(keep: (entry: QueuedWrite) => boolean): void {
+    for (const slot of this.writeSlots.values()) {
+      const entry = slot.pending;
+      if (entry && !keep(entry)) {
+        slot.pending = null;
+        settleWrite(entry, clientOutcome('16'));
+      }
+    }
+  }
+
+  /** One PUT; resolves its WC6 outcome and never rejects. */
+  private async sendWriteRequest(pvName: string, entry: QueuedWrite): Promise<WriteOutcome> {
+    try {
+      const fetchFn = this.fetchFn;
+      if (!fetchFn) return clientOutcome('15');
+      const body: PVWriteRequestDTO = { value: entry.value };
+      if (entry.timeoutS !== undefined) body.timeout = entry.timeoutS;
+      if (entry.binding !== null) body.binding = entry.binding;
+      if (entry.origin !== undefined) body.origin = entry.origin;
+      const headers: Record<string, string> = {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      };
+      if (this.apiKey) headers['X-API-Key'] = this.apiKey;
+      const url = `${this.httpPvsBaseUrl.replace(/\/+$/, '')}/${encodePvNameForPath(pvName)}`;
+      const res = await fetchFn(url, { method: 'PUT', headers, body: JSON.stringify(body) });
+      let text = '';
+      try {
+        text = await res.text();
+      } catch {
+        // The status alone decides.
+      }
+      return outcomeFromResponse(res.ok, res.status, text);
+    } catch {
+      return clientOutcome('15');
+    }
+  }
+
   // ── Socket lifecycle ────────────────────────────────────────────────────
 
   private openSocket(): void {
@@ -338,6 +522,8 @@ export class HarePVService implements PVService {
     // Ops queued for a previous socket are void: the new socket's open
     // resubscribes every PV that still has listeners.
     this.clearPending();
+    // A new socket has delivered no heartbeat yet.
+    this.forgetHeartbeat();
 
     const wsUrl = this.apiKey
       ? `${this.url}${this.url.includes('?') ? '&' : '?'}api_key=${encodeURIComponent(this.apiKey)}`
@@ -391,6 +577,7 @@ export class HarePVService implements PVService {
     this.clearPending();
     this.stopHeartbeat();
     this.setStatus('disconnected');
+    this.forgetHeartbeat();
     this.markAllDisconnected();
 
     if (this.desiredConnected) {
@@ -534,6 +721,7 @@ export class HarePVService implements PVService {
       notice: frame.notice ?? null,
       binding: frame.binding ?? null,
     };
+    this.noteHeartbeat(next.binding);
     const prev = this.backend;
     if (
       prev &&
@@ -546,6 +734,32 @@ export class HarePVService implements PVService {
     }
     this.backend = next;
     this.onBackendChangeCallback?.({ ...next });
+  }
+
+  /** Record the current socket's heartbeat; drop waiting writes whose binding it changed. */
+  private noteHeartbeat(binding: string | null): void {
+    const socket = this.socket;
+    if (!socket) return;
+    const before = this.heartbeat();
+    this.heartbeatSocket = socket;
+    this.heartbeatBinding = binding;
+    const after = this.heartbeat();
+    if (before.seen === after.seen && before.binding === after.binding) return;
+    this.dropPendingWrites(
+      (entry) => entry.socket === socket && entry.heartbeatBinding === binding
+    );
+    this.onHeartbeatCallback?.(after);
+  }
+
+  /** The current socket is gone: heartbeat unseen, every waiting write dropped. */
+  private forgetHeartbeat(): void {
+    const wasSeen = this.heartbeatSocket !== null;
+    this.heartbeatSocket = null;
+    this.heartbeatBinding = null;
+    this.dropPendingWrites(() => false);
+    if (wasSeen) {
+      this.onHeartbeatCallback?.({ seen: false, binding: null });
+    }
   }
 
   private applyValue(pvName: string, dto: PVValueDTO): void {

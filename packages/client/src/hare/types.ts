@@ -150,12 +150,69 @@ export type HareClientMessage = HareSubscribeMessage | HareUnsubscribeMessage | 
 
 // ── REST write DTOs for PUT /hare/v1/pvs/{pv} ───────────────────────────────
 
+/** The screen and revision that issued a write (recorded in the write's audit record only). */
+export interface PVWriteOrigin {
+  screen: string;
+  rev?: string | null;
+}
+
 export interface PVWriteRequestDTO {
   value: PVWriteValue;
   wait?: boolean;
   timeout?: number;
+  /** The control-target binding the screen showed; a backend that checks it refuses a PUT naming another. */
+  binding?: string;
+  origin?: PVWriteOrigin;
 }
 
 export interface PVWriteResultDTO {
   pv: string;
+}
+
+// ── Write outcomes (WC6) ────────────────────────────────────────────────────
+
+/** How a write ended, as WC6 names it. */
+export type WriteOutcomeKind =
+  | 'confirmed'
+  | 'mismatch'
+  | 'unconfirmed'
+  | 'unknown'
+  | 'refused'
+  | 'target_changed'
+  | 'switch_in_progress';
+
+/**
+ * What `HarePVService.submit()` resolves to: one WC6 row. `detail` is always
+ * toast-ready text (never a raw response body). `status`/`code` are the HTTP
+ * status and envelope code when a response arrived, else null. `coalesced` is
+ * true when a newer value for the same PV superseded this one before it was
+ * sent: the outcome is then the newer value's, and this value was never sent.
+ */
+export interface WriteOutcome {
+  outcome: WriteOutcomeKind;
+  code: string | null;
+  status: number | null;
+  detail: string;
+  coalesced: boolean;
+}
+
+/** Options accepted by `HarePVService.submit()`. */
+export interface SubmitOptions {
+  /** Screen and revision for the audit record. */
+  origin?: PVWriteOrigin;
+  /**
+   * Binding to send (captured when a confirmation dialog opened). Omitted:
+   * the current socket's heartbeat binding at call time. Null is never sent.
+   */
+  binding?: string | null;
+  /** Sent as the request's `timeout`; never weakens the server's confirm policy. */
+  timeoutS?: number;
+}
+
+/** Per-socket heartbeat state, as returned by `HarePVService.heartbeat()`. */
+export interface HareHeartbeatState {
+  /** True once the current socket is open and has delivered a heartbeat. */
+  seen: boolean;
+  /** That heartbeat's binding; null when unseen or unbound. */
+  binding: string | null;
 }
