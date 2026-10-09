@@ -186,24 +186,47 @@ function toastText(detail: unknown): string | undefined {
   return text.length > WC6_DETAIL_MAX_CHARS ? text.slice(0, WC6_DETAIL_MAX_CHARS) : text;
 }
 
-/**
- * Map a PUT response to its WC6 outcome: by envelope code, and by status only
- * for a 2xx (row 10) and a 405 (row 14a, generic canopy with the relay off).
- * An unrecognised code, or a non-2xx with no envelope, is row 15.
- */
-export function outcomeFromResponse(ok: boolean, status: number, bodyText: string): WriteOutcome {
-  if (ok) return rowOutcome('10', status, null);
-  if (status === 405) return rowOutcome('14a', status, null);
-
-  let envelope: { code?: unknown; detail?: unknown } | null = null;
+/** The parsed body when it is a JSON object (not an array, not null), else null. */
+function jsonObject(bodyText: string): Record<string, unknown> | null {
   try {
     const parsed: unknown = JSON.parse(bodyText);
     if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      envelope = parsed as { code?: unknown; detail?: unknown };
+      return parsed as Record<string, unknown>;
     }
   } catch {
-    // Not an envelope.
+    // Not JSON.
   }
+  return null;
+}
+
+/**
+ * Map a PUT response to its WC6 outcome. A redirect (`type` is
+ * `'opaqueredirect'` under `redirect: 'manual'`, or any 3xx status) is row 15:
+ * the write did not reach the relay, or nobody can say whether it did. A 2xx
+ * is row 10 only when its body is the server's write result, a JSON object
+ * with a string `pv` (shape only: the name is not compared); any other 2xx
+ * body — a followed redirect's login page, an empty body — is row 15. Other
+ * statuses map by envelope code, and a 405 with none is row 14a (generic
+ * canopy with the relay off). An unrecognised code, or a non-2xx with no
+ * envelope, is row 15.
+ */
+export function outcomeFromResponse(
+  ok: boolean,
+  status: number,
+  bodyText: string,
+  type?: string
+): WriteOutcome {
+  if (type === 'opaqueredirect') return rowOutcome('15', null, null);
+  if (status >= 300 && status < 400) return rowOutcome('15', status, null);
+  if (ok) {
+    const result = jsonObject(bodyText);
+    return typeof result?.pv === 'string'
+      ? rowOutcome('10', status, null)
+      : rowOutcome('15', status, null);
+  }
+  if (status === 405) return rowOutcome('14a', status, null);
+
+  const envelope = jsonObject(bodyText);
   const code = typeof envelope?.code === 'string' ? envelope.code : null;
   const mapping = code !== null && Object.hasOwn(CODE_ROWS, code) ? CODE_ROWS[code] : undefined;
   if (!mapping) return rowOutcome('15', status, code);

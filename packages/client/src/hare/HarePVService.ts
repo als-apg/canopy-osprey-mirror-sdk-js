@@ -38,10 +38,20 @@ export interface WebSocketLike {
 
 export type WebSocketFactory = (url: string) => WebSocketLike;
 
+/**
+ * The slice of `fetch` the SDK uses. `redirect` and `type` are optional so a
+ * minimal fetch stays assignable; `submit` sends `redirect: 'manual'` and reads
+ * `type` to see an unfollowed redirect (`'opaqueredirect'`).
+ */
 export type FetchLike = (
   url: string,
-  init: { method: string; headers: Record<string, string>; body: string }
-) => Promise<{ ok: boolean; status: number; text(): Promise<string> }>;
+  init: {
+    method: string;
+    headers: Record<string, string>;
+    body: string;
+    redirect?: 'follow' | 'manual' | 'error';
+  }
+) => Promise<{ ok: boolean; status: number; type?: string; text(): Promise<string> }>;
 
 export type HareConnectionStatus = 'idle' | 'connecting' | 'connected' | 'disconnected';
 
@@ -495,14 +505,20 @@ export class HarePVService implements PVService {
       };
       if (this.apiKey) headers['X-API-Key'] = this.apiKey;
       const url = `${this.httpPvsBaseUrl.replace(/\/+$/, '')}/${encodePvNameForPath(pvName)}`;
-      const res = await fetchFn(url, { method: 'PUT', headers, body: JSON.stringify(body) });
+      // A redirect is never followed: a login page behind it would read as a 2xx.
+      const res = await fetchFn(url, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(body),
+        redirect: 'manual',
+      });
       let text = '';
       try {
         text = await res.text();
       } catch {
         // The status alone decides.
       }
-      return outcomeFromResponse(res.ok, res.status, text);
+      return outcomeFromResponse(res.ok, res.status, text, res.type);
     } catch {
       return clientOutcome('15');
     }

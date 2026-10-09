@@ -41,7 +41,15 @@ function heartbeatFrame(binding: string | null, backend = 'va'): HareHeartbeatFr
   return { type: 'heartbeat', timestamp: 0, backend, label: null, notice: null, binding };
 }
 
-type Reply = { ok: boolean; status: number; text?: string };
+type Reply = { ok: boolean; status: number; text?: string; type?: string };
+
+/** The server's write result (`PVWriteResultDTO`): what a real 2xx carries. */
+const WRITE_RESULT = '{"pv":"X"}';
+
+/** A reply's body: its own text, else the write result for a 2xx and nothing otherwise. */
+function replyText(reply: Reply): string {
+  return reply.text ?? (reply.ok ? WRITE_RESULT : '');
+}
 
 /** A fetch whose replies the test releases one by one. */
 function deferredFetch() {
@@ -59,7 +67,12 @@ function deferredFetch() {
           if (reply instanceof Error) {
             reject(reply);
           } else {
-            resolve({ ok: reply.ok, status: reply.status, text: async () => reply.text ?? '' });
+            resolve({
+              ok: reply.ok,
+              status: reply.status,
+              type: reply.type,
+              text: async () => replyText(reply),
+            });
           }
         });
       })
@@ -71,7 +84,8 @@ function replyFetch(reply: Reply) {
   return vi.fn<FetchLike>(async () => ({
     ok: reply.ok,
     status: reply.status,
-    text: async () => reply.text ?? '',
+    type: reply.type,
+    text: async () => replyText(reply),
   }));
 }
 
@@ -144,7 +158,7 @@ describe('WC6 outcome table', () => {
     for (const [id, row] of Object.entries(vectors.rows)) {
       if (row.status === null || row.outcome === null) continue;
       const ok = row.status >= 200 && row.status < 300;
-      const text = row.code === null ? '' : envelope(row.code, row.default!);
+      const text = ok ? WRITE_RESULT : row.code === null ? '' : envelope(row.code, row.default!);
       const got = outcomeFromResponse(ok, row.status, text);
       expect(got, id).toEqual({
         outcome: row.outcome,
@@ -211,6 +225,58 @@ describe('WC6 outcome table', () => {
       outcome: 'unknown',
       detail: UNKNOWN_TEXT,
     });
+  });
+
+  it('reads a 2xx as written only when its body is a JSON object with a string pv', () => {
+    const unknown = (status: number) => ({
+      outcome: 'unknown',
+      code: null,
+      status,
+      detail: UNKNOWN_TEXT,
+      coalesced: false,
+    });
+    expect(outcomeFromResponse(true, 200, '{"pv":"SR:X","value":1}')).toEqual({
+      outcome: 'confirmed',
+      code: null,
+      status: 200,
+      detail: 'written',
+      coalesced: false,
+    });
+    // Shape only: the name is not compared with the written PV.
+    expect(outcomeFromResponse(true, 200, '{"pv":"other"}').outcome).toBe('confirmed');
+    expect(outcomeFromResponse(true, 200, '<html><form>Sign in</form></html>')).toEqual(
+      unknown(200)
+    );
+    expect(outcomeFromResponse(true, 200, '')).toEqual(unknown(200));
+    expect(outcomeFromResponse(true, 204, '')).toEqual(unknown(204));
+    expect(outcomeFromResponse(true, 200, '{"pv":7}')).toEqual(unknown(200));
+    expect(outcomeFromResponse(true, 200, '{"value":1}')).toEqual(unknown(200));
+    expect(outcomeFromResponse(true, 200, '[{"pv":"X"}]')).toEqual(unknown(200));
+    expect(outcomeFromResponse(true, 200, 'null')).toEqual(unknown(200));
+  });
+
+  it('reads any redirect as unknown, whatever its body', () => {
+    expect(outcomeFromResponse(false, 0, '', 'opaqueredirect')).toEqual({
+      outcome: 'unknown',
+      code: null,
+      status: null,
+      detail: UNKNOWN_TEXT,
+      coalesced: false,
+    });
+    // An opaque redirect is unknown even from a fetch that reports it as ok.
+    expect(outcomeFromResponse(true, 200, WRITE_RESULT, 'opaqueredirect').outcome).toBe('unknown');
+    for (const status of [301, 302, 303, 307, 308]) {
+      expect(outcomeFromResponse(false, status, WRITE_RESULT), String(status)).toEqual({
+        outcome: 'unknown',
+        code: null,
+        status,
+        detail: UNKNOWN_TEXT,
+        coalesced: false,
+      });
+    }
+    expect(
+      outcomeFromResponse(false, 302, envelope('pv_write_refused', 'nothing written')).outcome
+    ).toBe('unknown');
   });
 });
 
@@ -430,8 +496,85 @@ describe('HarePVService.heartbeat / submit', () => {
           throw new Error('stream reset');
         },
       }));
+      // A 2xx is row 10 only on a write-result body; an unreadable one is row 15.
       const b = connected(unreadable);
-      expect((await b.service.submit('X', 1)).outcome).toBe('confirmed');
+      expect((await b.service.submit('X', 1)).outcome).toBe('unknown');
+    });
+
+    it('asks fetch not to follow redirects', async () => {
+      const fetchFn = replyFetch({ ok: true, status: 200 });
+      const { service } = connected(fetchFn);
+      await service.submit('X', 1);
+      expect(fetchFn.mock.calls[0]![1].redirect).toBe('manual');
+    });
+
+    it('a followed redirect to a login page (2xx HTML) is unknown, not written', async () => {
+      // A fetch that ignores redirect: 'manual' and lands on the login page.
+      const fetchFn = vi.fn<FetchLike>(async () => ({
+        ok: true,
+        status: 200,
+        type: 'basic',
+        text: async () => '<!doctype html><title>Sign in</title><form action="/login"></form>',
+      }));
+      const { service } = connected(fetchFn);
+      await expect(service.submit('X', 1)).resolves.toEqual({
+        outcome: 'unknown',
+        code: null,
+        status: 200,
+        detail: UNKNOWN_TEXT,
+        coalesced: false,
+      });
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('an opaque redirect is unknown', async () => {
+      const fetchFn = replyFetch({ ok: false, status: 0, type: 'opaqueredirect', text: '' });
+      const { service } = connected(fetchFn);
+      await expect(service.submit('X', 1)).resolves.toEqual({
+        outcome: 'unknown',
+        code: null,
+        status: null,
+        detail: UNKNOWN_TEXT,
+        coalesced: false,
+      });
+    });
+
+    it('a 302 is unknown', async () => {
+      const fetchFn = replyFetch({ ok: false, status: 302, text: '' });
+      const { service } = connected(fetchFn);
+      await expect(service.submit('X', 1)).resolves.toEqual({
+        outcome: 'unknown',
+        code: null,
+        status: 302,
+        detail: UNKNOWN_TEXT,
+        coalesced: false,
+      });
+    });
+
+    it('a 2xx with an HTML body is unknown', async () => {
+      const fetchFn = replyFetch({ ok: true, status: 200, text: '<html>ok</html>' });
+      const { service } = connected(fetchFn);
+      const got = await service.submit('X', 1);
+      expect(got).toMatchObject({ outcome: 'unknown', status: 200, detail: UNKNOWN_TEXT });
+    });
+
+    it('a 2xx with an empty body is unknown', async () => {
+      const fetchFn = replyFetch({ ok: true, status: 200, text: '' });
+      const { service } = connected(fetchFn);
+      const got = await service.submit('X', 1);
+      expect(got).toMatchObject({ outcome: 'unknown', status: 200, detail: UNKNOWN_TEXT });
+    });
+
+    it('a 2xx with the write result {pv} is written', async () => {
+      const fetchFn = replyFetch({ ok: true, status: 200, text: '{"pv":"SR:X","value":1}' });
+      const { service } = connected(fetchFn);
+      await expect(service.submit('SR:X', 1)).resolves.toEqual({
+        outcome: 'confirmed',
+        code: null,
+        status: 200,
+        detail: 'written',
+        coalesced: false,
+      });
     });
 
     it('a refused write is not retried', async () => {
