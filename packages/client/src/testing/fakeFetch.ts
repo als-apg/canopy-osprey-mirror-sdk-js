@@ -2,6 +2,7 @@
 // `canopyFetch` (Mole, jobs, app API layers). Published as part of
 // `@slaclab/canopy-client/testing`; framework-free (no test-runner imports).
 
+import { abortReason } from '../rest/abort.js';
 import type { AbortSignalLike } from '../rest/canopyFetch.js';
 import type { FetchLike } from '../transport.js';
 
@@ -143,13 +144,6 @@ function parseQuery(search: string): Record<string, string> {
   return query;
 }
 
-function abortError(signal: AbortSignalLike): unknown {
-  if (signal.reason !== undefined) return signal.reason;
-  const error = new Error('The operation was aborted');
-  error.name = 'AbortError';
-  return error;
-}
-
 /**
  * A route-matching fake `fetch` for `CanopyConnection.fetch` (or any
  * `FetchLike` injection point). Unmatched requests get a FastAPI-style
@@ -202,7 +196,7 @@ export function createFakeFetch(
     init: Parameters<FetchLike>[1]
   ): Promise<{ ok: boolean; status: number; text(): Promise<string> }> => {
     const signal = (init as { signal?: AbortSignalLike }).signal;
-    if (signal?.aborted) return Promise.reject(abortError(signal));
+    if (signal?.aborted) return Promise.reject(abortReason(signal));
 
     const [pathAndQuery = ''] = stripOrigin(url).split('#');
     const queryIndex = pathAndQuery.indexOf('?');
@@ -234,7 +228,7 @@ export function createFakeFetch(
     const result = respond(req);
     if (!signal?.addEventListener) return result;
     return new Promise((resolve, reject) => {
-      const onAbort = () => reject(abortError(signal));
+      const onAbort = () => reject(abortReason(signal));
       signal.addEventListener!('abort', onAbort, { once: true });
       result.then(
         (response) => {

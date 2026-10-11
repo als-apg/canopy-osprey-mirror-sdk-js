@@ -2,6 +2,7 @@
 // one-shot status fetch plus a polling helper that resolves/rejects on the
 // job's terminal state.
 
+import { abortReason } from '../rest/abort.js';
 import { CanopyError, canopyFetch } from '../rest/canopyFetch.js';
 import type { AbortSignalLike, CanopyConnection } from '../rest/canopyFetch.js';
 import { isTerminalJobStatus } from './types.js';
@@ -119,14 +120,6 @@ export async function awaitJob(
     }
     await sleep(Math.min(pollMs, remainingMs), signal);
   }
-}
-
-/** The signal's abort reason, or a synthetic `AbortError` when none was given. */
-function abortReason(signal: AbortSignalLike): unknown {
-  if (signal.reason !== undefined) return signal.reason;
-  const error = new Error('The operation was aborted');
-  error.name = 'AbortError';
-  return error;
 }
 
 /** Abort-aware delay: resolves after `ms`, rejects immediately on abort. */

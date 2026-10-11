@@ -1,6 +1,11 @@
 import type { WebSocketFactory } from '../transport.js';
-import { ResilientSocket, toWsUrl } from '../ws/ResilientSocket.js';
-import type { SocketError, SocketFrame, SocketStatus } from '../ws/ResilientSocket.js';
+import {
+  ResilientSocket,
+  describeSocketError,
+  toServiceStatus,
+  toWsUrl,
+} from '../ws/ResilientSocket.js';
+import type { SocketFrame } from '../ws/ResilientSocket.js';
 import type { FormulaResultDTO, FormulaSpec, FoxServerFrame } from './types.js';
 
 export type FoxConnectionStatus = 'idle' | 'connecting' | 'connected' | 'disconnected';
@@ -121,8 +126,10 @@ export class FoxFormulaService {
       onFrame: (frame) => this.handleFrame(frame),
       // Server-assigned ids die with their socket.
       onClose: () => this.resetServerCorrelation(),
-      onStatusChange: (status) => this.handleSocketStatus(status),
-      onError: (error) => this.handleSocketError(error),
+      // A stopped socket reads as 'disconnected' (drops and dispose() alike).
+      onStatusChange: (status) => this.setStatus(toServiceStatus(status)),
+      onError: (error) =>
+        this.reportError({ code: error.code, message: describeSocketError(error, 'formula') }),
     });
   }
 
@@ -201,23 +208,6 @@ export class FoxFormulaService {
   }
 
   // ── Connection callbacks ──────────────────────────────────────────────────
-
-  private handleSocketStatus(status: SocketStatus): void {
-    // A stopped socket ('closed') is reported as 'disconnected', the status
-    // this service has always used for both drops and dispose().
-    this.setStatus(status === 'closed' ? 'disconnected' : status);
-  }
-
-  private handleSocketError(error: SocketError): void {
-    if (error.code === 'ws_connect_failed') {
-      this.reportError({
-        code: error.code,
-        message: `Could not open formula connection: ${errorMessage(error.cause)}`,
-      });
-      return;
-    }
-    this.reportError({ code: error.code, message: error.message });
-  }
 
   /** Server-assigned ids die with their socket; forget all reply correlation. */
   private resetServerCorrelation(): void {
@@ -349,8 +339,4 @@ export class FoxFormulaService {
       console.warn(`[FoxFormulaService] ${error.code}: ${error.message}`);
     }
   }
-}
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }

@@ -113,8 +113,33 @@ function defaultWebSocketFactory(): WebSocketFactory | undefined {
   return ctor ? (url: string) => new ctor(url) : undefined;
 }
 
-function errorMessage(err: unknown): string {
+// ── Helpers shared with the protocol services in this package ──────────────
+// (Exported for HarePVService / FoxFormulaService; not re-exported from the
+// package root.)
+
+/** `err.message` for an Error, else `String(err)`. */
+export function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * The status a protocol service reports for a socket status: a stopped
+ * socket ('closed') reads as 'disconnected', the status Hare and Fox have
+ * always used for both drops and an explicit disconnect.
+ */
+export function toServiceStatus(status: SocketStatus): Exclude<SocketStatus, 'closed'> {
+  return status === 'closed' ? 'disconnected' : status;
+}
+
+/**
+ * The message a protocol service reports for a socket error:
+ * `ws_connect_failed` names the service's connection ("Could not open live
+ * connection: ..."); any other error keeps the socket's own message.
+ */
+export function describeSocketError(error: SocketError, connection: string): string {
+  return error.code === 'ws_connect_failed'
+    ? `Could not open ${connection} connection: ${errorMessage(error.cause)}`
+    : error.message;
 }
 
 /**

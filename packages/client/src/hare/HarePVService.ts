@@ -3,8 +3,13 @@ import type { PVData, PVListener, PVService } from '../pv/PVService.js';
 import { DISCONNECTED_PV } from '../pv/PVService.js';
 import { canopyFetch } from '../rest/canopyFetch.js';
 import type { FetchLike, WebSocketFactory } from '../transport.js';
-import { ResilientSocket } from '../ws/ResilientSocket.js';
-import type { SocketError, SocketFrame, SocketStatus } from '../ws/ResilientSocket.js';
+import {
+  ResilientSocket,
+  describeSocketError,
+  errorMessage,
+  toServiceStatus,
+} from '../ws/ResilientSocket.js';
+import type { SocketFrame } from '../ws/ResilientSocket.js';
 import type {
   HareAlarmSeverity,
   HareServerFrame,
@@ -131,8 +136,10 @@ export class HarePVService implements PVService {
       onOpen: () => this.resubscribeAll(),
       onFrame: (frame) => this.handleFrame(frame),
       onClose: () => this.markAllDisconnected(),
-      onStatusChange: (status) => this.handleSocketStatus(status),
-      onError: (error) => this.handleSocketError(error),
+      // A stopped socket reads as 'disconnected' (drops and disconnect() alike).
+      onStatusChange: (status) => this.setStatus(toServiceStatus(status)),
+      onError: (error) =>
+        this.reportError({ code: error.code, message: describeSocketError(error, 'live') }),
     });
   }
 
@@ -232,23 +239,6 @@ export class HarePVService implements PVService {
   }
 
   // ── Connection callbacks ────────────────────────────────────────────────
-
-  private handleSocketStatus(status: SocketStatus): void {
-    // A stopped socket ('closed') is reported as 'disconnected', the status
-    // this service has always used for both drops and disconnect().
-    this.setStatus(status === 'closed' ? 'disconnected' : status);
-  }
-
-  private handleSocketError(error: SocketError): void {
-    if (error.code === 'ws_connect_failed') {
-      this.reportError({
-        code: error.code,
-        message: `Could not open live connection: ${errorMessage(error.cause)}`,
-      });
-      return;
-    }
-    this.reportError({ code: error.code, message: error.message });
-  }
 
   private resubscribeAll(): void {
     const pvNames = [...this.listeners.keys()];
@@ -410,8 +400,4 @@ function formatDisplayValue(dto: PVValueDTO, meta: PVMetaDTO | undefined): strin
   }
 
   return String(value);
-}
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }
