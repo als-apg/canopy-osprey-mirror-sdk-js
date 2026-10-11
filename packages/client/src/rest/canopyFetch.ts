@@ -144,10 +144,14 @@ function isFormData(value: unknown): boolean {
 /**
  * A failure while fetching or reading the response: an abort passes through
  * unchanged, anything else becomes `CanopyError('network_error', 0, ...)`.
+ *
+ * Once the caller's signal has aborted, whatever fetch rejected with is the
+ * abort: real fetch rejects with `signal.reason` when one was given (any
+ * error, e.g. `AbortSignal.timeout()`'s `TimeoutError`), not an `AbortError`.
  */
-function networkFailure(err: unknown): unknown {
+function networkFailure(err: unknown, signal: AbortSignalLike | undefined): unknown {
   const error = err as { name?: unknown; message?: unknown } | null | undefined;
-  if (error?.name === 'AbortError') return err;
+  if (signal?.aborted || error?.name === 'AbortError') return err;
   return new CanopyError(
     'network_error',
     0,
@@ -254,8 +258,9 @@ function errorFromResponse(status: number, text: string): CanopyError {
  * - Network-level failures, including a body that fails mid-read, are
  *   normalized to `CanopyError('network_error', 0, ...)`. Only a misuse
  *   (such as no `fetch` implementation) throws something else.
- * - Aborts pass through unchanged (`err.name === 'AbortError'`), so callers
- *   can distinguish cancellation from failure.
+ * - Aborts pass through unchanged (an `AbortError`, or the signal's own
+ *   `reason`, such as a `TimeoutError`), so callers can distinguish
+ *   cancellation from failure.
  * - An empty 2xx body resolves to `undefined` (e.g. 204 responses).
  * - A `FormData` body is sent as-is (multipart); anything else as JSON.
  */
@@ -307,7 +312,7 @@ export async function canopyFetch<T>(
     // and test fakes accept both, so cast here instead of widening the type.
     res = await fetchFn(url, init as Parameters<FetchLike>[1]);
   } catch (err) {
-    throw networkFailure(err);
+    throw networkFailure(err, options.signal);
   }
 
   let text: string;
@@ -315,7 +320,7 @@ export async function canopyFetch<T>(
     text = await res.text();
   } catch (err) {
     // The connection dropped while the body was streaming in.
-    throw networkFailure(err);
+    throw networkFailure(err, options.signal);
   }
 
   if (!res.ok) {

@@ -134,6 +134,38 @@ describe('canopyFetch', () => {
     expect(caught).toBe(abortError);
   });
 
+  it("passes an aborted signal's own reason through (custom reason, TimeoutError)", async () => {
+    // Real fetch rejects with `signal.reason` when one was given, whatever
+    // its name; it must not be rewrapped as network_error.
+    const abortWith = (reason: Error) => {
+      const signal = { aborted: false, reason: undefined as unknown };
+      const fetchFn: FetchLike = vi.fn(async () => {
+        signal.aborted = true;
+        signal.reason = reason;
+        throw reason;
+      });
+      return canopyFetch({ baseUrl: BASE_URL, fetch: fetchFn }, '/x', { signal }).catch(
+        (err: unknown) => err
+      );
+    };
+
+    const custom = new Error('user navigated away');
+    expect(await abortWith(custom)).toBe(custom);
+
+    const timeout = new Error('signal timed out');
+    timeout.name = 'TimeoutError';
+    expect(await abortWith(timeout)).toBe(timeout);
+  });
+
+  it('still wraps a failure as network_error while the signal has not aborted', async () => {
+    const fetchFn: FetchLike = vi.fn(async () => {
+      throw new TypeError('fetch failed');
+    });
+    await expect(
+      canopyFetch({ baseUrl: BASE_URL, fetch: fetchFn }, '/x', { signal: { aborted: false } })
+    ).rejects.toMatchObject({ name: 'CanopyError', code: 'network_error', status: 0 });
+  });
+
   it('resolves undefined for an empty 2xx body', async () => {
     const fetchFn = makeFetchMock({ ok: true, status: 204 });
     await expect(canopyFetch({ baseUrl: BASE_URL, fetch: fetchFn }, '/x')).resolves.toBeUndefined();

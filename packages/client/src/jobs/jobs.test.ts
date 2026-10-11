@@ -166,6 +166,22 @@ describe('awaitJob', () => {
     await vi.advanceTimersByTimeAsync(10_000);
     expect(fetchFn).toHaveBeenCalledTimes(1); // no polls after the abort
   });
+
+  it('rejects with the abort reason when the signal aborts with a reason mid-request', async () => {
+    const timeout = new Error('signal timed out');
+    timeout.name = 'TimeoutError';
+    const signal = { aborted: false, reason: undefined as unknown };
+    // Like real fetch: an in-flight request rejects with `signal.reason`.
+    const fetchFn = vi.fn<FetchLike>(async () => {
+      signal.aborted = true;
+      signal.reason = timeout;
+      throw timeout;
+    });
+
+    await expect(
+      awaitJob({ baseUrl: 'http://host', fetch: fetchFn }, 'job-1', { signal })
+    ).rejects.toBe(timeout);
+  });
 });
 
 describe('awaitJob notFoundGraceMs', () => {
