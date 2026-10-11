@@ -109,11 +109,14 @@ has no CORS), and have the key added for it.
 
 - **Cross-origin requests are refused.** A request whose `Origin` does not
   match the dev server's host and port (the `Host` header), or that has
-  `Sec-Fetch-Site: cross-site`, is answered `403` and never forwarded; a
-  WebSocket handshake is refused (Vite answers `404`). Same-origin requests
-  from the app, and clients that send no `Origin` (curl, scripts, tests),
-  pass. List other trusted origins, such as a Storybook on another port, in
-  `allowedOrigins`.
+  `Sec-Fetch-Site: cross-site` or `same-site`, is answered `403` and never
+  forwarded; a WebSocket handshake is refused (Vite answers `404`).
+  `same-site` covers pages on another port of `localhost`, which browsers
+  count as the same site. Same-origin requests from the app, and clients
+  that send no `Origin` (curl, scripts, tests), pass. List other trusted
+  origins, such as a Storybook on another port, in `allowedOrigins`; that
+  admits their `fetch` and WebSocket calls (which carry an `Origin`), not
+  `<img>`-style requests without one.
 - **Cookies are dropped.** The `Cookie` header is removed before forwarding,
   so `localhost` cookies from other apps never reach the target.
 - **Keep Vite's host check.** DNS rebinding (a hostile name resolving to

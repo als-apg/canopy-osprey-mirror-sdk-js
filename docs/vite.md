@@ -65,10 +65,11 @@ The proxy adds the key, so it only serves the app's own page and non-browser
 tools:
 
 - a request whose `Origin` is not the dev server's own host and port, or that
-  has `Sec-Fetch-Site: cross-site`, is refused (`403`; a WebSocket handshake
-  gets `404`) and never forwarded. Clients without an `Origin` (curl,
-  scripts) pass, and `allowedOrigins: ['http://localhost:6006']` admits other
-  trusted pages;
+  has `Sec-Fetch-Site: cross-site` or `same-site` (a page on another
+  `localhost` port), is refused (`403`; a WebSocket handshake gets `404`) and
+  never forwarded. Clients without an `Origin` (curl, scripts) pass, and
+  `allowedOrigins: ['http://localhost:6006']` admits other trusted pages'
+  `fetch` and WebSocket calls;
 - prefixes match on a path-segment boundary (`/api/canopy-foo` is not
   proxied), so the returned keys are `^`-anchored RegExp strings;
 - the `Cookie` header is dropped before forwarding.

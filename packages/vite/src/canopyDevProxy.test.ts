@@ -293,6 +293,18 @@ describe('canopyDevProxy', () => {
       expect(res.statusCode).toBe(403);
     });
 
+    it('refuses a same-site request with no Origin (a page on another localhost port)', async () => {
+      // e.g. <img src="http://localhost:5173/api/canopy/..."> on http://localhost:3000:
+      // no Origin, and Sec-Fetch-Site ignores ports.
+      const headers = { host: DEV_HOST, 'sec-fetch-site': 'same-site' };
+      const { result, res } = await bypass(entry(), headers);
+      expect(result).toBe(false);
+      expect(res.statusCode).toBe(403);
+      expect(res.body).toContain('same-site');
+      expect((await bypass(entry(), headers, 'ws')).result).toBe(false);
+      expect(outgoingHeaders(entry(), headers)).toEqual({ http: {}, ws: {} });
+    });
+
     it('allows the origins listed in allowedOrigins', async () => {
       const proxy = canopyDevProxy({ allowedOrigins: ['http://LOCALHOST:6006/'] });
       const storybook = { host: DEV_HOST, origin: 'http://localhost:6006' };

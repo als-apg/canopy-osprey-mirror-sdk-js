@@ -11,7 +11,8 @@
 // (and non-browser tools): any other website open in the developer's browser
 // could otherwise send requests, or open WebSockets (which have no CORS), to
 // the dev server and have the key added for it. Every route therefore refuses
-// cross-origin browser requests, matches its prefix on a path-segment
+// cross-origin browser requests (including pages on another localhost port,
+// which browsers count as same-site), matches its prefix on a path-segment
 // boundary, and drops the browser's cookies before forwarding.
 
 import type { ClientRequest, IncomingMessage } from 'node:http';
@@ -144,10 +145,13 @@ function originMatchesHost(origin: string, host: string | undefined): boolean {
  * - an `Origin` other than the dev server's own (its `Host`) and not in
  *   `allowedOrigins`; browsers send `Origin` on every WebSocket handshake,
  *   CORS request and non-GET request;
- * - `Sec-Fetch-Site: cross-site`, which also covers the no-cors GETs (an
- *   `<img>`, a link) that carry no `Origin`.
+ * - `Sec-Fetch-Site: cross-site` or `same-site`, which covers the no-cors
+ *   GETs (an `<img>`, a link) that carry no `Origin`. `same-site` matters:
+ *   a page on another port of `localhost` is same-site (ports don't count),
+ *   though it is a different origin.
  *
- * Non-browser clients (curl, scripts) send neither header and pass.
+ * Only `same-origin` and `none` (typed into the address bar) pass that
+ * check. Non-browser clients (curl, scripts) send neither header and pass.
  */
 function refusal(req: IncomingMessage, allowedOrigins: ReadonlySet<string>): string | undefined {
   const origin = headerValue(req, 'origin');
@@ -159,8 +163,9 @@ function refusal(req: IncomingMessage, allowedOrigins: ReadonlySet<string>): str
       return `a request from origin ${origin}, which is not this dev server (${host ?? 'no Host'})`;
     }
   }
-  if (headerValue(req, 'sec-fetch-site') === 'cross-site') {
-    return 'a cross-site request (Sec-Fetch-Site: cross-site)';
+  const site = headerValue(req, 'sec-fetch-site');
+  if (site === 'cross-site' || site === 'same-site') {
+    return `a ${site} request (Sec-Fetch-Site: ${site})`;
   }
   return undefined;
 }
