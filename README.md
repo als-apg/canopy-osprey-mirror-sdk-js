@@ -4,7 +4,7 @@ TypeScript SDK for building apps on [Canopy](https://github.com/slaclab/canopy) 
 
 Every Canopy web app (react-trace, react-squirrel, the screen system) needs the same three things: a client for Canopy's wire protocols, TypeScript types for its REST/WS contracts, and the standard header/theme. This repo is the single home for those, so they are written once instead of hand-rolled per app.
 
-This is **not** the screen system. `screen-ir`, the IR renderer, and the widget set live in the screen runtime repo, which consumes this SDK exactly like any other client.
+This is **not** the screen system. The IR renderer and the widget set live in the screen runtime repo, which consumes this SDK exactly like any other client. The Screen IR contract (`@slaclab/canopy-screen-ir`) lives here, because tools that never render a screen (the PyDM converter, `canopy-screens` CI) need it too. The language-neutral IR definition is owned by [canopy-spec](https://github.com/slaclab/canopy-spec); the SDK package follows it (#8).
 
 ## Packages
 
@@ -24,7 +24,7 @@ Porting sources: `PVService`/`MockPVService` and `usePV` from `canopy-screen-bui
 - **One-way dependency arrow.** trace, squirrel, and the screen system import the SDK; the SDK never imports from any app repo. CI-enforced once packages land.
 - **`@slaclab/canopy-client` stays framework-free.** React enters only in `@slaclab/canopy-react`, `@slaclab/canopy-shell` and `@slaclab/canopy-charts`, so Node-side consumers (headless render workers, monitoring scripts, CI) can use the protocol client directly.
 - **The screen system stays out.** If a package is only useful when rendering `.screen.json`, it belongs in the screen runtime repo.
-- **Language-scoped by design.** A Python SDK would be a sibling (`canopy-sdk-python`), not a tenant here.
+- **Language-scoped by design.** A Python SDK would be a sibling (`canopy-sdk-py`), not a tenant here.
 
 ## Status
 
