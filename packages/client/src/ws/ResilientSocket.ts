@@ -144,6 +144,8 @@ export class ResilientSocket {
   private desiredConnected = false;
   private _status: SocketStatus = 'idle';
   private reconnectAttempt = 0;
+  /** Bumped by every openSocket() call, so a re-entrant one supersedes the outer. */
+  private openGeneration = 0;
 
   private reconnectTimer: number | undefined;
   private pingTimer: number | undefined;
@@ -213,7 +215,11 @@ export class ResilientSocket {
       );
     }
 
+    const generation = ++this.openGeneration;
     this.setStatus('connecting');
+    // A status listener may have called close() (stop) or connect() (which
+    // already opened a socket) while it was being told 'connecting'.
+    if (!this.desiredConnected || generation !== this.openGeneration) return;
 
     const wsUrl = this.apiKey
       ? `${this.url}${this.url.includes('?') ? '&' : '?'}api_key=${encodeURIComponent(this.apiKey)}`

@@ -407,6 +407,41 @@ describe('ResilientSocket', () => {
       expect(instances[0]!.sent).toEqual([]);
       expect(socket.status).toBe('closed');
     });
+
+    it("opens no socket when a status listener calls close() on 'connecting'", () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const socket: ResilientSocket = new ResilientSocket({
+        url: WS_URL,
+        webSocketFactory: factory,
+        onOpen: vi.fn(),
+        onFrame: vi.fn(),
+        onStatusChange: (status) => {
+          if (status === 'connecting') socket.close();
+        },
+      });
+      socket.connect();
+      expect(instances).toHaveLength(0);
+      expect(socket.status).toBe('closed');
+      vi.advanceTimersByTime(60_000);
+      expect(instances).toHaveLength(0);
+    });
+
+    it("opens exactly one socket when a status listener calls connect() on 'connecting'", () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const socket: ResilientSocket = new ResilientSocket({
+        url: WS_URL,
+        webSocketFactory: factory,
+        onOpen: vi.fn(),
+        onFrame: vi.fn(),
+        onStatusChange: (status) => {
+          if (status === 'connecting') socket.connect();
+        },
+      });
+      socket.connect();
+      expect(instances).toHaveLength(1);
+      instances[0]!.open();
+      expect(socket.status).toBe('connected');
+    });
   });
 
   describe('close', () => {
