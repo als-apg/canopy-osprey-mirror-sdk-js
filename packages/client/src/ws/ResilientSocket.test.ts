@@ -182,7 +182,7 @@ describe('ResilientSocket', () => {
   });
 
   describe('reconnect', () => {
-    it('reports the close info, reconnects on the capped backoff schedule, and resets it on open', () => {
+    it('reports the close info, reconnects on the capped backoff schedule, and resets it on the first frame', () => {
       const { socket, instances, onClose, onOpen, onStatusChange } = setup({
         reconnectDelaysMs: [100, 200],
       });
@@ -208,8 +208,9 @@ describe('ResilientSocket', () => {
       vi.advanceTimersByTime(200);
       expect(instances).toHaveLength(4);
 
-      instances[3]!.open(); // a successful open resets the schedule
+      instances[3]!.open();
       expect(onOpen).toHaveBeenCalledTimes(2);
+      instances[3]!.message({ type: 'hello' }); // the first frame resets the schedule
       instances[3]!.close();
       vi.advanceTimersByTime(100);
       expect(instances).toHaveLength(5);
@@ -220,6 +221,23 @@ describe('ResilientSocket', () => {
         ['disconnected'],
         ['connecting'],
       ]);
+    });
+
+    it('keeps backing off a server that accepts and then closes without sending a frame', () => {
+      const { socket, instances } = setup({ reconnectDelaysMs: [100, 200, 400] });
+      socket.connect();
+      instances[0]!.open();
+      instances[0]!.close(1011);
+
+      vi.advanceTimersByTime(100);
+      expect(instances).toHaveLength(2);
+      instances[1]!.open(); // accepted, but no frame before the close
+      instances[1]!.close(1011);
+
+      vi.advanceTimersByTime(199);
+      expect(instances).toHaveLength(2);
+      vi.advanceTimersByTime(1); // the schedule grew instead of restarting at 100
+      expect(instances).toHaveLength(3);
     });
 
     it('adds up to jitterMs of random delay when configured (none by default)', () => {

@@ -190,8 +190,9 @@ Behaviour:
   a terminal close code. `connect()` is idempotent and supersedes a pending
   reconnect.
 - **Reconnect**: capped backoff over `reconnectDelaysMs` (default
-  `[1000, 2000, 4000, 8000, 15000]`, reset by a successful open), plus a
-  random `0..jitterMs` (default 0).
+  `[1000, 2000, 4000, 8000, 15000]`, reset once a connection receives its
+  first frame, so a server that accepts and then closes is still backed
+  off), plus a random `0..jitterMs` (default 0).
 - **Liveness**: `{"type":"ping"}` every `pingIntervalMs` (15 s); if no frame
   of any kind arrives within `pongTimeoutMs` (10 s) of a ping, the socket is
   dropped and reconnected without waiting for a close handshake.

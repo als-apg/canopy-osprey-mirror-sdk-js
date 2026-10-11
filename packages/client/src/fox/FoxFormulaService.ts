@@ -24,7 +24,7 @@ export interface FoxFormulaServiceOptions {
   apiKey?: string;
   /** Override the full WS endpoint URL (skips derivation from `baseUrl`). */
   wsUrl?: string;
-  /** Capped backoff schedule; attempt counter resets on successful open. Default [1000, 2000, 4000, 8000, 15000]. */
+  /** Capped backoff schedule; the attempt counter resets once the server sends a frame on a new connection. Default [1000, 2000, 4000, 8000, 15000]. */
   reconnectDelaysMs?: number[];
   /** Client ping period while connected. Default 15000. */
   pingIntervalMs?: number;

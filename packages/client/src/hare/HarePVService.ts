@@ -34,7 +34,7 @@ export interface HarePVServiceOptions {
   apiKey?: string;
   /** Override the REST endpoint base for writes, e.g. https://host/hare/v1/pvs. Default: derived from `url` (ws->http, wss->https, trailing /ws/pvs -> /pvs, query stripped). */
   httpPvsBaseUrl?: string;
-  /** Capped backoff schedule; attempt counter resets on successful open. Default [1000, 2000, 4000, 8000, 15000]. */
+  /** Capped backoff schedule; the attempt counter resets once the server sends a frame on a new connection. Default [1000, 2000, 4000, 8000, 15000]. */
   reconnectDelaysMs?: number[];
   /** Client ping period while connected. Default 15000. */
   pingIntervalMs?: number;

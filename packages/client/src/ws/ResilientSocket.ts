@@ -43,7 +43,12 @@ export interface ResilientSocketOptions {
   url: string;
   /** Appended as `?api_key=` (or `&api_key=`) when set — browsers cannot set WS headers. */
   apiKey?: string;
-  /** Capped backoff schedule; the attempt counter resets on a successful open. Default [1000, 2000, 4000, 8000, 15000]. */
+  /**
+   * Capped backoff schedule. The attempt counter resets once the server sends
+   * a frame on a new connection (not merely on open), so a server that
+   * accepts and then immediately closes is still backed off. Default
+   * [1000, 2000, 4000, 8000, 15000].
+   */
   reconnectDelaysMs?: number[];
   /**
    * Adds a uniformly random 0..jitterMs to every reconnect delay, so many
@@ -119,7 +124,8 @@ function errorMessage(err: unknown): string {
  *   timer). On every open, `onOpen(send)` runs so the caller can
  *   (re)subscribe.
  * - A drop schedules a reconnect on the capped backoff schedule (plus
- *   optional jitter); a terminal close code stops instead.
+ *   optional jitter), which restarts once a connection receives a frame; a
+ *   terminal close code stops instead.
  * - While open, `{"type":"ping"}` goes out every `pingIntervalMs`; if nothing
  *   at all arrives within `pongTimeoutMs` of a ping, the socket is dropped
  *   and reconnected.
@@ -247,7 +253,6 @@ export class ResilientSocket {
     // the current connection's bookkeeping.
     socket.onopen = () => {
       if (this.socket !== socket) return;
-      this.reconnectAttempt = 0;
       this.setStatus('connected');
       // A status listener may have closed or replaced the socket.
       if (this.socket !== socket) return;
@@ -369,8 +374,10 @@ export class ResilientSocket {
   // ── Frames ────────────────────────────────────────────────────────────────
 
   private handleMessage(raw: unknown): void {
-    // Any inbound frame is proof of life, regardless of whether it parses.
+    // Any inbound frame is proof of life, regardless of whether it parses,
+    // and proves the connection is usable: restart the backoff schedule.
     this.disarmPongDeadline();
+    this.reconnectAttempt = 0;
 
     if (typeof raw !== 'string') return;
     let frame: unknown;
