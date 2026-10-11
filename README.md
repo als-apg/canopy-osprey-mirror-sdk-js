@@ -68,6 +68,39 @@ pnpm install
 
 Single-package variants go through `--filter`, e.g. `pnpm --filter @slaclab/canopy-client test`. Packages that depend on `@slaclab/canopy-client` resolve it via its built `dist/`, so run `pnpm build` after a fresh clone (the root `test`/`typecheck` scripts do this for you).
 
+### Developing an app against a local SDK checkout
+
+[`scripts/link-sdk.pnpmfile.cjs`](scripts/link-sdk.pnpmfile.cjs) points an app's `@slaclab/canopy-*` dependencies at this checkout (`link:`) without changing any file in the app repo. Build the SDK and keep it rebuilding:
+
+```sh
+pnpm build:watch
+```
+
+Then, in the app, opt in for one shell and install. POSIX shells:
+
+```sh
+pnpm_config_pnpmfile=<sdk checkout>/scripts/link-sdk.pnpmfile.cjs pnpm_config_lockfile=false pnpm install
+```
+
+PowerShell:
+
+```powershell
+$env:pnpm_config_pnpmfile = '<sdk checkout>\scripts\link-sdk.pnpmfile.cjs'
+$env:pnpm_config_lockfile = 'false'
+pnpm install
+```
+
+`lockfile=false` keeps the app's committed `pnpm-lock.yaml` untouched. To go back to the published packages, unset both variables and run `pnpm install` again.
+
+**Dedupe the shared libraries.** A `link:` package resolves its imports from the SDK checkout's own `node_modules`, so without help the app would load a second copy of React, Carbon and ECharts: hooks fail with "Invalid hook call", the shell reads a different Carbon theme context, and `echarts.connect` stops linking charts. Make Vite resolve them from the app:
+
+```ts
+// vite.config.ts
+export default defineConfig({
+  resolve: { dedupe: ['react', 'react-dom', '@carbon/react', 'echarts'] },
+});
+```
+
 ## Documentation
 
 The `docs/` directory contains a [Zensical](https://zensical.org) documentation site. To preview it locally:

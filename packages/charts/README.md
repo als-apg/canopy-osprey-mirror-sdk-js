@@ -29,8 +29,9 @@ version. The charts import only the shell's Carbon-free
 formatters in a Node script) never loads `@carbon/react`; the Carbon peers
 matter only to the package manager's peer check.
 
-Apps that link the SDK locally should dedupe `echarts` (Vite
-`resolve.dedupe: ['echarts', ...]`): `echarts.connect` only links charts that
+Apps that link the SDK locally must dedupe `echarts` along with React and
+Carbon (Vite `resolve.dedupe`, see "Developing an app against a local SDK
+checkout" in the root README): `echarts.connect` only links charts that
 share one echarts module.
 
 ## Themes

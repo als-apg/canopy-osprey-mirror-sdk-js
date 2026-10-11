@@ -19,6 +19,12 @@
 // The hook rewrites every @slaclab/canopy-* dependency found in this workspace's
 // packages/*/package.json to a link: to that package. Consumers import the
 // built dist/, so build the SDK first (`pnpm build`, or `pnpm build:watch`).
+//
+// Linked packages resolve their imports from this checkout's node_modules, so
+// the app must dedupe the shared libraries or it loads two copies of React
+// ("Invalid hook call"), Carbon and ECharts. In the app's vite.config.ts:
+//   resolve: { dedupe: ['react', 'react-dom', '@carbon/react', 'echarts'] }
+// (README.md, "Developing an app against a local SDK checkout").
 const fs = require('node:fs');
 const path = require('node:path');
 
