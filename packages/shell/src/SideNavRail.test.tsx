@@ -69,6 +69,19 @@ describe('findActiveNavItem', () => {
     expect(findActiveNavItem(hashed, '#/runs/new?x=1')).toBe('runs-new');
   });
 
+  it("matches an href ending in '/' only on its own path, with or without the slash", () => {
+    const home = [
+      { id: 'home', label: 'Home', href: '/badger/' },
+      { id: 'runs', label: 'Runs', href: '/badger/runs' },
+    ];
+    expect(findActiveNavItem(home, '/badger/')).toBe('home');
+    expect(findActiveNavItem(home, '/badger')).toBe('home');
+    expect(findActiveNavItem(home, '/badger/runs/3')).toBe('runs');
+    expect(findActiveNavItem(home, '/badger/unknown')).toBeUndefined();
+    // A trailing slash on the location is ignored for other items too.
+    expect(findActiveNavItem(home, '/badger/runs/')).toBe('runs');
+  });
+
   it('works with a base path', () => {
     const based = items.map((i) => ({ ...i, href: `/badger${i.href === '/' ? '' : i.href}` }));
     expect(findActiveNavItem(based, '/badger')).toBe('dash');

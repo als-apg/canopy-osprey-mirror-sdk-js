@@ -80,7 +80,8 @@ The shell has no router dependency.
   and middle clicks still open new tabs.
 - **Active matching** works by prefix: an item is active on its own `href` and
   on paths below it (`href + '/'`). When several items match, the longest one
-  wins.
+  wins. An `href` ending in `/` (a home item such as `${BASE}/`) matches only
+  its own path, with or without the trailing slash.
 - **`AppHeader nameAs`** replaces the name's anchor with your link component.
   It receives `href`, so a router `Link` that wants `to` needs a small adapter:
 

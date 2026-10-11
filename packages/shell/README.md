@@ -255,7 +255,10 @@ const NAV_ITEMS: NavItem[] = [
   the default navigation prevented; hand the path to your router here. Without
   `onNavigate`, the links navigate normally (full page load).
 - **Active item.** An item is active when `activeHref` equals its `href` or
-  starts with `href + '/'`. If several match, the longest `href` wins. Query
+  starts with `href + '/'`. If several match, the longest `href` wins. An
+  `href` ending in `/`, like the `${BASE}/` home item above, matches only its
+  own path, so it isn't highlighted on every page; a trailing slash on either
+  side is ignored when comparing (`/badger` matches `/badger/`). Query
   strings and fragments are ignored; a leading `#` (hash routing, `#/runs`) is
   read as the path. The active link gets `aria-current="page"`.
   The matcher is exported as `findActiveNavItem(items, activeHref)`.

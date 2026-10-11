@@ -23,8 +23,10 @@ export interface SideNavRailProps {
   /**
    * Current location, in the same form as the item hrefs (a pathname, or a
    * `#/...` hash for hash routing; query and fragment are ignored). An item is
-   * active when it equals its `href` or starts with `href + '/'`; when several
-   * match, the longest `href` wins.
+   * active when it equals its `href` (a trailing slash on either side is
+   * ignored) or starts with `href + '/'`; an `href` ending in `/`, such as a
+   * home item `${BASE}/`, matches only its own path. When several match, the
+   * longest `href` wins.
    */
   activeHref: string;
   /**
@@ -49,8 +51,16 @@ function toPath(href: string): string {
   return cut === -1 ? path : path.slice(0, cut);
 }
 
+// '/badger/' -> '/badger'; the root '/' stays '/'.
+function withoutTrailingSlash(path: string): string {
+  return path.length > 1 ? path.replace(/\/+$/, '') || '/' : path;
+}
+
 function matches(href: string, pathname: string): boolean {
-  return pathname === href || pathname.startsWith(`${href}/`);
+  if (withoutTrailingSlash(pathname) === withoutTrailingSlash(href)) return true;
+  // An href ending in '/' (a home item such as `${BASE}/`, or '/') matches
+  // only its own path; other hrefs also match the paths below them.
+  return !href.endsWith('/') && pathname.startsWith(`${href}/`);
 }
 
 /** The id of the item that should render active: the longest matching href. */
