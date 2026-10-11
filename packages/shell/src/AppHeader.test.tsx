@@ -77,6 +77,13 @@ describe('AppHeader branding', () => {
     expect(container.querySelector('.cds--header__name--prefix')).toBeNull();
   });
 
+  it('colors the name in brand red by default; brandColor={false} turns it off', () => {
+    const { rerender } = render(<AppHeader productName="Badger" />);
+    expect(screen.getByRole('banner').classList.contains('canopy-header--brand')).toBe(true);
+    rerender(<AppHeader productName="Badger" brandColor={false} />);
+    expect(screen.getByRole('banner').classList.contains('canopy-header--brand')).toBe(false);
+  });
+
   it('appends the context after a middle dot', () => {
     render(<AppHeader productName="Squirrel" context="LCLS" />);
     expect(screen.getByText('Squirrel · LCLS')).toBeDefined();
@@ -89,10 +96,13 @@ describe('AppHeader branding', () => {
   });
 
   it("theme='g100' wraps the header in a g100 theme (0.1 look)", () => {
-    const { container } = render(<AppHeader productName="Badger" theme="g100" prefix="" />);
+    const { container } = render(
+      <AppHeader productName="Badger" theme="g100" prefix="" brandColor={false} />
+    );
     const wrapper = container.querySelector('.cds--g100');
     expect(wrapper).not.toBeNull();
     expect(wrapper?.querySelector('header')).not.toBeNull();
+    expect(wrapper?.querySelector('.canopy-header--brand')).toBeNull();
   });
 
   it('is in-flow by default and gets the fixed modifier when fixed', () => {

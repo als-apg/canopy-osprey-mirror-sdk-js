@@ -144,6 +144,7 @@ How the store behaves:
 | ------------------------------ | ----------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `productName`                  | —                 | The product name. Also the banner landmark's `aria-label`                                                                     |
 | `prefix`                       | `'SLAC'`          | Carbon prefix slot; `''` hides it                                                                                             |
+| `brandColor`                   | `true`            | Prefix and name in SLAC red (`--canopy-brand`); `false` keeps Carbon's header text color                                      |
 | `context`                      | —                 | Appended as ` · {context}` (instance or deployment)                                                                           |
 | `href`                         | `'#'`             | Name link target                                                                                                              |
 | `nameAs`                       | `<a>`             | Router link component for the name (Carbon `as`); see [Router links](#router-links)                                           |
@@ -173,7 +174,8 @@ as `ThemeToggleAction` for custom bars.
   value as squirrel) on light headers, and Carbon red-40 `#ff8389` on dark
   (g90/g100) headers. `#901515` would be only about 2:1 against the g100 header
   background, which fails WCAG AA; red-40 is about 7.6:1. An app can override
-  `--canopy-brand` itself.
+  `--canopy-brand` itself, or pass `brandColor={false}` for Carbon's plain
+  header text color.
 - Header icon buttons drop their focus ring after a mouse click. Keyboard focus
   rings stay.
 - Header tooltips use Carbon's inverse tokens.
@@ -361,11 +363,12 @@ if (
 | Error toasts auto-dismiss after 5 s                   | Error toasts are sticky unless they set `timeoutMs`                                   |
 | No skip link                                          | `AppHeader` renders a "Skip to main content" link to `#main-content` (see below)      |
 
-**To keep the 0.1 look** (an always-dark bar with no prefix), for example in
-the screen viewer, pass `theme="g100" prefix=""`:
+**To keep the 0.1 look** (an always-dark bar with no prefix and a plain
+name), for example in the screen viewer, pass
+`theme="g100" prefix="" brandColor={false}`:
 
 ```tsx
-<AppHeader title="Canopy Screens" theme="g100" prefix="" />
+<AppHeader title="Canopy Screens" theme="g100" prefix="" brandColor={false} />
 ```
 
 **The skip link needs a target.** `AppHeader` now renders Carbon's "Skip to

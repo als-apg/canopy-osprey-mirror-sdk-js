@@ -33,8 +33,9 @@
   position: relative;
 }
 
-.canopy-header .cds--header__name,
-.canopy-header .cds--header__name--prefix {
+/* `brandColor` (default on); without it the name keeps Carbon's header color. */
+.canopy-header--brand .cds--header__name,
+.canopy-header--brand .cds--header__name--prefix {
   color: var(--canopy-brand);
 }
 

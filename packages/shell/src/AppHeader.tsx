@@ -31,6 +31,12 @@ export interface AppHeaderProps {
   title?: string;
   /** Carbon prefix slot, rendered in SLAC brand red. Default "SLAC"; pass "" to hide. */
   prefix?: string;
+  /**
+   * Prefix and name in SLAC brand red (`--canopy-brand`). Default true; false
+   * keeps Carbon's own header text color (with `theme="g100" prefix=""`, the
+   * 0.1 look).
+   */
+  brandColor?: boolean;
   /** Rendered as " · {context}" after the name (an instance or deployment name). */
   context?: string;
   /** Name link target. Default '#'. With `nameAs`, it is passed to that component as `href`. */
@@ -112,6 +118,7 @@ export function AppHeader(props: AppHeaderProps) {
     productName,
     title,
     prefix = 'SLAC',
+    brandColor = true,
     context,
     href = '#',
     nameAs,
@@ -136,6 +143,7 @@ export function AppHeader(props: AppHeaderProps) {
   const help = onHelp ?? (helpUrl ? () => openInNewTab(helpUrl) : undefined);
   const classes = [
     'canopy-header',
+    brandColor && 'canopy-header--brand',
     fixed && 'canopy-header--fixed',
     menu && 'canopy-header--with-menu',
     className,

@@ -99,11 +99,12 @@ changed:
 - it shows the "SLAC" prefix
 - the name is SLAC red
 
-To keep the old always-dark bar, pass `theme="g100" prefix=""`.
+To keep the old always-dark bar with a plain name, pass
+`theme="g100" prefix="" brandColor={false}`.
 
 !!! note "Brand contrast"
 
     SLAC red `#901515` is about 2:1 against the g100 header background, below
     WCAG AA, so dark (g90/g100) headers use Carbon red-40 `#ff8389` (about
     7.6:1). Light headers keep `#901515` (about 8:1). Override
-    `--canopy-brand` to change it.
+    `--canopy-brand` to change it, or pass `brandColor={false}` to drop it.
