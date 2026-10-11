@@ -89,9 +89,9 @@ function isPlainLeftClick(e: MouseEvent<HTMLAnchorElement>): boolean {
 }
 
 /**
- * Router-agnostic collapsible side navigation (react-squirrel's Sidebar look):
- * a fixed rail under the header, 256px expanded / 48px collapsed, on
- * `--cds-layer`, with a 3px `--cds-link-primary` left border on the active item.
+ * Router-agnostic collapsible side navigation: a fixed rail under the header,
+ * 256px expanded / 48px collapsed, on `--cds-layer`, with a 3px
+ * `--cds-link-primary` left border on the active item.
  * Pair it with `AppHeader menu` and `AppShell sideNavExpanded`.
  */
 export function SideNavRail({

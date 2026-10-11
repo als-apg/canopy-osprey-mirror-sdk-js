@@ -21,8 +21,6 @@ import type {
 } from './types.js';
 import { ValueKind } from './types.js';
 
-// The structural transport types moved to ../transport.ts; re-exported here
-// so existing `from './hare/HarePVService.js'` imports keep working.
 export type { FetchLike, WebSocketFactory, WebSocketLike } from '../transport.js';
 
 export type HareConnectionStatus = 'idle' | 'connecting' | 'connected' | 'disconnected';
@@ -136,7 +134,6 @@ export class HarePVService implements PVService {
       onOpen: () => this.resubscribeAll(),
       onFrame: (frame) => this.handleFrame(frame),
       onClose: () => this.markAllDisconnected(),
-      // A stopped socket reads as 'disconnected' (drops and disconnect() alike).
       onStatusChange: (status) => this.setStatus(toServiceStatus(status)),
       onError: (error) =>
         this.reportError({ code: error.code, message: describeSocketError(error, 'live') }),

@@ -16,9 +16,9 @@ export interface AppShellProps {
 }
 
 /**
- * Page layout for multi-page apps (react-squirrel's Layout): a fixed header, an
- * optional fixed side rail, and a <main> offset by the header height and the
- * rail width (with the rail's width transition). Banners sit at the top of
+ * Page layout for multi-page apps: a fixed header, an optional fixed side
+ * rail, and a <main> offset by the header height and the rail width (with the
+ * rail's width transition). Banners sit at the top of
  * <main>; the content below them scrolls inside <main>, not the page.
  */
 export function AppShell({

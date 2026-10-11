@@ -114,7 +114,7 @@ export interface BaseChartOptionConfig {
 
 /**
  * The shared starting point for a chart option: animation off (live data),
- * themed background/text/axes/tooltip/legend, and trace's grid insets. Spread
+ * themed background/text/axes/tooltip/legend, and standard grid insets. Spread
  * it first and override per chart; replace `xAxis`/`yAxis` with your own axes
  * (use `chartAxisStyle` to theme them).
  */

@@ -3,9 +3,6 @@
 // No DOM lib, no @types/node: consumers inject their own WebSocket/fetch (or
 // the services read them off `globalThis` at call time), so the package never
 // names the concrete `WebSocket`/`Response` types from either environment.
-//
-// These used to live in `hare/HarePVService.ts`; they are re-exported from
-// there (and from the package root) under the same names.
 
 /** The fields of a WebSocket `close` event this package reads. */
 export interface WebSocketCloseEventLike {

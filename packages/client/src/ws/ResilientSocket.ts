@@ -1,10 +1,8 @@
-// A reconnecting JSON WebSocket for Canopy's streaming endpoints.
-//
-// Extracted from the connection skeleton HarePVService and FoxFormulaService
-// used to duplicate: connect / capped-backoff reconnect / resubscribe on open
-// / ping + pong-deadline liveness / orphaned-socket guards. Protocol services
-// (Hare, Fox, the optimization run stream) sit on top and only deal with
-// frames and (re)subscription.
+// A reconnecting JSON WebSocket for Canopy's streaming endpoints: connect /
+// capped-backoff reconnect / resubscribe on open / ping + pong-deadline
+// liveness / orphaned-socket guards. Protocol services (Hare, Fox, the
+// optimization run stream) sit on top and only deal with frames and
+// (re)subscription.
 
 import type { WebSocketCloseEventLike, WebSocketFactory, WebSocketLike } from '../transport.js';
 
@@ -45,7 +43,7 @@ export interface ResilientSocketOptions {
   apiKey?: string;
   /**
    * Capped backoff schedule. The attempt counter resets once the server sends
-   * a frame on a new connection (not merely on open), so a server that
+   * a frame on a new connection, so a server that
    * accepts and then immediately closes is still backed off. Default
    * [1000, 2000, 4000, 8000, 15000].
    */
@@ -128,8 +126,8 @@ export function errorMessage(err: unknown): string {
 
 /**
  * The status a protocol service reports for a socket status: a stopped
- * socket ('closed') reads as 'disconnected', the status Hare and Fox have
- * always used for both drops and an explicit disconnect.
+ * socket ('closed') reads as 'disconnected', as Hare and Fox report both
+ * drops and an explicit disconnect.
  */
 export function toServiceStatus(status: SocketStatus): Exclude<SocketStatus, 'closed'> {
   return status === 'closed' ? 'disconnected' : status;
@@ -413,7 +411,7 @@ export class ResilientSocket {
     try {
       frame = JSON.parse(raw);
     } catch {
-      return; // Malformed frame: ignore.
+      return;
     }
     if (typeof frame !== 'object' || frame === null || Array.isArray(frame)) return;
     this.options.onFrame(frame as SocketFrame);

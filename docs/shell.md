@@ -6,7 +6,7 @@ icon: lucide/panels-top-left
 
 The standard chrome for Canopy web apps: the SLAC-branded header, the light/dark
 color mode, the page layout, and the feedback primitives every app needs. The
-look follows react-squirrel after PR #181:
+look:
 
 - a **"SLAC"** prefix and product name in SLAC red (`#901515`; Carbon red-40 `#ff8389` on dark headers, for contrast)
 - a header that **follows the page theme**

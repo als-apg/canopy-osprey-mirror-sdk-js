@@ -27,14 +27,13 @@ export interface AppHeaderMenu {
 export interface AppHeaderProps {
   /** Product name, e.g. "Badger". */
   productName?: string;
-  /** @deprecated since 0.2 — alias of `productName` (kept so 0.1 call sites compile). */
+  /** @deprecated since 0.2 — alias of `productName`. */
   title?: string;
   /** Carbon prefix slot, rendered in SLAC brand red. Default "SLAC"; pass "" to hide. */
   prefix?: string;
   /**
    * Prefix and name in SLAC brand red (`--canopy-brand`). Default true; false
-   * keeps Carbon's own header text color (with `theme="g100" prefix=""`, the
-   * 0.1 look).
+   * keeps Carbon's header text color.
    */
   brandColor?: boolean;
   /** Rendered as " · {context}" after the name (an instance or deployment name). */
@@ -47,7 +46,7 @@ export interface AppHeaderProps {
    * link wants `to` needs a small adapter (see the README).
    */
   nameAs?: ElementType;
-  /** 'inherit' (default) follows the surrounding <Theme>; 'g100' = the 0.1 always-dark bar. */
+  /** See {@link HeaderTheme}. Default 'inherit'. */
   theme?: HeaderTheme;
   /** true = Carbon's fixed header (content needs a 3rem top offset; AppShell does this). Default false = in-flow. */
   fixed?: boolean;
@@ -109,9 +108,9 @@ export function ThemeToggleAction({ shortcut }: ThemeToggleActionProps = {}) {
 }
 
 /**
- * The standard SLAC app header (react-squirrel #181 look): "SLAC" prefix and
- * product name in brand red, header following the page theme, and the trailing
- * actions in the order app actions → theme toggle → report bug → help.
+ * The standard SLAC app header: "SLAC" prefix and product name in brand red,
+ * header following the page theme, and the trailing actions in the order app
+ * actions → theme toggle → report bug → help.
  */
 export function AppHeader(props: AppHeaderProps) {
   const {

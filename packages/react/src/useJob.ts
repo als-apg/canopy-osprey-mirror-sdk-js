@@ -31,9 +31,8 @@ export interface UseJobOptions {
   /**
    * After this long (from the first poll) with the job still `unknown`,
    * surface the 404 on `error` and stop polling. Default 30000 (30 s), a
-   * margin for a job that is not visible yet; `0` surfaces the first 404
-   * (the 0.1 behaviour), `Infinity` polls for as long as the component is
-   * mounted.
+   * margin for a job that is not visible yet; `0` surfaces the first 404,
+   * `Infinity` polls for as long as the component is mounted.
    */
   notFoundGraceMs?: number;
 }

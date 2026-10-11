@@ -124,9 +124,7 @@ export class FoxFormulaService {
       label: 'FoxFormulaService',
       onOpen: () => this.resubscribeAll(),
       onFrame: (frame) => this.handleFrame(frame),
-      // Server-assigned ids die with their socket.
       onClose: () => this.resetServerCorrelation(),
-      // A stopped socket reads as 'disconnected' (drops and dispose() alike).
       onStatusChange: (status) => this.setStatus(toServiceStatus(status)),
       onError: (error) =>
         this.reportError({ code: error.code, message: describeSocketError(error, 'formula') }),

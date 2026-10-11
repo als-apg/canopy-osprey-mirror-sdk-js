@@ -23,9 +23,7 @@ export async function getJob(
  * another deployment), or the job finished and its result expired (results
  * are kept for the worker's `keep_result_s`, one hour by default). It means
  * "unknown", not "failed". A job waiting on any worker queue, the
- * optimization worker's included, reports `pending` instead; only Canopy
- * versions before commit daa584d answered 404 for a job queued on a
- * non-default queue.
+ * optimization worker's included, reports `pending` instead.
  */
 export function isJobNotFoundError(error: unknown): boolean {
   return error instanceof CanopyError && error.status === 404 && error.code === 'job_not_found';

@@ -2,10 +2,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 
 export type ColorMode = 'light' | 'dark';
 
-/**
- * Carbon theme per color mode — the SLAC standard since react-squirrel #181:
- * g10 for light, g100 for dark.
- */
+/** Carbon theme per color mode, the SLAC standard: g10 for light, g100 for dark. */
 export const CARBON_THEME = { light: 'g10', dark: 'g100' } as const satisfies Record<
   ColorMode,
   'g10' | 'g100'
@@ -15,7 +12,7 @@ export type CarbonColorModeTheme = (typeof CARBON_THEME)[ColorMode];
 export interface ColorModeConfig {
   /** localStorage key the choice is persisted under. Default 'canopy.theme'. */
   storageKey?: string;
-  /** Mode used when nothing is stored yet. Default 'dark' (0.1 behaviour). */
+  /** Mode used when nothing is stored yet. Default 'dark'. */
   defaultMode?: ColorMode;
   /**
    * Keys an app used before adopting the SDK store (e.g. 'trace.theme',

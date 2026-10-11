@@ -266,9 +266,8 @@ Canopy's Jobs API answers `404 job_not_found` when it has no record of the
 id: it is mistyped or from another deployment, or the job finished and its
 result expired (after the worker's `keep_result_s`, one hour by default). A
 job still waiting on a worker queue, the optimization worker's included,
-reports `pending`. (Canopy before commit daa584d answered 404 for a job
-queued on a non-default queue.) By default `awaitJob` rejects on the 404;
-pass `notFoundGraceMs` to keep polling through it for that long (`Infinity`
+reports `pending`. By default `awaitJob` rejects on the 404; pass
+`notFoundGraceMs` to keep polling through it for that long (`Infinity`
 together with `timeoutMs` for "until the deadline"), e.g. against an older
 backend. `isJobNotFoundError(err)` identifies the 404.
 

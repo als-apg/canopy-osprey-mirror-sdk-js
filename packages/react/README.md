@@ -2,7 +2,7 @@
 
 React bindings over [`@slaclab/canopy-client`](../client): an app-wide
 `CanopyProvider` for the `CanopyConnection`, a context provider for the
-`PVService`, the `usePV` hook (ported from `canopy-screen-builder`), and the
+`PVService`, the `usePV` hook, and the
 `useJob` / `useCanopyJob` polling hooks for background jobs.
 
 Peer dependencies: `react`, `react-dom` (^19).

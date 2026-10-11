@@ -1,11 +1,8 @@
-// Vite dev-server proxy entries for Canopy apps.
-//
-// react-trace and react-squirrel each hand-rolled the same `server.proxy`
-// block: forward the Canopy API (REST + WebSocket upgrades) to the backend
-// and inject `X-API-Key` server-side, so the key never ships in the browser
-// bundle; trace also forwards `/elog` to elog-plus with its access token.
-// This is that block, once. In production a reverse proxy (nginx) owns the
-// same paths and header injection.
+// Vite dev-server proxy entries for Canopy apps: forward the Canopy API (REST
+// and WebSocket upgrades) to the backend and inject `X-API-Key` server-side,
+// so the key never ships in the browser bundle; optionally forward `/elog` to
+// elog-plus with its access token. In production a reverse proxy (nginx) owns
+// the same paths and header injection.
 //
 // Because the proxy adds credentials, it must serve only the app's own page
 // (and non-browser tools): any other website open in the developer's browser
@@ -56,7 +53,7 @@ export interface CanopyDevProxyOptions {
    */
   basePath?: string;
   /**
-   * Per-module mode (trace/squirrel style): each prefix, e.g. `'/hare'` or
+   * Per-module mode: each prefix, e.g. `'/hare'` or
    * `'/mole'`, is forwarded unchanged, so the app uses `{ baseUrl: '' }`.
    * May be combined with `basePath`.
    */

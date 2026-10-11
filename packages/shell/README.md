@@ -1,7 +1,6 @@
 # @slaclab/canopy-shell
 
-The standard chrome for Canopy web apps, following react-squirrel's SLAC look
-(squirrel PR #181):
+The standard chrome for Canopy web apps, in the SLAC look:
 
 - **`AppHeader`**: "SLAC" prefix and product name in SLAC red. The header
   follows the page theme. Built-in theme toggle, bug report and help actions.
@@ -267,7 +266,7 @@ const NAV_ITEMS: NavItem[] = [
   strings and fragments are ignored; a leading `#` (hash routing, `#/runs`) is
   read as the path. The active link gets `aria-current="page"`.
   The matcher is exported as `findActiveNavItem(items, activeHref)`.
-- **Look.** Squirrel's Sidebar: 256px expanded, 48px collapsed, a
+- **Look.** 256px expanded, 48px collapsed, a
   `--cds-layer` background, and a 3px `--cds-link-primary` left border plus
   `--cds-layer-selected` on the active item.
 - **Collapsed.** Only icons show, each with a Carbon tooltip that also gives

@@ -25,8 +25,8 @@ export interface CanopyChartProps {
   option: EChartsOption;
   /**
    * Components replaced (not merged) on update, e.g. ['series', 'yAxis'] when
-   * series come and go. Don't give those components `id`s (react-trace footgun:
-   * id matching pins survivors to their old index).
+   * series come and go. Don't give those components `id`s: id matching pins
+   * survivors to their old index.
    */
   replaceMerge?: string | string[];
   /** Replace the whole option on update instead of merging. */
@@ -66,10 +66,10 @@ function applyGroup(chart: ECharts, group: string | undefined): void {
 const FILL: CSSProperties = { width: '100%', height: '100%' };
 
 /**
- * The standard ECharts wrapper (react-trace's recipe): canvas renderer, a
- * wrapper div for pointer listeners, stable event bindings, connect-group
- * handling, and no `theme` prop (it would re-create the instance and drop it
- * from its group — theme through the option instead, see `baseChartOption`).
+ * The standard ECharts wrapper: canvas renderer, a wrapper div for pointer
+ * listeners, stable event bindings, connect-group handling, and no `theme`
+ * prop (it would re-create the instance and drop it from its group — theme
+ * through the option instead, see `baseChartOption`).
  * Throttle how often `option` changes for live data; connected charts
  * rebroadcast axis-pointer and dataZoom actions to each other.
  */

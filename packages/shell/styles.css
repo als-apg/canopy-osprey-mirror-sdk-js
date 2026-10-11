@@ -6,7 +6,7 @@
  */
 
 :root {
-  /* SLAC brand red (react-squirrel #181). */
+  /* SLAC brand red. */
   --canopy-brand: #901515;
 }
 
@@ -119,7 +119,7 @@
   flex-shrink: 0;
 }
 
-/* Banners span the content width, squared off (react-squirrel). */
+/* Banners span the content width, squared off. */
 .canopy-shell__banners .cds--inline-notification,
 .canopy-shell__banners .cds--actionable-notification {
   max-width: 100%;

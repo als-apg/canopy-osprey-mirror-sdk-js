@@ -23,7 +23,10 @@ export interface ConfirmOptions {
 export type ConfirmFn = (options: ConfirmOptions) => Promise<boolean>;
 
 interface ConfirmRequest extends ConfirmOptions {
-  /** Keys the dialog, so each request mounts a fresh Modal with its own initial focus. */
+  /**
+   * Keys the dialog, so each request mounts a fresh Modal with its own initial
+   * focus (a danger dialog must start on Cancel).
+   */
   id: number;
   resolve: (ok: boolean) => void;
   settled: boolean;
@@ -112,8 +115,6 @@ export function ConfirmProvider({ children }: ConfirmProviderProps) {
       {children}
       {current && (
         <Modal
-          // A new Modal per request: reusing one would keep focus on the
-          // previous dialog's button (a danger dialog must start on Cancel).
           key={current.id}
           open
           className="canopy-confirm"

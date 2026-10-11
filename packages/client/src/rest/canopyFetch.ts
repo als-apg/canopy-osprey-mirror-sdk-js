@@ -1,12 +1,8 @@
 // REST core for Canopy's HTTP APIs: the `{code, detail}` error envelope,
 // query building, and a typed fetch wrapper shared by the Mole, Jobs, and
-// Hare REST surfaces.
-//
-// Ported from react-trace's `src/api/client.ts`, generalized in two ways:
-// - an explicit `CanopyConnection` (base URL + API key + injectable fetch)
-//   replaces trace's assumption of a dev proxy at `''` that injects the key;
-// - `method`/`body` support so non-GET endpoints (e.g. Hare PV writes) can
-//   share the same envelope-aware error path.
+// Hare REST surfaces. Every call takes an explicit `CanopyConnection` (base
+// URL + API key + injectable fetch) and may set a method and body, so writes
+// such as Hare PV puts share the same envelope-aware error path.
 
 import type { FetchLike } from '../transport.js';
 

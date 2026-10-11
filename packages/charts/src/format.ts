@@ -1,7 +1,7 @@
 /**
- * Axis tick label (react-trace). Numbers like 0.000000018 produce very wide
- * tick labels that spill past neighbouring axes, so switch to exponential at
- * the magnitudes where the default Number→string stops being compact.
+ * Axis tick label. Numbers like 0.000000018 produce very wide tick labels
+ * that spill past neighbouring axes, so switch to exponential at the
+ * magnitudes where the default Number→string stops being compact.
  */
 export function formatAxisTick(v: number): string {
   if (v === 0) return '0';
@@ -17,9 +17,8 @@ function trimExponential(s: string): string {
 }
 
 /**
- * Display a value in tooltips and tables (react-trace's tooltip formatter):
- * `digits` significant digits, exponential below 1e-3 or at/above 1e7, with
- * trailing zeros trimmed. Non-numbers are stringified; null/undefined → ''.
+ * Display a value in tooltips and tables: `digits` significant digits,
+ * exponential below 1e-3 or at/above 1e7, with trailing zeros trimmed. Non-numbers are stringified; null/undefined → ''.
  */
 export function formatValue(v: unknown, digits = 7): string {
   if (v === null || v === undefined) return '';

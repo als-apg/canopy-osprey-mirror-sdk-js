@@ -4,7 +4,7 @@ icon: lucide/chart-line
 
 # Charts (`@slaclab/canopy-charts`)
 
-ECharts helpers extracted from react-trace and recolored to Carbon g10/g100.
+ECharts helpers themed to Carbon g10/g100.
 Peers: `@slaclab/canopy-shell` (same version; its color-mode store must be a
 single copy), `echarts` ^6, `echarts-for-react` ^3, React 19. The full
 reference is the
@@ -76,5 +76,5 @@ It wraps `echarts-for-react` and guards against the known pitfalls:
 | `captureChartPng(chart, { background })` | PNG data URL at 2× pixel ratio, or `null` if the chart is gone                                    |
 | `dataUrlToBlob(url)`                     | data: URL → `Blob`, e.g. for a logbook attachment                                                 |
 | `CARBON_CATEGORICAL`, `seriesColor`      | Carbon's 14-color categorical palettes (light / dark)                                             |
-| `formatAxisTick(v)`                      | Exponential below 1e-3 and from 1e6 up (react-trace)                                              |
+| `formatAxisTick(v)`                      | Exponential below 1e-3 and from 1e6 up                                                            |
 | `formatValue(v, digits = 7)`             | Tooltip/table values: significant digits, exponential outside [1e-3, 1e7), trailing zeros trimmed |

@@ -1,6 +1,6 @@
 # @slaclab/canopy-charts
 
-ECharts helpers shared by Canopy apps, extracted from react-trace:
+ECharts helpers shared by Canopy apps:
 
 - Carbon **g10 / g100 chart themes** (`CHART_THEMES`, `chartThemeFor`, `useChartTheme`)
 - a themed **base option** (`baseChartOption`, `chartAxisStyle`)
@@ -109,7 +109,7 @@ following:
 
 - `animation: false`
 - the themed background and text
-- react-trace's grid insets: 40 / 60 / 70 / 20
+- grid insets: 40 / 60 / 70 / 20
 - a themed axis tooltip with dashed crosshair lines
 - a themed legend
 - default `xAxis`/`yAxis` styling with no `type`, so ECharts' own defaults apply
@@ -136,7 +136,7 @@ axes), spread `chartAxisStyle(theme)` into each one.
 />
 ```
 
-It follows react-trace's recipe, with these fixes for known ECharts pitfalls:
+It includes these fixes for known ECharts pitfalls:
 
 - **Canvas renderer by default.**
 - **Theming goes through the option, never a `theme` prop.** echarts-for-react
@@ -155,7 +155,7 @@ It follows react-trace's recipe, with these fixes for known ECharts pitfalls:
   (`ref`), not to the zrender instance. echarts-for-react disposes and
   re-creates zrender.
 
-Performance notes for live data (from react-trace):
+Performance notes for live data:
 
 - **Throttle `option` updates**, about 150 ms for streams. Connected charts
   rebroadcast axis-pointer and dataZoom actions to each other, so each update
@@ -208,7 +208,7 @@ website:
 
 ## Formatters
 
-`formatAxisTick(v)` is react-trace's tick formatter. It switches to exponential
+`formatAxisTick(v)` is the axis tick formatter. It switches to exponential
 notation below 1e-3 and at or above 1e6, for example `5.0e-4` and `1.2e+6`,
 and otherwise uses the default number string.
 
