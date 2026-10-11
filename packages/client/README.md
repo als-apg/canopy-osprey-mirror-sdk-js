@@ -123,7 +123,9 @@ naming conventions in the PV name (e.g. `TEMP`, `CURRENT`, `PRESSURE`).
 `FoxFormulaService` streams live formula evaluations over
 `WS {baseUrl}/fox/v1/ws/formulas`. It knows `FormulaSpec` only — expression,
 token→PV bindings, and evaluation options — with no naming conventions or
-screen-level rule types:
+screen-level rule types. `baseUrl` may also be relative, such as the dev
+proxy's `/api/canopy`; it is resolved against the page like `toWsUrl` does
+(outside a browser, pass an absolute base or `wsUrl`):
 
 ```ts
 import { FoxFormulaService } from '@slaclab/canopy-client';

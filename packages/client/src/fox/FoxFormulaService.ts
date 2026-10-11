@@ -1,5 +1,5 @@
 import type { WebSocketFactory } from '../transport.js';
-import { ResilientSocket } from '../ws/ResilientSocket.js';
+import { ResilientSocket, toWsUrl } from '../ws/ResilientSocket.js';
 import type { SocketError, SocketFrame, SocketStatus } from '../ws/ResilientSocket.js';
 import type { FormulaResultDTO, FormulaSpec, FoxServerFrame } from './types.js';
 
@@ -14,7 +14,10 @@ export interface FoxFormulaServiceOptions {
   /**
    * Base URL of the Canopy API, e.g. `https://canopy.example.org` — the
    * service connects to `{baseUrl}/fox/v1/ws/formulas` (http(s) is switched
-   * to ws(s); a ws(s) base is used as-is).
+   * to ws(s); a ws(s) base is used as-is). A relative base such as a
+   * same-origin dev-proxy prefix (`/api/canopy`) is resolved against
+   * `globalThis.location` (see {@link toWsUrl}); without one (Node) the
+   * constructor throws, so pass an absolute base or `wsUrl` there.
    */
   baseUrl: string;
   /** Appended as `?api_key=` on the WS URL. */
@@ -73,13 +76,6 @@ interface LocalSubscription {
   unsubscribed: boolean;
 }
 
-/** Derive the formulas WS endpoint from the API base URL (http(s) -> ws(s)). */
-function deriveFormulasWsUrl(baseUrl: string): string {
-  let base = baseUrl.replace(/\/+$/, '');
-  base = base.replace(/^http:/i, 'ws:').replace(/^https:/i, 'wss:');
-  return `${base}/fox/v1/ws/formulas`;
-}
-
 /**
  * Live formula evaluation over Canopy Fox's WebSocket
  * (`WS /fox/v1/ws/formulas`). Knows `FormulaSpec` only — naming conventions
@@ -113,7 +109,7 @@ export class FoxFormulaService {
     this.onErrorCallback = options.onError;
     this.onStatusChangeCallback = options.onStatusChange;
     this.socket = new ResilientSocket({
-      url: options.wsUrl ?? deriveFormulasWsUrl(options.baseUrl),
+      url: options.wsUrl ?? toWsUrl(options.baseUrl, '/fox/v1/ws/formulas'),
       apiKey: options.apiKey,
       reconnectDelaysMs: options.reconnectDelaysMs,
       pingIntervalMs: options.pingIntervalMs,

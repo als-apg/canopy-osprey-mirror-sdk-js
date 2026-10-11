@@ -62,6 +62,28 @@ describe('FoxFormulaService', () => {
       }).connect();
       expect(instances[1]!.url).toBe('wss://elsewhere/fox/v1/ws/formulas');
     });
+
+    it('resolves a relative baseUrl (a dev-proxy prefix) against the page location', () => {
+      vi.stubGlobal('location', { protocol: 'http:', host: 'localhost:5173', pathname: '/' });
+      try {
+        const { factory, instances } = createFakeWebSocketFactory();
+        new FoxFormulaService({ baseUrl: '/api/canopy', webSocketFactory: factory }).connect();
+        expect(instances[0]!.url).toBe('ws://localhost:5173/api/canopy/fox/v1/ws/formulas');
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it('does not resolve baseUrl when wsUrl overrides it', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      // A relative base with no location would throw if it were resolved.
+      new FoxFormulaService({
+        baseUrl: '/api/canopy',
+        wsUrl: 'ws://host/fox/v1/ws/formulas',
+        webSocketFactory: factory,
+      }).connect();
+      expect(instances[0]!.url).toBe('ws://host/fox/v1/ws/formulas');
+    });
   });
 
   // ── Subscribe / result routing ────────────────────────────────────────────
