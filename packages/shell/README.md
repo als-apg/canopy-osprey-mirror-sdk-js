@@ -118,6 +118,11 @@ How the store behaves:
   `data-theme="light|dark"`, for plain CSS. It also sets the Carbon
   `cds--g10`/`cds--g100` class, so content portaled outside the app's
   `<Theme>` (menus, tooltips, toasts) gets the right tokens.
+- **Carbon-free entry.** `@slaclab/canopy-shell/color-mode` exports the store
+  alone (everything above except `ColorModeTheme`), without loading
+  `@carbon/react`. Libraries that only follow the mode, such as
+  `@slaclab/canopy-charts`, import it from there. It is the same module as
+  the root entry's, so both share one store.
 
 ## AppHeader
 

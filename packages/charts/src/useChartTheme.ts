@@ -1,4 +1,5 @@
-import { useColorMode } from '@slaclab/canopy-shell';
+// The Carbon-free subpath: importing the root would load @carbon/react.
+import { useColorMode } from '@slaclab/canopy-shell/color-mode';
 import { chartThemeFor } from './theme.js';
 import type { ChartTheme } from './theme.js';
 

@@ -24,7 +24,10 @@ pnpm add @slaclab/canopy-charts @slaclab/canopy-shell echarts echarts-for-react
 `useChartTheme` reads the shell's color-mode store, which is module state:
 the app and the charts must share one copy of the shell, or the charts
 follow a store the app never toggles. Keep both packages on the same
-version.
+version. The charts import only the shell's Carbon-free
+`@slaclab/canopy-shell/color-mode` entry, so using them (even just the
+formatters in a Node script) never loads `@carbon/react`; the Carbon peers
+matter only to the package manager's peer check.
 
 Apps that link the SDK locally should dedupe `echarts` (Vite
 `resolve.dedupe: ['echarts', ...]`): `echarts.connect` only links charts that
