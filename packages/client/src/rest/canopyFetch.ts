@@ -57,7 +57,9 @@ export class CanopyError extends Error {
 
   constructor(code: string, status: number, detail: string, issues?: ValidationIssue[]) {
     // Guard the documented contract even for callers passing a non-string.
-    const text = typeof detail === 'string' ? detail : JSON.stringify(detail);
+    // JSON.stringify returns undefined (not a string) for undefined,
+    // functions and symbols.
+    const text = typeof detail === 'string' ? detail : (JSON.stringify(detail) ?? String(detail));
     super(`${code} (${status}): ${text}`);
     this.name = 'CanopyError';
     this.code = code;

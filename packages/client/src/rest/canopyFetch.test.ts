@@ -287,6 +287,12 @@ describe('canopyFetch error normalization (FastAPI bodies without a code)', () =
     expect(error.detail).toBe('[{"a":1}]');
     expect(error.message).toBe('x (400): [{"a":1}]');
     expect(new CanopyError('x', 400, 'plain').issues).toBeUndefined();
+
+    // JSON.stringify gives undefined for these; detail must still be a string.
+    const missing = new CanopyError('x', 500, undefined as unknown as string);
+    expect(missing.detail).toBe('undefined');
+    expect(missing.message).toBe('x (500): undefined');
+    expect(typeof new CanopyError('x', 500, (() => 1) as unknown as string).detail).toBe('string');
   });
 });
 
