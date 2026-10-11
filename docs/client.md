@@ -76,7 +76,9 @@ socket.connect();
 - Close codes in `terminalCloseCodes` (default `[1008]`) stop the loop
   (status `closed`, `onError` with `ws_terminal_close`). Browsers only ever
   report a rejected handshake as 1006, so browser apps detect a bad key
-  through a REST 401 instead.
+  through REST instead: 401 `invalid_api_key`, or 403
+  `insufficient_module_access` for a key not scoped to the module, probed on
+  the module the socket uses.
 - `toWsUrl` maps `http(s)` to `ws(s)` and resolves relative bases against
   the page location.
 

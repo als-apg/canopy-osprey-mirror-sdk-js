@@ -42,6 +42,12 @@ CANOPY_BASE_URL=http://localhost:8000
 CANOPY_API_KEY=dev
 ```
 
+The proxy sends this one key to every module it forwards. Canopy keys are
+scoped per module, so the key must be scoped `@*` or to each module the app
+uses (in the backend's `CANOPY_API_KEYS`, `<token>:<scopes>@<module>+<module>`).
+A module outside the key's scope answers 403 `insufficient_module_access`, and
+its WebSocket never connects.
+
 The app then talks to the same-origin prefix, and needs no key:
 
 ```ts

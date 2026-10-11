@@ -40,9 +40,9 @@ export interface FoxFormulaServiceOptions {
   /**
    * Close codes after which the service stops reconnecting (status
    * `disconnected`, `onError` with `ws_terminal_close`) until `connect()` is
-   * called again. Default `[1008]` (Canopy's "invalid API key"). Browsers
-   * report a rejected handshake as 1006, which never stops the service; pass
-   * `[]` to always reconnect.
+   * called again. Default `[1008]` (Canopy's "invalid API key", or a key not
+   * scoped to this module). Browsers report a rejected handshake as 1006,
+   * which never stops the service; pass `[]` to always reconnect.
    */
   terminalCloseCodes?: number[];
   /** Connection-level errors and error frames that match no subscription. */

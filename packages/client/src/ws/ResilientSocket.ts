@@ -70,12 +70,16 @@ export interface ResilientSocketOptions {
   /**
    * Close codes after which the socket stops (status `closed`, `onError`
    * with `ws_terminal_close`) instead of reconnecting. Default `[1008]`
-   * (policy violation — Canopy's "invalid API key").
+   * (policy violation — Canopy's "invalid API key", and "API key is not
+   * scoped to this module", reason `insufficient_module_access: ...`).
    *
    * Only non-browser clients ever see these: a browser reports a rejected
    * handshake as 1006 with no reason, which is never terminal. Browser apps
-   * detect auth failure through a REST 401 (`invalid_api_key`) and call
-   * `close()` / `connect()` themselves.
+   * detect auth failure through REST (401 `invalid_api_key`, or 403
+   * `insufficient_module_access` for a key not scoped to that module),
+   * probed on the same module the socket connects to, and call `close()` /
+   * `connect()` themselves. A key that works for one module's REST API can
+   * still be refused by another module's socket.
    */
   terminalCloseCodes?: number[];
   /**

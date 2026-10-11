@@ -199,8 +199,11 @@ Behaviour:
 - **Terminal close codes**: `terminalCloseCodes` (default `[1008]`) stop the
   loop and report `ws_terminal_close`. Only non-browser clients see them:
   browsers report a rejected handshake as 1006, which always reconnects.
-  Browser apps should detect auth failure through a REST 401
-  (`invalid_api_key`) and call `close()`/`connect()` themselves.
+  Browser apps should detect auth failure through REST, probed on the same
+  module the socket connects to: 401 `invalid_api_key`, or 403
+  `insufficient_module_access` when the key isn't scoped to that module (a
+  key that works for squirrel's REST API can still be refused by Hare's
+  socket). Then call `close()`/`connect()` themselves.
 - **Auth**: `apiKey` is appended as `?api_key=` (browsers cannot set
   WebSocket headers); behind a key-injecting proxy, leave it unset.
 - Events from a socket that has since been replaced are ignored, and

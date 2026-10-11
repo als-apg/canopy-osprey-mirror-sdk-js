@@ -54,7 +54,10 @@ const wsUrl = toWsUrl(connection.baseUrl, '/optimization/v1/ws/runs'); // from @
   same-origin `baseUrl: ''`). It can be combined with `basePath`.
 - **API key**: `X-API-Key` is set on proxied requests and on WebSocket
   upgrades, and only when a key is configured (`apiKey`, else
-  `CANOPY_API_KEY`).
+  `CANOPY_API_KEY`). The same key goes to every proxied module, so with
+  Canopy's module-scoped keys it must be scoped `@*` or to each module the
+  app uses (in `CANOPY_API_KEYS`, `<token>:<scopes>@<module>+<module>`);
+  otherwise those modules answer 403 `insufficient_module_access`.
 - **elog** (opt-in): `elog: { target, accessToken, path }` forwards `/elog`
   to elog-plus with the prefix stripped and `x-vouch-idp-accesstoken`
   injected; without a target (`ELOG_BASE_URL`) the route is left out.
