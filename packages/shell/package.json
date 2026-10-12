@@ -32,7 +32,7 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "gen-tokens": "node scripts/gen-tokens.mjs",
-    "test": "vitest run",
+    "test": "node scripts/gen-tokens.mjs --check && vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
   },

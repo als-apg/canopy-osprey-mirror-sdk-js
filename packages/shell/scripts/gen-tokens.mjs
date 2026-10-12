@@ -3,16 +3,22 @@
 // The stylesheet that ships in the lockfile-pinned `@carbon/styles` is the source of truth. This
 // script parses its four zone blocks (`.cds--white|g10|g90|g100`), enumerates what they declare,
 // and writes `tokens.json`: the 27 contract names, the Carbon token each one aliases standalone,
-// and the literal that token has in each zone (the per-zone fallback of the hosted block).
+// the literal that token has in each zone (the per-zone fallback of the hosted block) and the
+// Carbon tokens the name drives when hosted.
 //
 // `wiring.json` is the hand-reviewed map from every enumerated Carbon token to the contract
-// expression that drives it when hosted, or to the reason it keeps Carbon's value. `--check`
-// writes nothing: it fails, naming the token, when that map and the stylesheet disagree.
+// expression that drives it when hosted, or to the reason it keeps Carbon's value.
+//
+// From those two it also writes the variable blocks of `host-contract.css`, between the two
+// `@generated` marker comments; everything outside the markers is hand-written and left alone.
+//
+// `--check` writes nothing: it fails, naming the token, when the wiring map and the stylesheet
+// disagree, and it fails when `tokens.json` or the generated blocks differ from a fresh render.
 //
 // Run it through the package script only (`pnpm run gen-tokens`). Inputs and outputs are resolved
 // from this file's own location, never from the working directory.
 
-import { readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -101,6 +107,15 @@ export const WIRING_GROUPS = ['zone', 'type', 'layout'];
 export const ALIAS_REASON = 'context alias derives from the -0x token';
 
 const CONTRACT_REFERENCE = /--canopy-([a-z0-9-]+)/g;
+
+/** The comments that fence the generated blocks of `host-contract.css`. */
+export const MARKERS = {
+  start: '/* @generated blocks start */',
+  end: '/* @generated blocks end */',
+};
+
+/** The selector of the hosted rule of one zone: it outranks the zone class it repeats. */
+export const HOST_GATE = 'html[data-canopy-host]';
 
 function fail(message) {
   throw new Error(`gen-tokens: ${message}`);
@@ -192,8 +207,45 @@ export function parseStylesheet(css) {
   };
 }
 
-/** The `tokens.json` document for a parsed stylesheet. */
-export function buildTokens(parsed) {
+/**
+ * The wired tokens of a checked `wiring.json`, as `[token, expression]` pairs: the entries that
+ * are a contract expression, group by group and sorted by token inside each group.
+ */
+export function mappedTokens(wiring) {
+  const mapped = [];
+  for (const group of WIRING_GROUPS) {
+    for (const token of Object.keys(wiring[group]).sort()) {
+      const entry = wiring[group][token];
+      if (typeof entry === 'string') mapped.push([token, entry]);
+    }
+  }
+  return mapped;
+}
+
+/** Per contract name, the sorted Carbon tokens (without `--cds-`) whose expression reads it. */
+function drivenTokens(wiring) {
+  const drives = Object.fromEntries(CONTRACT.map(([name]) => [name, new Set()]));
+  for (const [token, expression] of mappedTokens(wiring)) {
+    for (const [, name] of expression.matchAll(CONTRACT_REFERENCE)) {
+      drives[name].add(token.slice('--cds-'.length));
+    }
+  }
+  return Object.fromEntries(CONTRACT.map(([name]) => [name, [...drives[name]].sort()]));
+}
+
+/**
+ * The `tokens.json` document for a parsed stylesheet. Given the checked `wiring.json` as well,
+ * every name also lists the Carbon tokens it `drives`; that is the document the script writes.
+ */
+export function buildTokens(parsed, wiring) {
+  const tokens = buildNames(parsed);
+  if (wiring === undefined) return tokens;
+  const drives = drivenTokens(wiring);
+  for (const [name] of CONTRACT) tokens.names[name].drives = drives[name];
+  return tokens;
+}
+
+function buildNames(parsed) {
   const names = {};
   for (const [name, spec] of CONTRACT) {
     const literals = {};
@@ -294,6 +346,117 @@ export function checkWiring(wiring, parsed) {
   }
 }
 
+function rule(selectors, declarations) {
+  const lines = declarations.map(([name, value]) => `  ${name}: ${value};`);
+  return `${selectors.join(',\n')} {\n${lines.join('\n')}\n}`;
+}
+
+/**
+ * The generated blocks of `host-contract.css`, from the start marker to the end marker.
+ *
+ * Block 1 is ungated: on the four zone classes, every contract name as an alias of the Carbon
+ * token it stands for, or its fixed literal. Block 2 is one rule per zone behind the host gate:
+ * every contract name reads the host's value and falls back to that zone's Carbon literal, and
+ * every wired Carbon token is rewired onto the contract. Inside the gate no `--canopy-*` reads a
+ * `--cds-*`: such a pair would be a cycle, which invalidates both.
+ */
+export function renderBlocks(tokens, wiring) {
+  const names = Object.entries(tokens.names);
+  const standalone = rule(
+    tokens.zones.map((zone) => `.cds--${zone}`),
+    names.map(([name, { alias, literals }]) => [
+      `--canopy-${name}`,
+      alias === null ? literals[tokens.zones[0]] : `var(--cds-${alias})`,
+    ])
+  );
+  const wired = mappedTokens(wiring);
+  const hosted = tokens.zones.map((zone) =>
+    rule(
+      [`${HOST_GATE} .cds--${zone}`],
+      [
+        ...names.map(([name, { literals }]) => [
+          `--canopy-${name}`,
+          `var(--canopy-host-${name}, ${literals[zone]})`,
+        ]),
+        ...wired,
+      ]
+    )
+  );
+  return [
+    MARKERS.start,
+    '/* Written by scripts/gen-tokens.mjs from @carbon/styles and wiring.json: do not edit between',
+    '   the markers, run `pnpm run gen-tokens`. Host theme contract ' +
+      `${tokens.contract}: a ${tokens.contract}.x release adds`,
+    '   names with fallbacks only; renaming or removing a name is the next major. */',
+    '',
+    standalone,
+    '',
+    hosted.join('\n\n'),
+    MARKERS.end,
+  ].join('\n');
+}
+
+/** Where the generated blocks sit in a sheet: both markers, once each, in order. */
+function locateBlocks(sheet) {
+  const start = sheet.indexOf(MARKERS.start);
+  const end = sheet.indexOf(MARKERS.end);
+  if (
+    start === -1 ||
+    end < start ||
+    sheet.indexOf(MARKERS.start, start + 1) !== -1 ||
+    sheet.indexOf(MARKERS.end, end + 1) !== -1
+  ) {
+    fail(`${PATHS.sheet} does not hold one "${MARKERS.start}" … "${MARKERS.end}" pair`);
+  }
+  return { start, end: end + MARKERS.end.length };
+}
+
+/**
+ * A sheet with its generated blocks replaced. Text outside the markers is kept byte for byte; a
+ * sheet that does not exist yet (`null`) starts as the blocks alone.
+ */
+export function spliceBlocks(sheet, blocks) {
+  if (sheet === null) return `${blocks}\n`;
+  const { start, end } = locateBlocks(sheet);
+  return sheet.slice(0, start) + blocks + sheet.slice(end);
+}
+
+/** The first line at which a committed artefact and its fresh render part ways. */
+function staleAt(committed, fresh) {
+  const have = committed.split('\n');
+  const want = fresh.split('\n');
+  const at = want.findIndex((line, i) => line !== have[i]);
+  const i = at === -1 ? want.length : at;
+  return `expected ${JSON.stringify((want[i] ?? '').trim())}, found ${JSON.stringify((have[i] ?? '').trim())}`;
+}
+
+/**
+ * Fail when a committed artefact is not what the generator would write now. A package that has
+ * generated neither artefact yet has nothing to be stale; one without the other is incomplete.
+ */
+function checkFresh(tokens, blocks) {
+  const committed = {
+    tokens: existsSync(PATHS.tokens) ? readFileSync(PATHS.tokens, 'utf8') : null,
+    sheet: existsSync(PATHS.sheet) ? readFileSync(PATHS.sheet, 'utf8') : null,
+  };
+  if (committed.tokens === null && committed.sheet === null) return false;
+  for (const artefact of ['tokens', 'sheet']) {
+    if (committed[artefact] === null) fail(`${PATHS[artefact]} is missing; run gen-tokens`);
+  }
+  const fresh = serialize(tokens);
+  if (committed.tokens !== fresh) {
+    fail(`${PATHS.tokens} is stale (${staleAt(committed.tokens, fresh)}); run gen-tokens`);
+  }
+  const { start, end } = locateBlocks(committed.sheet);
+  const generated = committed.sheet.slice(start, end);
+  if (generated !== blocks) {
+    fail(
+      `the generated blocks of ${PATHS.sheet} are stale (${staleAt(generated, blocks)}); run gen-tokens`
+    );
+  }
+  return true;
+}
+
 /** The exact bytes of a generated JSON file. */
 export function serialize(document) {
   return `${JSON.stringify(document, null, 2)}\n`;
@@ -306,7 +469,7 @@ export function readCarbonStylesheet() {
 }
 
 /** The committed wiring map of this package. */
-function readWiring() {
+export function readWiring() {
   let text;
   try {
     text = readFileSync(PATHS.wiring, 'utf8');
@@ -324,15 +487,25 @@ function main(args) {
   const unknown = args.find((arg) => arg !== '--check');
   if (unknown !== undefined) fail(`unknown argument ${unknown}`);
   const parsed = parseStylesheet(readCarbonStylesheet());
+  buildTokens(parsed);
+  const wiring = readWiring();
+  checkWiring(wiring, parsed);
+  const tokens = buildTokens(parsed, wiring);
+  const blocks = renderBlocks(tokens, wiring);
   if (args.includes('--check')) {
-    buildTokens(parsed);
-    checkWiring(readWiring(), parsed);
     console.log(`gen-tokens: ${PATHS.wiring} maps every enumerated token`);
+    if (checkFresh(tokens, blocks)) {
+      console.log(`gen-tokens: ${PATHS.tokens} and ${PATHS.sheet} are fresh`);
+    }
     return;
   }
-  const tokens = buildTokens(parsed);
+  const sheet = spliceBlocks(
+    existsSync(PATHS.sheet) ? readFileSync(PATHS.sheet, 'utf8') : null,
+    blocks
+  );
   writeFileSync(PATHS.tokens, serialize(tokens));
-  console.log(`gen-tokens: wrote ${PATHS.tokens}`);
+  writeFileSync(PATHS.sheet, sheet);
+  console.log(`gen-tokens: wrote ${PATHS.tokens} and ${PATHS.sheet}`);
 }
 
 const entry = process.argv[1] ? realpathSync(process.argv[1]) : '';

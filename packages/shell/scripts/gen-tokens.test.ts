@@ -17,10 +17,15 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   buildTokens,
   CONTRACT,
+  enumerateTokens,
+  MARKERS,
   PATHS,
   parseStylesheet,
   readCarbonStylesheet,
+  readWiring,
+  renderBlocks,
   serialize,
+  spliceBlocks,
   ZONES,
 } from './gen-tokens.mjs';
 
@@ -412,10 +417,119 @@ describe('buildTokens', () => {
   });
 });
 
+/** Contract expressions for three tokens of the stand-in stylesheet, one per wiring group. */
+const SYNTHETIC_MAPPED: Record<string, string> = {
+  '--cds-interactive': 'var(--canopy-accent)',
+  '--cds-filler-0': 'color-mix(in srgb, var(--canopy-accent) 85%, var(--canopy-bg-base))',
+  '--cds-label-01-font-size': 'var(--canopy-text-sm)',
+  '--cds-layout-size-height-sm': 'var(--canopy-control-h-sm)',
+};
+
+/** A wiring map for the stand-in stylesheet: every token it enumerates, most left to Carbon. */
+function syntheticWiring(): Record<string, Record<string, string | { carbon: string }>> {
+  const enumerated = enumerateTokens(parseStylesheet(stylesheet())) as Record<string, string[]>;
+  return Object.fromEntries(
+    Object.entries(enumerated).map(([group, tokens]) => [
+      group,
+      Object.fromEntries(
+        tokens.map((token) => [token, SYNTHETIC_MAPPED[token] ?? { carbon: 'stand-in' }])
+      ),
+    ])
+  );
+}
+
+describe('buildTokens with a wiring map', () => {
+  it('lists under each name the Carbon tokens whose expression reads it, sorted', () => {
+    const tokens = buildTokens(parseStylesheet(stylesheet()), syntheticWiring());
+
+    expect(tokens.names.accent.drives).toEqual(['filler-0', 'interactive']);
+    expect(tokens.names['bg-base'].drives).toEqual(['filler-0']);
+    expect(tokens.names['text-sm'].drives).toEqual(['label-01-font-size']);
+    expect(tokens.names['control-h-sm'].drives).toEqual(['layout-size-height-sm']);
+    expect(tokens.names['font-ui'].drives).toEqual([]);
+    expect(Object.keys(tokens.names.accent)).toEqual(['alias', 'literals', 'drives']);
+  });
+
+  it('does not take border-strong for border', () => {
+    const wiring = syntheticWiring();
+    wiring.zone['--cds-filler-1'] = 'var(--canopy-border-strong)';
+
+    const tokens = buildTokens(parseStylesheet(stylesheet()), wiring);
+
+    expect(tokens.names['border-strong'].drives).toEqual(['filler-1']);
+    expect(tokens.names.border.drives).toEqual([]);
+  });
+});
+
+describe('renderBlocks', () => {
+  const wiring = syntheticWiring();
+  const tokens = buildTokens(parseStylesheet(stylesheet()), wiring);
+  const blocks: string = renderBlocks(tokens, wiring);
+
+  it('starts and ends on the markers', () => {
+    expect(blocks.startsWith(`${MARKERS.start}\n`)).toBe(true);
+    expect(blocks.endsWith(`\n${MARKERS.end}`)).toBe(true);
+  });
+
+  it('aliases a colour name standalone and fixes a non-colour name, on the four zones', () => {
+    expect(blocks).toContain(
+      '.cds--white,\n.cds--g10,\n.cds--g90,\n.cds--g100 {\n' +
+        "  --canopy-font-ui: 'IBM Plex Sans', system-ui, sans-serif;\n"
+    );
+    expect(blocks).toContain('\n  --canopy-accent: var(--cds-interactive);\n');
+    expect(blocks).toContain('\n  --canopy-control-h-sm: 2rem;\n');
+  });
+
+  it('gates one rule per zone, each falling back to that zone literal, rgba verbatim', () => {
+    for (const zone of ['white', 'g10', 'g90', 'g100'] as const) {
+      const d = ZONE_DIGIT[zone];
+      const start = blocks.indexOf(`\nhtml[data-canopy-host] .cds--${zone} {\n`);
+      const rule = blocks.slice(start, blocks.indexOf('\n}', start));
+
+      expect(start).toBeGreaterThan(-1);
+      expect(rule).toContain(`  --canopy-bg-base: var(--canopy-host-bg-base, #${d}00abc);\n`);
+      expect(rule).toContain(
+        `  --canopy-accent-tint: var(--canopy-host-accent-tint, rgba(141, 141, 141, 0.${d}));\n`
+      );
+      expect(rule).toContain('  --cds-interactive: var(--canopy-accent);\n');
+      expect(rule).toContain('  --cds-layout-size-height-sm: var(--canopy-control-h-sm);');
+      expect(rule).not.toContain('--cds-toggle-off');
+    }
+  });
+});
+
+describe('spliceBlocks', () => {
+  const blocks = `${MARKERS.start}\nnew\n${MARKERS.end}`;
+
+  it('starts a sheet that does not exist yet as the blocks alone', () => {
+    expect(spliceBlocks(null, blocks)).toBe(`${blocks}\n`);
+  });
+
+  it('replaces only what is between the markers', () => {
+    const sheet = `/* head */\n${MARKERS.start}\nold\n${MARKERS.end}\n\n.canopy-btn { color: red; }\n`;
+
+    expect(spliceBlocks(sheet, blocks)).toBe(
+      `/* head */\n${blocks}\n\n.canopy-btn { color: red; }\n`
+    );
+  });
+
+  it.each([
+    ['no marker', '.canopy-btn { color: red; }\n'],
+    ['no end marker', `${MARKERS.start}\nold\n`],
+    ['the markers out of order', `${MARKERS.end}\n${MARKERS.start}\n`],
+    ['a second start marker', `${MARKERS.start}\n${MARKERS.start}\n${MARKERS.end}\n`],
+  ])('refuses a sheet with %s', (_, sheet) => {
+    expect(() => spliceBlocks(sheet, blocks)).toThrow('does not hold one');
+  });
+});
+
 describe('the generator as a script', () => {
   const made: string[] = [];
 
-  /** A package directory holding a copy of the generator and a `@carbon/styles` it resolves. */
+  /**
+   * A package directory holding a copy of the generator, a `@carbon/styles` it resolves and the
+   * wiring map of the stand-in stylesheet beside it.
+   */
   function tempPackage(css: string): string {
     const dir = realpathSync(mkdtempSync(join(tmpdir(), 'gen-tokens-')));
     made.push(dir);
@@ -429,6 +543,7 @@ describe('the generator as a script', () => {
       '{ "name": "@carbon/styles", "version": "0.0.0" }\n'
     );
     writeFileSync(join(carbon, 'css', 'styles.css'), css);
+    writeFileSync(join(dir, 'wiring.json'), serialize(syntheticWiring()));
     return dir;
   }
 
@@ -449,25 +564,148 @@ describe('the generator as a script', () => {
     for (const dir of made.splice(0)) rmSync(dir, { recursive: true, force: true });
   });
 
-  it('writes tokens.json beside its own package, whatever the working directory', () => {
+  it('writes its artefacts beside its own package, whatever the working directory', () => {
     const css = stylesheet();
     const dir = tempPackage(css);
-    const strayOutput = join(tmpdir(), 'tokens.json');
-    const strayBefore = existsSync(strayOutput) ? readFileSync(strayOutput, 'utf8') : null;
+    const strayOutputs = ['tokens.json', 'host-contract.css', 'wiring.json'].map((name) =>
+      join(tmpdir(), name)
+    );
+    const stray = () =>
+      strayOutputs.map((path) => (existsSync(path) ? readFileSync(path, 'utf8') : null));
+    const strayBefore = stray();
+    const wiringBefore = readFileSync(join(dir, 'wiring.json'), 'utf8');
 
     expect(run(dir)).toEqual({ status: 0, stderr: '' });
 
-    expect(readFileSync(join(dir, 'tokens.json'), 'utf8')).toBe(
-      serialize(buildTokens(parseStylesheet(css)))
+    const tokens = buildTokens(parseStylesheet(css), syntheticWiring());
+    expect(readFileSync(join(dir, 'tokens.json'), 'utf8')).toBe(serialize(tokens));
+    expect(readFileSync(join(dir, 'host-contract.css'), 'utf8')).toBe(
+      `${renderBlocks(tokens, syntheticWiring())}\n`
     );
+    expect(readFileSync(join(dir, 'wiring.json'), 'utf8')).toBe(wiringBefore);
     expect(readdirSync(dir).sort()).toEqual([
+      'host-contract.css',
       'node_modules',
       'package.json',
       'scripts',
       'tokens.json',
+      'wiring.json',
     ]);
     // Nothing was written into the working directory.
-    expect(existsSync(strayOutput) ? readFileSync(strayOutput, 'utf8') : null).toBe(strayBefore);
+    expect(stray()).toEqual(strayBefore);
+  });
+
+  it('regenerates the blocks and keeps the hand-written rest of the sheet', () => {
+    const dir = tempPackage(stylesheet());
+    const sheet = join(dir, 'host-contract.css');
+    expect(run(dir).status).toBe(0);
+    const blocks = readFileSync(sheet, 'utf8').trimEnd();
+    writeFileSync(
+      sheet,
+      `/* head */\n${blocks.replace('var(--cds-interactive)', 'red')}\n\n.canopy-btn { color: red; }\n`
+    );
+
+    expect(run(dir)).toEqual({ status: 0, stderr: '' });
+
+    expect(readFileSync(sheet, 'utf8')).toBe(
+      `/* head */\n${blocks}\n\n.canopy-btn { color: red; }\n`
+    );
+  });
+
+  it('passes --check on what it just wrote, and writes nothing doing so', () => {
+    const dir = tempPackage(stylesheet());
+    expect(run(dir).status).toBe(0);
+    const artefacts = ['tokens.json', 'host-contract.css'].map((name) => join(dir, name));
+    const before = artefacts.map((path) => readFileSync(path, 'utf8'));
+
+    expect(run(dir, ['--check'])).toEqual({ status: 0, stderr: '' });
+
+    expect(artefacts.map((path) => readFileSync(path, 'utf8'))).toEqual(before);
+  });
+
+  it('fails --check when the stylesheet moved a literal under the committed artefacts', () => {
+    const dir = tempPackage(stylesheet());
+    expect(run(dir).status).toBe(0);
+    const before = readFileSync(join(dir, 'tokens.json'), 'utf8');
+    writeFileSync(
+      join(dir, 'node_modules', '@carbon', 'styles', 'css', 'styles.css'),
+      stylesheet((declarations, zone) => {
+        if (zone === 'g90') declarations.set('--cds-interactive', '#123456');
+      })
+    );
+
+    const result = run(dir, ['--check']);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(`gen-tokens: ${join(dir, 'tokens.json')} is stale`);
+    expect(result.stderr).toContain('expected "\\"g90\\": \\"#123456\\","');
+    expect(readFileSync(join(dir, 'tokens.json'), 'utf8')).toBe(before);
+  });
+
+  it('fails --check when a literal of the generated blocks was edited by hand', () => {
+    const dir = tempPackage(stylesheet());
+    const sheet = join(dir, 'host-contract.css');
+    expect(run(dir).status).toBe(0);
+    const edited = readFileSync(sheet, 'utf8').replace(
+      'var(--canopy-host-bg-base, #300abc)',
+      'var(--canopy-host-bg-base, #000000)'
+    );
+    writeFileSync(sheet, edited);
+
+    const result = run(dir, ['--check']);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(`gen-tokens: the generated blocks of ${sheet} are stale`);
+    expect(result.stderr).toContain(
+      'expected "--canopy-bg-base: var(--canopy-host-bg-base, #300abc);"'
+    );
+    expect(readFileSync(sheet, 'utf8')).toBe(edited);
+  });
+
+  it('passes --check over an edit outside the markers', () => {
+    const dir = tempPackage(stylesheet());
+    const sheet = join(dir, 'host-contract.css');
+    expect(run(dir).status).toBe(0);
+    writeFileSync(sheet, `${readFileSync(sheet, 'utf8')}\n.canopy-btn { color: red; }\n`);
+
+    expect(run(dir, ['--check'])).toEqual({ status: 0, stderr: '' });
+  });
+
+  it.each(['tokens.json', 'host-contract.css'])(
+    'fails --check when %s is missing beside the other artefact',
+    (name) => {
+      const dir = tempPackage(stylesheet());
+      expect(run(dir).status).toBe(0);
+      rmSync(join(dir, name));
+
+      const result = run(dir, ['--check']);
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain(`gen-tokens: ${join(dir, name)} is missing`);
+    }
+  );
+
+  it('fails --check on a sheet that lost its markers', () => {
+    const dir = tempPackage(stylesheet());
+    const sheet = join(dir, 'host-contract.css');
+    expect(run(dir).status).toBe(0);
+    writeFileSync(sheet, readFileSync(sheet, 'utf8').replace(MARKERS.end, ''));
+
+    const result = run(dir, ['--check']);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('does not hold one');
+  });
+
+  it('refuses to generate without a wiring map, and writes nothing', () => {
+    const dir = tempPackage(stylesheet());
+    rmSync(join(dir, 'wiring.json'));
+
+    const result = run(dir);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(`gen-tokens: cannot read ${join(dir, 'wiring.json')}`);
+    expect(readdirSync(dir).sort()).toEqual(['node_modules', 'package.json', 'scripts']);
   });
 
   it('parses the @carbon/styles its own package resolves, not this package', () => {
@@ -495,6 +733,7 @@ describe('the generator as a script', () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('gen-tokens: sentinel --cds-toggle-off is missing');
     expect(existsSync(join(dir, 'tokens.json'))).toBe(false);
+    expect(existsSync(join(dir, 'host-contract.css'))).toBe(false);
   });
 
   it('refuses an argument it does not know', () => {
@@ -546,8 +785,16 @@ describe('the pinned @carbon/styles', () => {
   });
 
   it('matches the committed tokens.json byte for byte', () => {
-    const tokens = buildTokens(parseStylesheet(readCarbonStylesheet()));
+    const tokens = buildTokens(parseStylesheet(readCarbonStylesheet()), readWiring());
 
     expect(readFileSync(PATHS.tokens, 'utf8')).toBe(serialize(tokens));
+  });
+
+  it('matches the generated blocks of the committed host-contract.css byte for byte', () => {
+    const wiring = readWiring();
+    const tokens = buildTokens(parseStylesheet(readCarbonStylesheet()), wiring);
+    const sheet = readFileSync(PATHS.sheet, 'utf8');
+
+    expect(spliceBlocks(sheet, renderBlocks(tokens, wiring))).toBe(sheet);
   });
 });
