@@ -552,3 +552,170 @@ html[data-canopy-host] .cds--g100 {
   --cds-layout-size-height-xs: var(--canopy-control-h-xs);
 }
 /* @generated blocks end */
+
+/* Component rules, written by hand: the generator keeps everything outside its markers.
+   They read contract variables only, so standalone they compute to Carbon's own values.
+
+   One colour literal lives here, the white of the danger pair. Carbon's text-on-color is wired
+   to on-accent for primary buttons, but button-danger-primary stays Carbon red, and a host's
+   on-accent may be near-black; every Carbon reader that paints text-on-color over the danger
+   red therefore keeps Carbon's white.
+
+   Rule of thumb: a Carbon Button whose height is pinned is sized through
+   the layout-size-height-local variable plus explicit block and inline sizes. */
+
+/* The shell ghost button: an alpha accent border on hover, never the solid accent. */
+.canopy-btn {
+  block-size: var(--canopy-control-h-sm);
+  min-inline-size: var(--canopy-control-h-sm);
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--canopy-radius-sm);
+  background: transparent;
+  color: var(--canopy-text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.canopy-btn:hover {
+  color: var(--canopy-accent-hover);
+  border-color: color-mix(in srgb, var(--canopy-accent) 25%, transparent);
+  background: var(--canopy-bg-elevated);
+}
+
+.canopy-btn[aria-pressed='true'] {
+  border-color: color-mix(in srgb, var(--canopy-accent) 25%, transparent);
+}
+
+.canopy-btn:focus-visible {
+  outline: 2px solid var(--canopy-focus);
+  outline-offset: -2px;
+}
+
+/* The anchor is opaque and fills the viewport; body keeps its document default. */
+html[data-canopy-host] [data-canopy-host-root] {
+  font-family: var(--canopy-font-ui);
+  min-height: 100%;
+  background: var(--canopy-bg-base);
+}
+
+html[data-canopy-host] code {
+  font-family: var(--canopy-font-mono);
+}
+
+/* Carbon sets these two families itself instead of inheriting. */
+html[data-canopy-host] .cds--number input,
+html[data-canopy-host] .cds--content-switcher-btn {
+  font-family: var(--canopy-font-ui);
+}
+
+html[data-canopy-host] .cds--modal-container,
+html[data-canopy-host] .cds--menu,
+html[data-canopy-host] .cds--overflow-menu-options {
+  background: var(--canopy-bg-elevated);
+}
+
+/* Carbon paints the selected pill with the ::after pseudo, not the button background. */
+html[data-canopy-host] .cds--content-switcher-btn.cds--content-switcher--selected::after {
+  background-color: var(--canopy-accent);
+}
+
+html[data-canopy-host] .cds--content-switcher-btn.cds--content-switcher--selected {
+  color: var(--canopy-on-accent);
+}
+
+/* Carbon fills a tertiary button with the accent in all three states. */
+html[data-canopy-host] .cds--btn--tertiary:hover,
+html[data-canopy-host] .cds--btn--tertiary:focus,
+html[data-canopy-host] .cds--btn--tertiary:active {
+  color: var(--canopy-on-accent);
+}
+
+/* The secondary ladder is mixed from its surface, so its label is the surface's text. */
+html[data-canopy-host] .cds--btn--secondary,
+html[data-canopy-host] .cds--btn--secondary:hover,
+html[data-canopy-host] .cds--btn--secondary:focus {
+  color: var(--canopy-text-primary);
+}
+
+/* The danger pair. */
+html[data-canopy-host] .cds--btn--danger,
+html[data-canopy-host] .cds--btn--danger:hover,
+html[data-canopy-host] .cds--btn--danger:focus,
+html[data-canopy-host] .cds--btn--danger:active,
+html[data-canopy-host] .cds--menu-item--danger:hover,
+html[data-canopy-host] .cds--menu-item--danger:focus,
+html[data-canopy-host]
+  .cds--overflow-menu-options__option--danger
+  .cds--overflow-menu-options__btn:hover,
+html[data-canopy-host]
+  .cds--overflow-menu-options__option--danger
+  .cds--overflow-menu-options__btn:focus {
+  color: #ffffff;
+}
+
+/* Carbon's Search input has no border and no radius rule, so it is named. */
+html[data-canopy-host] .cds--btn,
+html[data-canopy-host] .cds--text-input,
+html[data-canopy-host] .cds--select-input,
+html[data-canopy-host] .cds--search-input,
+html[data-canopy-host] .cds--tabs__nav-link {
+  border-radius: var(--canopy-radius-sm);
+}
+
+html[data-canopy-host] .cds--modal-container {
+  border-radius: var(--canopy-radius-md);
+}
+
+/* Carbon pins a NumberInput to literal heights in both sizes and ignores the layout variable. */
+html[data-canopy-host] .cds--number input[type='number'],
+html[data-canopy-host] .cds--number input[type='text'],
+html[data-canopy-host] .cds--number--sm input[type='number'],
+html[data-canopy-host] .cds--number--sm input[type='text'] {
+  block-size: var(--canopy-control-h-sm);
+}
+
+html[data-canopy-host] .cds--modal-footer {
+  block-size: auto;
+  padding: 8px 12px;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* The :not() selector outranks Carbon's own footer padding, which would push the label of a
+   compact button outside its box. */
+html[data-canopy-host] .cds--modal-footer .cds--btn,
+html[data-canopy-host] .cds--modal-footer .cds--btn:not(.cds--skeleton) {
+  flex: 0 0 auto;
+  align-items: center;
+  block-size: var(--canopy-control-h-sm);
+  min-block-size: var(--canopy-control-h-sm);
+  padding-block: 0;
+  padding-inline: 12px;
+  max-inline-size: none;
+}
+
+html[data-canopy-host] .cds--header {
+  block-size: var(--canopy-control-h-sm);
+  background: var(--canopy-bg-panel);
+  border-bottom: 1px solid var(--canopy-border);
+}
+
+/* Carbon declares literal sizes on a header action at the specificity of its Button rule, and
+   again in a narrow-viewport media query: all four declarations are needed. */
+html[data-canopy-host] .cds--header__action {
+  --cds-layout-size-height-local: var(--canopy-control-h-sm);
+  block-size: var(--canopy-control-h-sm);
+  inline-size: var(--canopy-control-h-sm);
+  min-inline-size: var(--canopy-control-h-sm);
+}
+
+html[data-canopy-host] .cds--header__action svg {
+  inline-size: 16px;
+  block-size: 16px;
+}
+
+html[data-canopy-host] .cds--header__name {
+  padding-inline: 0 8px;
+  font-size: var(--canopy-text-lg);
+}
