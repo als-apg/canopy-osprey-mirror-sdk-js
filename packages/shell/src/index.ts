@@ -7,3 +7,5 @@ export { getColorMode, setColorMode, toggleColorMode, useColorMode } from './the
 export { useFontsReady } from './useFontsReady.js';
 export { useChartFont } from './useChartFont.js';
 export { applyHostSheetFallback } from './applyHostSheetFallback.js';
+export { HOST_THEME_ID, modeFromThemeId, useHostTheme } from './useHostTheme.js';
+export type { HostThemeAnchorProps } from './useHostTheme.js';
