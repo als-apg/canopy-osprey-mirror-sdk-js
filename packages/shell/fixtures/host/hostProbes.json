@@ -211,6 +211,7 @@
       "selector": "[data-testid=canopy-write-confirm]",
       "setup": ["open-write-dialog"],
       "stack": false,
+      "hare": true,
       "expect": {
         "height": { "contract": "control-h-sm", "hostOnly": true },
         "border-top-left-radius": { "contract": "radius-sm" },
@@ -225,6 +226,7 @@
       "selector": "[data-testid=canopy-write-confirm]",
       "setup": ["open-write-dialog", "hover"],
       "stack": false,
+      "hare": true,
       "expect": {
         "background-color": {
           "contract": "accent-hover",
@@ -239,6 +241,7 @@
       "selector": "[data-testid=canopy-write-decline]",
       "setup": ["open-write-dialog"],
       "stack": false,
+      "hare": true,
       "expect": {
         "background-color": { "carbon": "button-secondary" },
         "color": { "contract": "text-primary", "standalone": { "carbon": "text-on-color" } }
@@ -250,6 +253,7 @@
       "selector": "[data-testid=canopy-write-decline]",
       "setup": ["open-write-dialog", "hover"],
       "stack": false,
+      "hare": true,
       "expect": {
         "background-color": { "carbon": "button-secondary-hover" },
         "color": { "contract": "text-primary", "standalone": { "carbon": "text-on-color" } }
@@ -261,6 +265,7 @@
       "selector": ".cds--modal-container",
       "setup": ["open-write-dialog"],
       "stack": false,
+      "hare": true,
       "expect": {
         "background-color": { "contract": "bg-elevated", "standalone": { "carbon": "layer" } },
         "border-top-left-radius": { "contract": "radius-md" }
@@ -272,6 +277,7 @@
       "selector": "[data-testid=canopy-write-confirm]",
       "setup": ["open-write-dialog"],
       "stack": false,
+      "hare": true,
       "expect": {
         "padding-top": { "literal": "0px", "hostOnly": true }
       }
@@ -282,6 +288,7 @@
       "selector": ".canopy-write-dialog__writes td",
       "setup": ["open-write-dialog"],
       "stack": false,
+      "hare": true,
       "expect": {
         "font-family": { "contract": "font-mono" }
       }
