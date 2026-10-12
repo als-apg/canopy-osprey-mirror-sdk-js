@@ -118,4 +118,56 @@ describe('@slaclab/canopy-screen-ir validate', () => {
       expect(validate(withFormula(role)).length).toBeGreaterThan(0);
     });
   });
+
+  describe('property positions', () => {
+    const role = { $role: 'Text', fallback: '#161616', fallbackDark: '#f4f4f4' };
+
+    const withProps = (props: unknown) => ({ ...minimal, root: { ...minimal.root, props } });
+    const withChildProps = (props: unknown) => ({
+      ...minimal,
+      root: {
+        ...minimal.root,
+        children: [{ id: 'c', type: 'text-label', props, geometry: minimal.root.geometry }],
+      },
+    });
+
+    it.each([
+      ['a top-level prop', { foregroundColor: role }],
+      ['a role without fallbackDark', { foregroundColor: { $role: 'x', fallback: '#000000' } }],
+      ['curves[].color', { curves: [{ color: role, pv: 'A' }, { color: '#ff0000' }] }],
+      ['a nested object', { style: { line: { color: role } } }],
+    ])('accepts a role in %s', (_label, props) => {
+      expect(validate(withProps(props))).toEqual([]);
+      expect(validate(withChildProps(props))).toEqual([]);
+    });
+
+    it('accepts role-free literals at any depth', () => {
+      const props = { a: 1, b: null, c: [1, 'x', [true]], d: { e: { f: [] } } };
+      expect(validate(withProps(props))).toEqual([]);
+    });
+
+    it.each([
+      ['a named-color fallback', { $role: 'Text', fallback: 'black' }],
+      ['a missing fallback', { $role: 'Text' }],
+      ['an extra key', { $role: 'Text', fallback: '#000000', extra: 1 }],
+      ['a non-string role', { $role: 7, fallback: '#000000' }],
+      ['a #ff fallbackDark', { $role: 'x', fallback: '#000000', fallbackDark: '#ff' }],
+    ])('rejects %s in a prop, in curves[].color and in a nested object', (_label, bad) => {
+      expect(validate(withProps({ foregroundColor: bad })).length).toBeGreaterThan(0);
+      expect(validate(withChildProps({ foregroundColor: bad })).length).toBeGreaterThan(0);
+      expect(validate(withProps({ curves: [{ color: bad }] })).length).toBeGreaterThan(0);
+      expect(validate(withProps({ style: { line: { color: bad } } })).length).toBeGreaterThan(0);
+    });
+
+    it('names the property and the reason, once', () => {
+      expect(
+        validate(withProps({ foregroundColor: { $role: 'Text', fallback: 'black' } }))
+      ).toEqual([
+        '/root/props/foregroundColor/fallback must match pattern "^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"',
+      ]);
+      expect(
+        validate(withProps({ curves: [{ color: { $role: 'x', fallback: '#000000', extra: 1 } }] }))
+      ).toEqual(['/root/props/curves/0/color must NOT have additional properties']);
+    });
+  });
 });
