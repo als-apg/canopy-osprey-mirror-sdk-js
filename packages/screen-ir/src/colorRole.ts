@@ -1,6 +1,7 @@
 /**
- * A themeable color reference, usable at rule positions (a condition `value` or a
- * conditional rule's `default`).
+ * A themeable color reference: a legal value wherever a widget property holds a
+ * color, at any depth (`foregroundColor`, `curves[].color`), and at rule positions
+ * (a condition `value` or a conditional rule's `default`).
  *
  * `$role` names a color role the viewer's theme resolves (for example
  * `"alarm.major"`). When the theme does not define the role, the viewer uses

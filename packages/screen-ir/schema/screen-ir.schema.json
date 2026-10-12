@@ -100,7 +100,7 @@
         "id": { "type": "string" },
         "type": { "type": "string" },
         "props": {
-          "description": "Untagged JSON literals. Open by design: per-widget prop sets are not enumerated here. fox:// references live in designated channel props; resolution is checked in validate().",
+          "description": "JSON literals, with a ColorRole legal wherever a color is held, at any depth (for example curves[].color). Open by design: per-widget prop sets are not enumerated here. fox:// references live in designated channel props; resolution is checked in validate().",
           "type": "object"
         },
         "geometry": { "$ref": "#/$defs/Geometry" },
@@ -130,7 +130,7 @@
     },
     "RuleScalar": { "type": ["string", "number", "boolean", "null"] },
     "ColorRole": {
-      "description": "Themeable color reference at a rule position: a theme role name with hex fallbacks for light and (optionally) dark themes.",
+      "description": "Themeable color reference, legal as a property value and at a rule position: a theme role name with hex fallbacks for light and (optionally) dark themes.",
       "type": "object",
       "additionalProperties": false,
       "required": ["$role", "fallback"],

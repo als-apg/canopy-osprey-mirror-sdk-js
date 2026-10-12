@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isColorRole } from './index.js';
-import type { ColorRole } from './index.js';
+import type { ColorRole, PropertyLiteral, PropertyValue, Props } from './index.js';
 
 const accepted: [string, ColorRole][] = [
   ['role with fallback', { $role: 'alarm.major', fallback: '#ff0000' }],
@@ -37,5 +37,24 @@ describe('isColorRole', () => {
     ['extra key', { $role: 'x', fallback: '#000000', extra: 1 }],
   ])('rejects %s', (_label, v) => {
     expect(isColorRole(v)).toBe(false);
+  });
+});
+
+describe('ColorRole as a property value', () => {
+  const role: ColorRole = { $role: 'Text', fallback: '#161616', fallbackDark: '#f4f4f4' };
+
+  it('is assignable to PropertyValue and into Props, at any depth', () => {
+    const value: PropertyValue = role;
+    const props: Props = { foregroundColor: role, curves: [{ color: role }] };
+    const bag: Record<string, PropertyValue> = {};
+    bag['foregroundColor'] = role;
+    expect(value).toBe(role);
+    expect(props['foregroundColor']).toBe(role);
+    expect(bag['foregroundColor']).toBe(role);
+  });
+
+  it('enters PropertyValue by its own member, not as a nested literal', () => {
+    const ownMember: ColorRole extends PropertyLiteral ? never : true = true;
+    expect(ownMember).toBe(true);
   });
 });
