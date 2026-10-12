@@ -53,6 +53,8 @@ export interface LiteralTarget {
 /** The property is a `color-mix()` over contract variables, written out exactly. */
 export interface MixTarget {
   mix: string;
+  /** Standalone, Carbon paints this token of its own (a wiring.json zone key without `--cds-`). */
+  standalone?: { carbon: string };
 }
 
 export type Target = ContractTarget | CarbonTarget | LiteralTarget | MixTarget;

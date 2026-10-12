@@ -201,7 +201,8 @@
       "setup": ["hover"],
       "expect": {
         "background-color": {
-          "mix": "color-mix(in srgb, var(--canopy-bg-field), var(--canopy-text-primary) 8%)"
+          "mix": "color-mix(in srgb, var(--canopy-bg-field), var(--canopy-text-primary) 8%)",
+          "standalone": { "carbon": "field-hover-01" }
         }
       }
     },

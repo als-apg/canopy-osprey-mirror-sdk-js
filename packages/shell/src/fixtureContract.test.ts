@@ -178,7 +178,7 @@ describe('hostProbes.json', () => {
           expect(['contract', 'literal'], at).toContain(kinds[0]);
         }
         if ('standalone' in target) {
-          expect(kinds[0], at).toBe('contract');
+          expect(['contract', 'mix'], at).toContain(kinds[0]);
           expect(Object.keys(target.standalone ?? {}), at).toEqual(['carbon']);
         }
       }

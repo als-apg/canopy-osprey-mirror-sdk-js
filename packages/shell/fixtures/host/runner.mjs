@@ -163,7 +163,13 @@ async function evaluateRow(el, arg) {
     } else if (typeof target.literal === 'string') {
       compare('the literal', target.literal);
     } else if (typeof target.mix === 'string') {
-      compare('the mix', target.mix);
+      if (!gated && target.standalone && typeof target.standalone.carbon === 'string') {
+        // Standalone, Carbon paints its own token: the opaque replacement is gated.
+        const token = `--cds-${target.standalone.carbon}`;
+        compare(`var(${token})`, variable(token));
+      } else {
+        compare('the mix', target.mix);
+      }
     } else {
       check.comparisons.push({ against: 'an unknown target', expected: null, pass: false });
     }
@@ -280,7 +286,8 @@ const show = (/** @type {unknown} */ v) => (v === '' ? '(unparsable)' : String(v
  *    `tokens.json` literal. Standalone with a `standalone.carbon` branch, the property is
  *    compared to the zone's `--cds-<token>` instead.
  *  - `carbon`: the property equals the zone's `--cds-<token>`.
- *  - `literal`, `mix`: the property equals the value, resolved inside the zone.
+ *  - `literal`, `mix`: the property equals the value, resolved inside the zone. Standalone, a
+ *    `mix` with a `standalone.carbon` branch is compared to the zone's `--cds-<token>` instead.
  *  - `hostOnly` targets are skipped standalone.
  *
  * Hosted is what the document says (`data-canopy-host` on `<html>`); `hosted` is what the caller
