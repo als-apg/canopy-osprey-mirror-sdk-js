@@ -6,3 +6,4 @@ export { getColorMode, setColorMode, toggleColorMode, useColorMode } from './the
 
 export { useFontsReady } from './useFontsReady.js';
 export { useChartFont } from './useChartFont.js';
+export { applyHostSheetFallback } from './applyHostSheetFallback.js';
