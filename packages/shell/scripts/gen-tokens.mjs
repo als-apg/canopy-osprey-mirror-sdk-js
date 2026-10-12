@@ -5,6 +5,10 @@
 // and writes `tokens.json`: the 27 contract names, the Carbon token each one aliases standalone,
 // and the literal that token has in each zone (the per-zone fallback of the hosted block).
 //
+// `wiring.json` is the hand-reviewed map from every enumerated Carbon token to the contract
+// expression that drives it when hosted, or to the reason it keeps Carbon's value. `--check`
+// writes nothing: it fails, naming the token, when that map and the stylesheet disagree.
+//
 // Run it through the package script only (`pnpm run gen-tokens`). Inputs and outputs are resolved
 // from this file's own location, never from the working directory.
 
@@ -89,6 +93,14 @@ export const CONTRACT = [
   ['status-warning', { alias: 'support-warning' }],
   ['status-error', { alias: 'support-error' }],
 ];
+
+/** The groups of `wiring.json`, one per family of enumerated token. */
+export const WIRING_GROUPS = ['zone', 'type', 'layout'];
+
+/** Why a context alias is never wired: it follows the `-0x` token it derives from. */
+export const ALIAS_REASON = 'context alias derives from the -0x token';
+
+const CONTRACT_REFERENCE = /--canopy-([a-z0-9-]+)/g;
 
 function fail(message) {
   throw new Error(`gen-tokens: ${message}`);
@@ -211,6 +223,77 @@ export function buildTokens(parsed) {
   return { contract: CONTRACT_VERSION, zones: ZONES, names };
 }
 
+/** The tokens `wiring.json` must map, group by group: exactly these and no others. */
+export function enumerateTokens(parsed) {
+  return {
+    zone: parsed.zoneTokens,
+    type: parsed.typeTokens,
+    layout: Object.keys(parsed.layout).sort(),
+  };
+}
+
+function isRecord(value) {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** One wiring entry is a contract expression or `{ "carbon": "<reason>" }`. */
+function checkWiringEntry(group, token, entry, aliases) {
+  const where = `wiring.json group "${group}" maps ${token}`;
+  if (isRecord(entry)) {
+    const keys = Object.keys(entry);
+    if (keys.length !== 1 || keys[0] !== 'carbon') {
+      fail(`${where} to an object that is not { "carbon": "<reason>" }`);
+    }
+    if (typeof entry.carbon !== 'string' || entry.carbon.trim() === '') {
+      fail(`${where} to Carbon without a reason`);
+    }
+    return;
+  }
+  if (typeof entry !== 'string' || entry.trim() === '') {
+    fail(`${where} to neither a contract expression nor { "carbon": "<reason>" }`);
+  }
+  if (token in aliases) {
+    fail(`${where} to an expression, but it is a context alias of ${aliases[token]}`);
+  }
+  // A hosted `--cds-*` that reads another `--cds-*` can close a cycle with the contract aliases.
+  if (entry.includes('--cds-')) fail(`${where} to an expression that reads a Carbon token`);
+  const names = new Set(CONTRACT.map(([name]) => name));
+  const references = [...entry.matchAll(CONTRACT_REFERENCE)].map((match) => match[1]);
+  if (references.length === 0) fail(`${where} to an expression that reads no contract name`);
+  for (const name of references) {
+    if (!names.has(name)) fail(`${where} to --canopy-${name}, which is not a contract name`);
+  }
+}
+
+/**
+ * Check a `wiring.json` document against a parsed stylesheet, in both directions and group by
+ * group: every enumerated token is mapped, and no mapped key is outside the enumeration. The
+ * first disagreement throws, naming the group and the token.
+ */
+export function checkWiring(wiring, parsed) {
+  if (!isRecord(wiring)) fail('wiring.json is not an object of groups');
+  for (const group of Object.keys(wiring)) {
+    if (!WIRING_GROUPS.includes(group)) fail(`wiring.json has an unknown group "${group}"`);
+  }
+  const enumerated = enumerateTokens(parsed);
+  for (const group of WIRING_GROUPS) {
+    const map = wiring[group];
+    if (!isRecord(map)) fail(`wiring.json has no group "${group}"`);
+    for (const token of enumerated[group]) {
+      if (!Object.hasOwn(map, token)) {
+        fail(`wiring.json group "${group}" does not map ${token}`);
+      }
+    }
+    const known = new Set(enumerated[group]);
+    for (const token of Object.keys(map)) {
+      if (!known.has(token)) {
+        fail(`wiring.json group "${group}" maps ${token}, which the stylesheet does not enumerate`);
+      }
+      checkWiringEntry(group, token, map[token], parsed.aliases);
+    }
+  }
+}
+
 /** The exact bytes of a generated JSON file. */
 export function serialize(document) {
   return `${JSON.stringify(document, null, 2)}\n`;
@@ -222,9 +305,32 @@ export function readCarbonStylesheet() {
   return readFileSync(join(dirname(manifest), 'css', 'styles.css'), 'utf8');
 }
 
+/** The committed wiring map of this package. */
+function readWiring() {
+  let text;
+  try {
+    text = readFileSync(PATHS.wiring, 'utf8');
+  } catch {
+    fail(`cannot read ${PATHS.wiring}`);
+  }
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    fail(`${PATHS.wiring} is not JSON: ${error instanceof Error ? error.message : error}`);
+  }
+}
+
 function main(args) {
-  if (args.length > 0) fail(`unknown argument ${args[0]}`);
-  const tokens = buildTokens(parseStylesheet(readCarbonStylesheet()));
+  const unknown = args.find((arg) => arg !== '--check');
+  if (unknown !== undefined) fail(`unknown argument ${unknown}`);
+  const parsed = parseStylesheet(readCarbonStylesheet());
+  if (args.includes('--check')) {
+    buildTokens(parsed);
+    checkWiring(readWiring(), parsed);
+    console.log(`gen-tokens: ${PATHS.wiring} maps every enumerated token`);
+    return;
+  }
+  const tokens = buildTokens(parsed);
   writeFileSync(PATHS.tokens, serialize(tokens));
   console.log(`gen-tokens: wrote ${PATHS.tokens}`);
 }
