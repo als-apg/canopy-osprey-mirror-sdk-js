@@ -74,7 +74,7 @@
     },
     {
       "app": "trace",
-      "selector": ".view-mode-btn",
+      "selector": ".view-mode-btn:not(.view-mode-btn--active)",
       "setup": [],
       "expect": {
         "height": { "contract": "control-h-sm" },
@@ -141,7 +141,7 @@
     },
     {
       "app": "trace",
-      "selector": ".properties-panel .cds--text-input",
+      "selector": ".properties-panel .cds--text-input__field-wrapper .cds--text-input",
       "setup": [],
       "expect": {
         "height": { "contract": "control-h-sm" },
@@ -354,7 +354,7 @@
     },
     {
       "app": "correlation",
-      "selector": ".cds--content-switcher-btn:first-child",
+      "selector": ".cds--content-switcher-btn:not(.cds--content-switcher--selected)",
       "setup": [],
       "expect": {
         "border-top-color": {
