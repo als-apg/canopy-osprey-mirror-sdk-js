@@ -101,7 +101,8 @@
         "type": { "type": "string" },
         "props": {
           "description": "JSON literals, with a ColorRole legal wherever a color is held, at any depth (for example curves[].color). Open by design: per-widget prop sets are not enumerated here. fox:// references live in designated channel props; resolution is checked in validate().",
-          "type": "object"
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/PropertyValue" }
         },
         "geometry": { "$ref": "#/$defs/Geometry" },
         "children": { "type": "array", "items": { "$ref": "#/$defs/WidgetNode" } },
@@ -129,6 +130,15 @@
       }
     },
     "RuleScalar": { "type": ["string", "number", "boolean", "null"] },
+    "PropertyValue": {
+      "description": "A widget property value: a JSON literal or a ColorRole. An object that carries $role is a ColorRole and must be well-formed; every other object and every array is checked member by member.",
+      "if": { "type": "object", "required": ["$role"] },
+      "then": { "$ref": "#/$defs/ColorRole" },
+      "else": {
+        "additionalProperties": { "$ref": "#/$defs/PropertyValue" },
+        "items": { "$ref": "#/$defs/PropertyValue" }
+      }
+    },
     "ColorRole": {
       "description": "Themeable color reference, legal as a property value and at a rule position: a theme role name with hex fallbacks for light and (optionally) dark themes.",
       "type": "object",
