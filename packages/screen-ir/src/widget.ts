@@ -1,3 +1,4 @@
+import type { ColorRole } from './colorRole.js';
 import type { Rule } from './rules.js';
 
 /** Absolute pixel bounds in canvas coordinates. Absolute-only for v0.1. */
@@ -14,11 +15,13 @@ export interface WidgetMeta {
 }
 
 /**
- * A widget property value. v0.1 ships only PropertyLiteral and macro strings —
- * macro substitution is detected via the widget's `propSchema`
+ * A widget property value: a JSON literal, or a {@link ColorRole} wherever the
+ * property holds a color. An object carrying `$role` is a role and nothing else;
+ * `validate()` rejects one that is not well-formed. Macro substitution is
+ * detected via the widget's `propSchema`
  * (`format: "pv-channel" | "macro-string"`), not via the value.
  */
-export type PropertyValue = PropertyLiteral | PropertyTagged;
+export type PropertyValue = PropertyLiteral | ColorRole | PropertyTagged;
 
 export type PropertyLiteral =
   | string
@@ -28,7 +31,10 @@ export type PropertyLiteral =
   | readonly PropertyValue[]
   | { readonly [key: string]: PropertyValue };
 
-/** Reserved tagged form, detected by the leading `$` key prefix. Unused in v0.1. */
+/**
+ * Reserved tagged form, detected by the leading `$` key prefix. `$role` is the
+ * one tag in use, and {@link ColorRole} is its type.
+ */
 export interface PropertyTagged {
   readonly [key: `$${string}`]: unknown;
 }
