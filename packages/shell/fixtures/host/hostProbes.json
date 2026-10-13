@@ -573,7 +573,8 @@
       "setup": ["dock-second-tile", "hold-tab-drag"],
       "stack": false,
       "expect": {
-        "background-color": { "contract": "accent-tint" }
+        "background-color": { "mix": "color-mix(in srgb, var(--canopy-accent) 20%, transparent)" },
+        "border-top-color": { "contract": "accent" }
       }
     }
   ]

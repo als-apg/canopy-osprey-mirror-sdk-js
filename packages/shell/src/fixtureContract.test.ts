@@ -330,7 +330,12 @@ describe('hostProbes.json', () => {
         '.dv-drop-target-anchor',
         ['dock-second-tile', 'hold-tab-drag'],
         false,
-        { 'background-color': { contract: 'accent-tint' } },
+        {
+          // The drop preview reads like OSPREY's: a fifth of the accent over the tile (the
+          // host's accent-tint is its selection tint, too faint for a target), edged in it.
+          'background-color': { mix: 'color-mix(in srgb, var(--canopy-accent) 20%, transparent)' },
+          'border-top-color': { contract: 'accent' },
+        },
       ],
     ]);
     expect(typeof setups.postconditions['hold-tab-drag']).toBe('function');
