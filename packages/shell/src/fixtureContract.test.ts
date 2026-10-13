@@ -57,6 +57,8 @@ const SETUP_NAMES = [
   'switch-density-view',
   'open-trace-tab',
   'open-view-menu',
+  'dock-second-tile',
+  'hold-tab-drag',
 ];
 
 const LONGHANDS = [
@@ -288,6 +290,55 @@ describe('hostProbes.json', () => {
       ['correlation', '[data-testid=pv-picker-add]', false],
     ]);
     expect(typeof setups.postconditions['hold-pv-check']).toBe('function');
+  });
+
+  it('probes the bar and the × of the one tile with no setup, so on the deployed stack too', () => {
+    for (const selector of ['.canopy-tile-bar', '.canopy-tile-bar__close']) {
+      const rows = rowsWhere('viewer', selector);
+      expect(
+        rows.map((row) => [row.setup, row.stack]),
+        selector
+      ).toEqual([[[], undefined]]);
+    }
+    expect(Object.keys(rowsWhere('viewer', '.canopy-tile-bar')[0].expect).sort()).toEqual([
+      'background-color',
+      'border-bottom-color',
+    ]);
+    expect(rowsWhere('viewer', '.canopy-tile-bar__close')[0].expect).toEqual({
+      color: { contract: 'text-secondary' },
+    });
+  });
+
+  it('docks a second tile for the title and the focused hairline, off the deployed stack', () => {
+    const rows = PROBES.rows.filter((row) => row.setup.includes('dock-second-tile'));
+    expect(rows.map((row) => [row.app, row.selector, row.setup, row.stack])).toEqual([
+      ['viewer', '[data-testid=tile-bar-title]', ['dock-second-tile'], false],
+      ['viewer', '.canopy-tile-bar--focused', ['dock-second-tile'], false],
+      ['viewer', '.dv-drop-target-anchor', ['dock-second-tile', 'hold-tab-drag'], false],
+    ]);
+    expect(rows[0].expect).toEqual({ 'font-family': { contract: 'font-ui' } });
+    expect(rows[1].expect).toEqual({ 'border-top-color': { contract: 'accent' } });
+    // One tile is the state every other viewer row expects: no row on the default page may
+    // reach two tiles and stay on the stack, whose rows share one browser context.
+    for (const row of rows) expect(row.page, label(row)).toBeUndefined();
+  });
+
+  it('holds a tab drag over the second tile for the drop highlight, and releases it', () => {
+    const rows = PROBES.rows.filter((row) => row.setup.includes('hold-tab-drag'));
+    expect(rows.map((row) => [row.selector, row.setup, row.stack, row.expect])).toEqual([
+      [
+        '.dv-drop-target-anchor',
+        ['dock-second-tile', 'hold-tab-drag'],
+        false,
+        { 'background-color': { contract: 'accent-tint' } },
+      ],
+    ]);
+    expect(typeof setups.postconditions['hold-tab-drag']).toBe('function');
+    expect(setups.postconditions['dock-second-tile']).toBeUndefined();
+  });
+
+  it('adds no token for the dock rows', () => {
+    expect(NAMES.length).toBe(27);
   });
 
   it('probes the Trace header action at a 600 px viewport too', () => {
@@ -564,6 +615,45 @@ describe('runner.mjs', () => {
       expect(late.failures).toEqual([
         'hold-pv-check: [data-testid=pv-picker-add] is no longer disabled; the row was read too late',
       ]);
+    });
+
+    it('fails a drop-highlight row that is read while no drag is held', async () => {
+      const page = mount(
+        '.probed { border-left-width: 2px; }',
+        '<div class="cds--white"><div class="tab-strip"></div><b class="probed"></b></div>'
+      );
+      const probe = row({ 'border-left-width': { literal: '2px' } }, { setup: ['hold-tab-drag'] });
+      const loose = await runner.checkRow(page, probe, { throwOnFailure: false });
+      expect(loose.failures).toEqual(['hold-tab-drag: no drag is held']);
+    });
+
+    it('fails the drag setup where there is no second tile to hold it over', async () => {
+      const page = mount(
+        '',
+        '<div class="cds--white">' +
+          '<div data-testid="workspace-dock" data-docked=\'["a","b"]\'></div>' +
+          '<div class="tab-strip"><div role="tab" data-docked="true" data-tab-key="a"></div></div>' +
+          '<div data-testid="tile-bar" data-panel-key="a"></div></div>'
+      );
+      const waited: string[] = [];
+      const withWait: PageLike = {
+        ...page,
+        locator: (selector: string) => {
+          const found = page.locator(selector);
+          const self = {
+            ...found,
+            first: () => self,
+            waitFor: async () => {
+              waited.push(selector);
+            },
+          };
+          return self as unknown as ReturnType<PageLike['locator']>;
+        },
+      };
+      await expect(
+        runner.runSetups(withWait, { selector: '.probed', setup: ['hold-tab-drag'] })
+      ).rejects.toThrow('hold-tab-drag: no second tile to hold the drag over');
+      expect(waited).toEqual([`[data-testid=workspace-dock][data-docked*='","']`]);
     });
   });
 });

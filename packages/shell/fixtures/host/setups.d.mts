@@ -15,7 +15,8 @@ export interface LocatorLike {
   locator(selector: string): LocatorLike;
   // Typed as loosely as it gets on purpose: Playwright's own `evaluate` is generic over the
   // element and the argument, and only parameters of type `never` let a real Locator be passed
-  // where this interface is asked for. Only the runner calls it.
+  // where this interface is asked for. The runner calls it, and so does the one setup that has
+  // to run in the page (`hold-tab-drag` and its release).
   evaluate(pageFunction: never, arg?: never): Promise<unknown>;
 }
 
@@ -54,7 +55,9 @@ export type SetupName =
   | 'hold-pv-check'
   | 'switch-density-view'
   | 'open-trace-tab'
-  | 'open-view-menu';
+  | 'open-view-menu'
+  | 'dock-second-tile'
+  | 'hold-tab-drag';
 
 /** The page of the write-dialog rows; `{theme}` is the theme id. */
 export declare const WRITE_PROBE_PAGE: string;
@@ -63,8 +66,8 @@ export declare const WRITE_PROBE_PAGE: string;
 export declare const HOLD_PV: string;
 
 /**
- * Conditions that must still hold when a row's expectations have been read, by setup name. The
- * probe runner runs them as the last step of a row.
+ * Conditions that must still hold when a row's expectations have been read, by setup name, and
+ * the release of a state a setup holds. The probe runner runs them as the last step of a row.
  */
 export declare const postconditions: Partial<Record<SetupName, (page: PageLike) => Promise<void>>>;
 
@@ -79,6 +82,8 @@ declare const holdPvCheck: Setup;
 declare const switchDensityView: Setup;
 declare const openTraceTab: Setup;
 declare const openViewMenu: Setup;
+declare const dockSecondTile: Setup;
+declare const holdTabDrag: Setup;
 
 export {
   selectFirstNavRow as 'select-first-nav-row',
@@ -92,4 +97,6 @@ export {
   switchDensityView as 'switch-density-view',
   openTraceTab as 'open-trace-tab',
   openViewMenu as 'open-view-menu',
+  dockSecondTile as 'dock-second-tile',
+  holdTabDrag as 'hold-tab-drag',
 };

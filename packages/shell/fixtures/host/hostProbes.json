@@ -531,6 +531,50 @@
       "expect": {
         "font-family": { "contract": "font-ui" }
       }
+    },
+    {
+      "app": "viewer",
+      "selector": ".canopy-tile-bar",
+      "setup": [],
+      "expect": {
+        "background-color": { "contract": "bg-panel" },
+        "border-bottom-color": { "contract": "border" }
+      }
+    },
+    {
+      "app": "viewer",
+      "selector": ".canopy-tile-bar__close",
+      "setup": [],
+      "expect": {
+        "color": { "contract": "text-secondary" }
+      }
+    },
+    {
+      "app": "viewer",
+      "selector": "[data-testid=tile-bar-title]",
+      "setup": ["dock-second-tile"],
+      "stack": false,
+      "expect": {
+        "font-family": { "contract": "font-ui" }
+      }
+    },
+    {
+      "app": "viewer",
+      "selector": ".canopy-tile-bar--focused",
+      "setup": ["dock-second-tile"],
+      "stack": false,
+      "expect": {
+        "border-top-color": { "contract": "accent" }
+      }
+    },
+    {
+      "app": "viewer",
+      "selector": ".dv-drop-target-anchor",
+      "setup": ["dock-second-tile", "hold-tab-drag"],
+      "stack": false,
+      "expect": {
+        "background-color": { "contract": "accent-tint" }
+      }
     }
   ]
 }
