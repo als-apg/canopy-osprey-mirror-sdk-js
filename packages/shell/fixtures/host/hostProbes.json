@@ -142,6 +142,7 @@
     {
       "app": "trace",
       "selector": "#plot-title",
+      "page": "/?embedded=true&theme={theme}&range=-10m",
       "setup": ["open-properties"],
       "expect": {
         "height": { "contract": "control-h-sm" },
@@ -184,6 +185,7 @@
     {
       "app": "trace",
       "selector": "#grid-style",
+      "page": "/?embedded=true&theme={theme}&range=-10m",
       "setup": ["open-properties", "inspector-tab-appearance"],
       "expect": {
         "height": { "contract": "control-h-sm" },

@@ -401,6 +401,15 @@ describe('hostProbes.json', () => {
     expect(PROBES.rows.filter((row) => row.app === 'trace').length).toBe(14);
   });
 
+  it('opens the plot-level Trace rows on a page with no curve, so Properties shows the plot', () => {
+    // With a PV the opening selection is its curve, whose Properties hold no plot field.
+    for (const selector of ['#plot-title', '#grid-style']) {
+      const rows = PROBES.rows.filter((row) => row.app === 'trace' && row.selector === selector);
+      expect(rows.length, selector).toBe(1);
+      expect(rows[0].page, selector).toBe('/?embedded=true&theme={theme}&range=-10m');
+    }
+  });
+
   it('opens Properties, then the tab when not the first, for every Trace Properties row', () => {
     // A field lives in Properties under its #id (the swatch under its testid); a curve field
     // needs the curve selected first. The composed setups are idempotent (r2 CC-10).
