@@ -4,7 +4,7 @@
 
 import type { PageLike, SetupName } from './setups.mjs';
 
-export type ProbeApp = 'viewer' | 'trace' | 'correlation';
+export type ProbeApp = 'viewer' | 'trace' | 'correlation' | 'waveform';
 
 /** The Carbon zones a probed element can live in. */
 export type Zone = 'white' | 'g10' | 'g90' | 'g100';

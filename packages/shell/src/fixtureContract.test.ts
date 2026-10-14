@@ -125,11 +125,16 @@ const RULES = parseRules(HOST_CSS);
 
 describe('hostProbes.json', () => {
   it('names a default page for each app, and nothing else', () => {
-    expect(Object.keys(PROBES.defaults.page).sort()).toEqual(['correlation', 'trace', 'viewer']);
+    expect(Object.keys(PROBES.defaults.page).sort()).toEqual([
+      'correlation',
+      'trace',
+      'viewer',
+      'waveform',
+    ]);
   });
 
   it('has rows for every app', () => {
-    for (const app of ['viewer', 'trace', 'correlation']) {
+    for (const app of ['viewer', 'trace', 'correlation', 'waveform']) {
       expect(PROBES.rows.filter((row) => row.app === app).length, app).toBeGreaterThan(0);
     }
   });
@@ -394,6 +399,43 @@ describe('hostProbes.json', () => {
     expect(rowsWhere('trace', '.cds--overflow-menu-options').map((row) => row.setup)).toEqual([
       ['open-insight-overflow'],
     ]);
+  });
+
+  it('opens Waveform beside the Trace pages, embedded, themed and with a live PV', () => {
+    const page = PROBES.defaults.page.waveform;
+    expect(page.startsWith('/waveform.html?')).toBe(true);
+    const query = new URLSearchParams(page.slice(page.indexOf('?') + 1));
+    expect(query.get('embedded')).toBe('true');
+    expect(query.get('theme')).toBe('{theme}');
+    expect(query.getAll('pv').length).toBeGreaterThan(0);
+    for (const pv of query.getAll('pv')) expect(pv).not.toBe('');
+    // The page renders from the Hare mock alone: no row needs a page of its own or a backend.
+    for (const row of PROBES.rows.filter((r) => r.app === 'waveform')) {
+      expect(row.page, label(row)).toBeUndefined();
+      expect(row.hare, label(row)).toBeUndefined();
+    }
+  });
+
+  it("probes the Waveform actions bar, its action and its tooltip as Trace's (A39)", () => {
+    // Same place, same widget: a third tool's bar holds the very rows Trace's does.
+    for (const selector of [
+      '[data-testid=actions-bar]',
+      '[data-testid=actions-bar] .cds--btn--icon-only',
+      '[data-testid=actions-bar] .cds--popover-content',
+    ]) {
+      const trace = rowsWhere('trace', selector).filter((row) => row.viewport === undefined);
+      const waveform = rowsWhere('waveform', selector);
+      expect(waveform.length, selector).toBe(1);
+      expect(
+        waveform.map((row) => [row.setup, row.expect, row.viewport]),
+        selector
+      ).toEqual(trace.map((row) => [row.setup, row.expect, row.viewport]));
+    }
+  });
+
+  it('keeps the Trace and Correlation rows as they were', () => {
+    expect(PROBES.rows.filter((row) => row.app === 'correlation').length).toBe(12);
+    expect(PROBES.defaults.page.trace).toBe('/?embedded=true&theme={theme}&pv=SR:TEST&range=-10m');
   });
 
   it('retires only the header-counts row of the Trace header (A39)', () => {

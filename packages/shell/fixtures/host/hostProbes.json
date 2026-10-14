@@ -3,7 +3,8 @@
     "page": {
       "viewer": "/embed/drafts/host-probe?embedded=true&theme={theme}",
       "trace": "/?embedded=true&theme={theme}&pv=SR:TEST&range=-10m",
-      "correlation": "/correlation.html?embedded=true&theme={theme}&x=PROBE:X&y=PROBE:Y1&y=PROBE:Y2&dt=1&n=1000&lookback=1h&view=scatter&axes=shared"
+      "correlation": "/correlation.html?embedded=true&theme={theme}&x=PROBE:X&y=PROBE:Y1&y=PROBE:Y2&dt=1&n=1000&lookback=1h&view=scatter&axes=shared",
+      "waveform": "/waveform.html?embedded=true&theme={theme}&pv=PROBE:WF"
     }
   },
   "rows": [
@@ -568,6 +569,38 @@
       "expect": {
         "background-color": { "mix": "color-mix(in srgb, var(--canopy-accent) 20%, transparent)" },
         "border-top-color": { "contract": "accent" }
+      }
+    },
+    {
+      "app": "waveform",
+      "selector": "[data-testid=actions-bar]",
+      "setup": [],
+      "expect": {
+        "height": { "contract": "control-h-sm", "hostOnly": true },
+        "background-color": { "contract": "bg-panel", "standalone": { "carbon": "layer" } },
+        "border-bottom-color": { "contract": "border", "standalone": { "carbon": "border-subtle" } }
+      }
+    },
+    {
+      "app": "waveform",
+      "selector": "[data-testid=actions-bar] .cds--btn--icon-only",
+      "setup": [],
+      "expect": {
+        "height": { "contract": "control-h-sm", "hostOnly": true },
+        "min-height": { "contract": "control-h-sm", "hostOnly": true },
+        "width": { "contract": "control-h-sm", "hostOnly": true }
+      }
+    },
+    {
+      "app": "waveform",
+      "selector": "[data-testid=actions-bar] .cds--popover-content",
+      "setup": ["hover-action"],
+      "expect": {
+        "background-color": {
+          "contract": "text-primary",
+          "standalone": { "carbon": "background-inverse" }
+        },
+        "color": { "contract": "bg-base", "standalone": { "carbon": "text-inverse" } }
       }
     }
   ]
