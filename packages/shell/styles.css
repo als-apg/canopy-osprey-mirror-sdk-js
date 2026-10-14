@@ -1,16 +1,294 @@
 /*
- * @slaclab/canopy-shell — header styles. Import once per app:
+ * @slaclab/canopy-shell styles. Import once per app, after Carbon's CSS:
+ *   import '@carbon/styles/css/styles.css';
  *   import '@slaclab/canopy-shell/styles.css';
- * Carbon's own styles (@carbon/styles/css/styles.css) must be loaded by the app.
+ * Every color is a Carbon --cds-* token except the documented brand variable.
  */
 
-/* Carbon Header takes position: fixed by default; pin it into the app's flex
-   column instead so the content below fills the remaining height. */
+:root {
+  /* SLAC brand red. */
+  --canopy-brand: #901515;
+}
+
+/* On a dark header #901515 is about 2:1 against #161616 (fails WCAG AA; it is
+   about 8:1 on g10), so dark themes use Carbon red-40 (about 7.6:1). Matches
+   both a dark app theme (ColorModeTheme / <html class="cds--g100">) and the
+   legacy always-dark bar (`theme="g100"`). */
+.cds--g90 .canopy-header,
+.cds--g100 .canopy-header,
+.canopy-header.cds--g90,
+.canopy-header.cds--g100 {
+  --canopy-brand: #ff8389;
+}
+
+/* ---------------------------------------------------------------- Header -- */
+
 .canopy-header {
-  position: relative;
   flex-shrink: 0;
 }
 
-.canopy-header__name {
-  letter-spacing: 0.04em;
+/* Carbon's Header is position: fixed by default. Unless `fixed` is set, pin it
+   into the app's flex column instead so the content below fills the rest. */
+.canopy-header:not(.canopy-header--fixed) {
+  position: relative;
+}
+
+/* `brandColor` (default on); without it the name keeps Carbon's header color. */
+.canopy-header--brand .cds--header__name,
+.canopy-header--brand .cds--header__name--prefix {
+  color: var(--canopy-brand);
+}
+
+/* Mouse-click focus: drop the persistent background and ring on header icon
+   buttons. :focus:not(:focus-visible) matches pointer focus only, so keyboard
+   focus rings stay. Active actions (e.g. an admin toggle) are excluded. */
+.canopy-header .cds--btn--icon-only.cds--btn--ghost:focus:not(.cds--header__action--active) {
+  background-color: transparent;
+}
+
+.canopy-header .cds--header__action:focus:not(:focus-visible):not(.cds--header__action--active),
+.canopy-header
+  .cds--btn--icon-only.cds--btn--ghost:focus:not(:focus-visible):not(.cds--header__action--active) {
+  border-color: transparent;
+  box-shadow: none;
+  outline: none;
+}
+
+/* The hamburger uses isActive only to swap the Menu/Close icon; no active background. */
+.canopy-header .cds--header__menu-trigger.cds--header__action--active {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+/* Header tooltips follow the theme via Carbon's inverse tokens. */
+.canopy-header .cds--popover--high-contrast .cds--popover,
+.canopy-header .cds--popover {
+  --cds-popover-background-color: var(--cds-background-inverse);
+  --cds-popover-text-color: var(--cds-text-inverse);
+}
+
+/* Always show the hamburger when a menu is wired up; Carbon hides it at wide viewports. */
+.canopy-header--with-menu .cds--header__menu-toggle,
+.canopy-header--with-menu .cds--header__menu-trigger {
+  display: flex !important;
+}
+
+/* ------------------------------------------------------------- AppShell -- */
+
+.canopy-shell {
+  --canopy-header-height: 3rem;
+  --canopy-rail-expanded-width: 16rem;
+  --canopy-rail-collapsed-width: 3rem;
+  --canopy-rail-transition: 0.11s ease;
+
+  position: relative;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--cds-background);
+}
+
+/* The shell always pins its header, whether or not `fixed` was passed. */
+.canopy-shell .cds--header.canopy-header {
+  position: fixed;
+}
+
+.canopy-shell__main {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - var(--canopy-header-height));
+  margin-top: var(--canopy-header-height);
+  margin-left: 0;
+  overflow: hidden;
+  background-color: var(--cds-background);
+  transition: margin-left var(--canopy-rail-transition);
+}
+
+.canopy-shell__main:focus {
+  outline: none;
+}
+
+.canopy-shell--rail-expanded .canopy-shell__main {
+  margin-left: var(--canopy-rail-expanded-width);
+}
+
+.canopy-shell--rail-collapsed .canopy-shell__main {
+  margin-left: var(--canopy-rail-collapsed-width);
+}
+
+.canopy-shell__banners {
+  flex-shrink: 0;
+}
+
+/* Banners span the content width, squared off. */
+.canopy-shell__banners .cds--inline-notification,
+.canopy-shell__banners .cds--actionable-notification {
+  max-width: 100%;
+  border-radius: 0;
+}
+
+.canopy-shell__content {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* ---------------------------------------------------------- SideNavRail -- */
+
+.canopy-rail {
+  position: fixed;
+  top: var(--canopy-header-height, 3rem);
+  bottom: 0;
+  left: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  width: var(--canopy-rail-expanded-width, 16rem);
+  overflow: hidden;
+  background-color: var(--cds-layer);
+  border-right: 1px solid var(--cds-border-subtle);
+  transition: width var(--canopy-rail-transition, 0.11s ease);
+}
+
+/* Collapsed: icons only, so nothing to clip, and tooltips must escape the rail. */
+.canopy-rail--collapsed {
+  width: var(--canopy-rail-collapsed-width, 3rem);
+  overflow: visible;
+}
+
+.canopy-rail__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.canopy-rail .canopy-rail__tooltip,
+.canopy-rail .canopy-rail__tooltip .cds--tooltip-trigger__wrapper {
+  display: block;
+}
+
+.canopy-rail__link {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  height: 3rem;
+  padding: 0 0.875rem;
+  overflow: hidden;
+  color: var(--cds-text-secondary);
+  font-size: 0.875rem;
+  white-space: nowrap;
+  text-decoration: none;
+  background-color: transparent;
+  border-left: 3px solid transparent;
+}
+
+.canopy-rail__link:hover {
+  color: var(--cds-text-primary);
+  background-color: var(--cds-layer-hover);
+}
+
+.canopy-rail__link[aria-current='page'] {
+  color: var(--cds-link-primary);
+  font-weight: 600;
+  background-color: var(--cds-layer-selected);
+  border-left-color: var(--cds-link-primary);
+}
+
+.canopy-rail__link[aria-current='page']:hover {
+  background-color: var(--cds-layer-selected-hover);
+}
+
+.canopy-rail__link:focus {
+  outline: 2px solid var(--cds-focus);
+  outline-offset: -2px;
+}
+
+.canopy-rail__link:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.canopy-rail__icon {
+  flex-shrink: 0;
+  fill: currentColor;
+}
+
+.canopy-rail__icon--initial {
+  width: 20px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.canopy-rail__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.canopy-rail__footer {
+  margin-top: auto;
+  border-top: 1px solid var(--cds-border-subtle);
+}
+
+.canopy-rail__footer-slot {
+  padding: 0.5rem;
+}
+
+.canopy-rail--collapsed .canopy-rail__footer-slot {
+  padding: 0.25rem;
+}
+
+/* --------------------------------------------------------------- Toasts -- */
+
+.canopy-toasts {
+  position: fixed;
+  top: calc(var(--canopy-header-height, 3rem) + 0.5rem);
+  right: 1rem;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - var(--canopy-header-height, 3rem) - 1rem);
+  overflow: hidden;
+  background: transparent;
+  pointer-events: none;
+}
+
+/* The live regions (errors, then the rest) stay mounted even when empty. */
+.canopy-toasts__region {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.canopy-toasts__region:not(:empty) + .canopy-toasts__region:not(:empty) {
+  margin-top: 0.5rem;
+}
+
+.canopy-toasts .cds--toast-notification {
+  margin: 0;
+  pointer-events: auto;
+}
+
+/* ---------------------------------------------------- Confirm / errors -- */
+
+.canopy-confirm .cds--modal-container,
+.canopy-confirm .cds--modal-container:focus {
+  border: none;
+  outline: none;
+}
+
+.canopy-confirm__body {
+  font-size: 0.875rem;
+}
+
+.canopy-error-fallback {
+  padding: 1rem;
+}
+
+.canopy-error-fallback .cds--inline-notification {
+  max-width: 100%;
+}
+
+.canopy-error-fallback__actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
 }

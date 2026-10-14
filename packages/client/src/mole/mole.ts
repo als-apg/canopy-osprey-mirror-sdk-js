@@ -1,9 +1,6 @@
-// Client for Canopy Mole's history REST API (`/mole/v1/...`).
-//
-// Lifted from react-trace's `src/api/mole.ts`, rebased on the shared REST
-// core: every call takes an explicit `CanopyConnection` (base URL + API key)
-// instead of trace's assumption of a same-origin dev proxy that injects the
-// key. Paths and query aliases cross-checked against `canopy.mole.api.v1`.
+// Client for Canopy Mole's history REST API (`/mole/v1/...`). Every call
+// takes an explicit `CanopyConnection` (base URL + API key). Paths and query
+// aliases follow `canopy.mole.api.v1`.
 
 import { canopyFetch } from '../rest/canopyFetch.js';
 import type { AbortSignalLike, CanopyConnection } from '../rest/canopyFetch.js';

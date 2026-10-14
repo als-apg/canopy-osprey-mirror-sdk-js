@@ -2,6 +2,7 @@
 // one-shot status fetch plus a polling helper that resolves/rejects on the
 // job's terminal state.
 
+import { abortReason } from '../rest/abort.js';
 import { CanopyError, canopyFetch } from '../rest/canopyFetch.js';
 import type { AbortSignalLike, CanopyConnection } from '../rest/canopyFetch.js';
 import { isTerminalJobStatus } from './types.js';
@@ -14,6 +15,18 @@ export async function getJob(
   signal?: AbortSignalLike
 ): Promise<JobStatusDTO> {
   return canopyFetch<JobStatusDTO>(conn, `/jobs/v1/${encodeURIComponent(id)}`, { signal });
+}
+
+/**
+ * True for the 404 `job_not_found` error {@link getJob} throws when Canopy
+ * has no record of the id: it was never enqueued there (mistyped, or from
+ * another deployment), or the job finished and its result expired (results
+ * are kept for the worker's `keep_result_s`, one hour by default). It means
+ * "unknown", not "failed". A job waiting on any worker queue, the
+ * optimization worker's included, reports `pending` instead.
+ */
+export function isJobNotFoundError(error: unknown): boolean {
+  return error instanceof CanopyError && error.status === 404 && error.code === 'job_not_found';
 }
 
 /** Thrown by {@link awaitJob} when the job reaches the `failed` state. */
@@ -38,6 +51,15 @@ export interface AwaitJobOptions {
   timeoutMs?: number;
   /** Abort polling; rejects with the abort reason (an `AbortError` by default). */
   signal?: AbortSignalLike;
+  /**
+   * Keep polling through a 404 `job_not_found` (see {@link isJobNotFoundError})
+   * until this long after the call started; after that the 404 is thrown.
+   * Default 0: the first 404 is thrown, since current Canopy answers 404 only
+   * for an unknown or expired job. A grace helps with older backends that
+   * answered 404 while a job was still queued. `Infinity` never gives up on a
+   * 404 (combine with `timeoutMs`).
+   */
+  notFoundGraceMs?: number;
 }
 
 /**
@@ -48,6 +70,9 @@ export interface AwaitJobOptions {
  * - Rejects with `CanopyError('job_timeout', 0, ...)` when `timeoutMs` elapses.
  * - Rejects with the abort reason when `signal` aborts (in-flight fetches
  *   pass their `AbortError` through; between polls the sleep is cut short).
+ * - A 404 `job_not_found` (unknown id, or the result expired) rejects
+ *   immediately, unless `notFoundGraceMs` allows waiting for the job to
+ *   show up.
  */
 export async function awaitJob(
   conn: CanopyConnection,
@@ -56,18 +81,27 @@ export async function awaitJob(
 ): Promise<JobStatusDTO> {
   const pollMs = options.pollMs ?? 1000;
   const { timeoutMs, signal } = options;
-  const deadline = timeoutMs !== undefined ? Date.now() + timeoutMs : undefined;
+  const notFoundGraceMs = options.notFoundGraceMs ?? 0;
+  const startedAt = Date.now();
+  const deadline = timeoutMs !== undefined ? startedAt + timeoutMs : undefined;
 
   for (;;) {
     if (signal?.aborted) {
       throw abortReason(signal);
     }
 
-    const job = await getJob(conn, id, signal);
-    if (job.status === 'failed') {
+    let job: JobStatusDTO | undefined;
+    try {
+      job = await getJob(conn, id, signal);
+    } catch (err) {
+      if (!isJobNotFoundError(err) || Date.now() - startedAt >= notFoundGraceMs) {
+        throw err;
+      }
+    }
+    if (job?.status === 'failed') {
       throw new JobFailedError(job);
     }
-    if (isTerminalJobStatus(job.status)) {
+    if (job && isTerminalJobStatus(job.status)) {
       return job;
     }
 
@@ -79,18 +113,11 @@ export async function awaitJob(
     // the deadline instead of overshooting it by up to pollMs.
     const remainingMs = deadline - Date.now();
     if (remainingMs <= 0) {
-      throw new CanopyError('job_timeout', 0, `Job ${id} still ${job.status} after ${timeoutMs}ms`);
+      const state = job?.status ?? 'not found';
+      throw new CanopyError('job_timeout', 0, `Job ${id} still ${state} after ${timeoutMs}ms`);
     }
     await sleep(Math.min(pollMs, remainingMs), signal);
   }
-}
-
-/** The signal's abort reason, or a synthetic `AbortError` when none was given. */
-function abortReason(signal: AbortSignalLike): unknown {
-  if (signal.reason !== undefined) return signal.reason;
-  const error = new Error('The operation was aborted');
-  error.name = 'AbortError';
-  return error;
 }
 
 /** Abort-aware delay: resolves after `ms`, rejects immediately on abort. */

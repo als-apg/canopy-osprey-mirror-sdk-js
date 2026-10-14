@@ -15,7 +15,7 @@ describe('MockPVService', () => {
     service.connect();
 
     const listener = vi.fn();
-    service.subscribe('LASR:IN20:475:PWR1H', listener);
+    service.subscribe('DEMO:LASER:POWER', listener);
 
     // Initial value delivered synchronously.
     expect(listener).toHaveBeenCalledTimes(1);

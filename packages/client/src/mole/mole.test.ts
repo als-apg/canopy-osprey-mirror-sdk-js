@@ -17,7 +17,7 @@ describe('mole', () => {
   it('fetchData GETs /mole/v1/data/{pv} with the documented query aliases', async () => {
     const series: ArchiverSeriesDTO = {
       mode: 'raw',
-      pv: 'BPMS:LI21:233:X',
+      pv: 'DEMO:BPM1:X',
       archiver: 'appliance',
       from: 1,
       to: 2,
@@ -26,7 +26,7 @@ describe('mole', () => {
     };
     const { conn, fetchFn } = makeConn(series);
 
-    const result = await fetchData(conn, 'BPMS:LI21:233:X', {
+    const result = await fetchData(conn, 'DEMO:BPM1:X', {
       fromNs: 1,
       toNs: 2,
       binning: 'time',
@@ -38,7 +38,7 @@ describe('mole', () => {
     expect(result).toEqual(series);
     const [url, init] = fetchFn.mock.calls[0]!;
     expect(url).toBe(
-      'http://host/mole/v1/data/BPMS%3ALI21%3A233%3AX?from=1&to=2&binning=time&maxPoints=500&binSize=1000000000&includeLastBefore=true'
+      'http://host/mole/v1/data/DEMO%3ABPM1%3AX?from=1&to=2&binning=time&maxPoints=500&binSize=1000000000&includeLastBefore=true'
     );
     expect(init.method).toBe('GET');
     expect(init.headers['X-API-Key']).toBe('secret-key');
@@ -59,10 +59,10 @@ describe('mole', () => {
   });
 
   it('searchPVs GETs /mole/v1/search and listArchivers GETs /mole/v1/archivers', async () => {
-    const search = makeConn({ archiver: 'a', pattern: 'BPMS.*', pvs: ['BPMS:1'] });
-    await searchPVs(search.conn, 'BPMS.*', { limit: 10 });
+    const search = makeConn({ archiver: 'a', pattern: 'DEMO.*', pvs: ['DEMO:BPM1:X'] });
+    await searchPVs(search.conn, 'DEMO.*', { limit: 10 });
     expect(search.fetchFn.mock.calls[0]![0]).toBe(
-      'http://host/mole/v1/search?pattern=BPMS.*&limit=10'
+      'http://host/mole/v1/search?pattern=DEMO.*&limit=10'
     );
 
     const list = makeConn({ default: 'a', archivers: [] });
