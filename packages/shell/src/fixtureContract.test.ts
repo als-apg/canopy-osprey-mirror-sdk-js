@@ -50,7 +50,11 @@ const SETUP_NAMES = [
   'open-write-dialog',
   'hover',
   'focus',
-  'hover-header-action',
+  'hover-action',
+  'open-properties',
+  'select-first-outline-row',
+  'inspector-tab-appearance',
+  'inspector-tab-symbol',
   'open-screen-tree-menu',
   'open-insight-overflow',
   'hold-pv-check',
@@ -346,9 +350,96 @@ describe('hostProbes.json', () => {
     expect(NAMES.length).toBe(27);
   });
 
-  it('probes the Trace header action at a 600 px viewport too', () => {
-    const rows = rowsWhere('trace', '.cds--header__action');
+  it('probes the Trace action at a 600 px viewport too', () => {
+    const rows = rowsWhere('trace', '[data-testid=actions-bar] .cds--btn--icon-only');
     expect(rows.map((row) => row.viewport?.width)).toEqual([undefined, 600]);
+  });
+
+  it('probes no Trace chrome the workbench retired', () => {
+    // The side panels, the Carbon header and its Live/Archive counts are gone (A12, A39).
+    const retired = [
+      '.properties-panel',
+      '.layers-panel',
+      '.trace-resize-handle',
+      '.trace-header',
+      'header[aria-label=Trace]',
+      '.cds--header',
+    ];
+    for (const row of PROBES.rows.filter((r) => r.app === 'trace')) {
+      for (const selector of retired) expect(row.selector, label(row)).not.toContain(selector);
+      expect(row.setup, label(row)).not.toContain('hover-header-action');
+    }
+  });
+
+  it('probes the Trace actions bar, its action and its tooltip as the header rows were (A39)', () => {
+    const bar = rowsWhere('trace', '[data-testid=actions-bar]');
+    expect(bar.map((row) => [row.setup, row.expect])).toEqual([
+      [
+        [],
+        {
+          height: { contract: 'control-h-sm', hostOnly: true },
+          // The bar paints Carbon's layer, not its background, when no host is present.
+          'background-color': { contract: 'bg-panel', standalone: { carbon: 'layer' } },
+          'border-bottom-color': { contract: 'border', standalone: { carbon: 'border-subtle' } },
+        },
+      ],
+    ]);
+    const size = { contract: 'control-h-sm', hostOnly: true };
+    for (const row of rowsWhere('trace', '[data-testid=actions-bar] .cds--btn--icon-only')) {
+      expect(row.setup, label(row)).toEqual([]);
+      expect(row.expect, label(row)).toEqual({ height: size, 'min-height': size, width: size });
+    }
+    const tooltip = rowsWhere('trace', '[data-testid=actions-bar] .cds--popover-content');
+    expect(tooltip.map((row) => row.setup)).toEqual([['hover-action']]);
+    expect(rowsWhere('trace', '.cds--overflow-menu-options').map((row) => row.setup)).toEqual([
+      ['open-insight-overflow'],
+    ]);
+  });
+
+  it('retires only the header-counts row of the Trace header (A39)', () => {
+    expect(PROBES.rows.filter((row) => row.selector.includes('counts'))).toEqual([]);
+    expect(PROBES.rows.filter((row) => row.app === 'trace').length).toBe(14);
+  });
+
+  it('opens Properties, then the tab when not the first, for every Trace Properties row', () => {
+    // A field lives in Properties under its #id (the swatch under its testid); a curve field
+    // needs the curve selected first. The composed setups are idempotent (r2 CC-10).
+    const curve = ['select-first-outline-row', 'open-properties'];
+    const expected: [string, string | undefined, string[]][] = [
+      ['#plot-title', undefined, ['open-properties']],
+      ['#grid-style', undefined, ['open-properties', 'inspector-tab-appearance']],
+      [
+        '.cds--toggle:has(#show-symbols) .cds--toggle__switch',
+        undefined,
+        [...curve, 'inspector-tab-symbol'],
+      ],
+      [
+        '.cds--toggle:has(#show-symbols) .cds--toggle__switch',
+        '::before',
+        [...curve, 'inspector-tab-symbol'],
+      ],
+      ['[data-testid=trace-color-swatch]', undefined, curve],
+    ];
+    const properties = PROBES.rows.filter(
+      (row) => row.app === 'trace' && row.setup.includes('open-properties')
+    );
+    expect(properties.map((row) => [row.selector, row.pseudo, row.setup])).toEqual(expected);
+    for (const row of PROBES.rows) {
+      const at = row.setup.indexOf('open-properties');
+      const tabs = row.setup.filter((name) => name.startsWith('inspector-tab-'));
+      if (tabs.length === 0) continue;
+      expect(at, label(row)).toBeGreaterThanOrEqual(0);
+      expect(row.setup.slice(at + 1, at + 1 + tabs.length), label(row)).toEqual(tabs);
+    }
+  });
+
+  it('probes the workbench sidebar chrome with no setup', () => {
+    for (const selector of ['.wb-split__edge', '.wb-sidebar__tabbar']) {
+      expect(
+        rowsWhere('trace', selector).map((row) => row.setup),
+        selector
+      ).toEqual([[]]);
+    }
   });
 });
 
@@ -453,6 +544,103 @@ describe('setups.mjs', () => {
 
   it('has postconditions only for setups it exports', () => {
     for (const name of Object.keys(setups.postconditions)) expect(SETUP_NAMES).toContain(name);
+  });
+
+  describe('the workbench setups', () => {
+    /** A page whose DOM holds `present`; every click and wait is recorded in order. */
+    function fakePage(present: string[]) {
+      const log: string[] = [];
+      const locator = (selector: string): unknown => ({
+        first: () => locator(selector),
+        count: async () => (present.includes(selector) ? 1 : 0),
+        click: async () => void log.push(`click ${selector}`),
+        hover: async () => void log.push(`hover ${selector}`),
+        waitFor: async () => void log.push(`wait ${selector}`),
+      });
+      const page = { locator } as unknown as PageLike;
+      return { page, log };
+    }
+    const run = (name: string, page: PageLike) =>
+      (setups as unknown as Record<string, (p: PageLike, c: object) => Promise<void>>)[name](
+        page,
+        {}
+      );
+    const INSPECTOR = '.wb-sidebar__pane--properties .wb-inspector';
+
+    it('open-properties clicks the Properties tab only when it is not selected', async () => {
+      const idle = fakePage(['[data-testid=sidebar-tab-properties][aria-selected=false]']);
+      await run('open-properties', idle.page);
+      expect(idle.log).toEqual([
+        'wait .wb-sidebar',
+        'click [data-testid=sidebar-tab-properties][aria-selected=false]',
+        'wait .wb-sidebar__pane--properties',
+        `wait ${INSPECTOR}`,
+      ]);
+
+      // Selected already: a click would collapse the sidebar, so none is made.
+      const shown = fakePage([]);
+      await run('open-properties', shown.page);
+      expect(shown.log.filter((entry) => entry.startsWith('click'))).toEqual([]);
+      expect(shown.log.at(-1)).toBe(`wait ${INSPECTOR}`);
+    });
+
+    it('open-properties expands a collapsed sidebar through the rail target', async () => {
+      const { page, log } = fakePage([
+        '.wb-sidebar__rail-target[data-pane=properties]',
+        '[data-testid=sidebar-tab-properties][aria-selected=false]',
+      ]);
+      await run('open-properties', page);
+      expect(log.filter((entry) => entry.startsWith('click'))).toEqual([
+        'click .wb-sidebar__rail-target[data-pane=properties]',
+      ]);
+    });
+
+    it('open-properties expands a collapsed stacked pane by its header', async () => {
+      const { page, log } = fakePage([
+        '.wb-sidebar__header[data-pane=properties][aria-expanded=false]',
+      ]);
+      await run('open-properties', page);
+      expect(log.filter((entry) => entry.startsWith('click'))).toEqual([
+        'click .wb-sidebar__header[data-pane=properties][aria-expanded=false]',
+      ]);
+    });
+
+    it('inspector-tab-<id> clicks the tab only when it is not selected', async () => {
+      const tab = `${INSPECTOR} [data-testid=inspector-tab-appearance]`;
+      const idle = fakePage([`${tab}:not([aria-selected=true])`]);
+      await run('inspector-tab-appearance', idle.page);
+      expect(idle.log).toEqual([
+        `click ${tab}:not([aria-selected=true])`,
+        `wait ${tab}[aria-selected=true]`,
+      ]);
+      const selected = fakePage([]);
+      await run('inspector-tab-symbol', selected.page);
+      expect(selected.log).toEqual([
+        `wait ${INSPECTOR} [data-testid=inspector-tab-symbol][aria-selected=true]`,
+      ]);
+    });
+
+    it('select-first-outline-row shows the Outline, selects, and waits for the item', async () => {
+      const { page, log } = fakePage(['[data-testid=sidebar-tab-outline][aria-selected=false]']);
+      await run('select-first-outline-row', page);
+      expect(log).toEqual([
+        'wait .wb-sidebar',
+        'click [data-testid=sidebar-tab-outline][aria-selected=false]',
+        'wait .wb-sidebar__pane--outline',
+        'click .wb-outline-row .wb-outline-row__name',
+        'wait .wb-outline-row--selected',
+        `wait ${INSPECTOR}[data-level=item]`,
+      ]);
+    });
+
+    it('hover-action hovers the first action until its tooltip shows', async () => {
+      const { page, log } = fakePage([]);
+      await run('hover-action', page);
+      expect(log).toEqual([
+        'hover [data-testid=actions-bar] .cds--btn--icon-only',
+        'wait [data-testid=actions-bar] .cds--popover-content',
+      ]);
+    });
   });
 });
 

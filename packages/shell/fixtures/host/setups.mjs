@@ -17,6 +17,7 @@
  * @property {(key: string, options?: object) => Promise<void>} press
  * @property {(options?: object) => Promise<void>} waitFor
  * @property {(options?: object) => Promise<boolean>} isDisabled
+ * @property {() => Promise<number>} count
  * @property {(selector: string) => LocatorLike} locator
  * @property {(pageFunction: Function, arg?: unknown) => Promise<unknown>} evaluate Runs
  *   `pageFunction(element, arg)` in the page; the synthetic tab drag needs it.
@@ -55,6 +56,17 @@ const DOCKED_TAB = `${TAB_STRIP} [role=tab][data-docked=true]`;
 const UNDOCKED_TAB = `${TAB_STRIP} [role=tab][data-docked=false]`;
 /** The dock root while it lists two or more docked keys (`data-docked` is a JSON array). */
 const TWO_TILES = `[data-testid=workspace-dock][data-docked*='","']`;
+
+/** The workbench sidebar of a tool (react-trace `src/workbench/`), and its two panes. */
+const SIDEBAR = '.wb-sidebar';
+/** @param {'outline' | 'properties'} pane */
+const PANE = (pane) => `.wb-sidebar__pane--${pane}`;
+/** The Inspector of the Properties pane: what every Properties row reads inside. */
+const INSPECTOR = `${PANE('properties')} .wb-inspector`;
+const OUTLINE_ROW = '.wb-outline-row';
+/** The tool's actions bar, and one of its actions (a Carbon IconButton). */
+const ACTIONS_BAR = '[data-testid=actions-bar]';
+const ACTION = `${ACTIONS_BAR} .cds--btn--icon-only`;
 
 /** The tile edge `hold-tab-drag` holds the drag at. */
 const HOLD_EDGE = 'bottom';
@@ -108,13 +120,83 @@ async function focus(_page, ctx) {
 }
 
 /**
+ * Hovers the first action of the actions bar until its tooltip shows.
+ *
  * @param {PageLike} page
  * @returns {Promise<void>}
  */
-async function hoverHeaderAction(page) {
-  await page.locator('.cds--header__action').first().hover();
-  await page.locator('.cds--header__global .cds--popover-content').first().waitFor();
+async function hoverAction(page) {
+  await page.locator(ACTION).first().hover();
+  await page.locator(`${ACTIONS_BAR} .cds--popover-content`).first().waitFor();
 }
+
+/**
+ * Shows one pane of the workbench sidebar, whatever the stored arrangement left it as: the rail
+ * (every pane collapsed) is expanded through its target for the pane; in tabbed mode the pane's
+ * tab is clicked only when it is not the selected one, because clicking the selected tab
+ * collapses the sidebar; in stacked mode a collapsed pane's header is clicked. A pane already
+ * showing is left alone, so the step is idempotent and composes after a setup that revealed it.
+ *
+ * @param {PageLike} page
+ * @param {'outline' | 'properties'} pane
+ * @returns {Promise<void>}
+ */
+async function showPane(page, pane) {
+  await page.locator(SIDEBAR).first().waitFor();
+  const rail = page.locator(`.wb-sidebar__rail-target[data-pane=${pane}]`);
+  const tab = page.locator(`[data-testid=sidebar-tab-${pane}][aria-selected=false]`);
+  const header = page.locator(`.wb-sidebar__header[data-pane=${pane}][aria-expanded=false]`);
+  if ((await rail.count()) > 0) await rail.first().click();
+  else if ((await tab.count()) > 0) await tab.first().click();
+  else if ((await header.count()) > 0) await header.first().click();
+  await page.locator(PANE(pane)).first().waitFor();
+}
+
+/**
+ * Shows the Properties pane and waits for its Inspector. Idempotent (see `showPane`).
+ *
+ * @param {PageLike} page
+ * @returns {Promise<void>}
+ */
+async function openProperties(page) {
+  await showPane(page, 'properties');
+  await page.locator(INSPECTOR).first().waitFor();
+}
+
+/**
+ * Selects the first row of the Outline (in Trace, the first curve), a user selection, which
+ * reveals Properties by itself; it waits until the Inspector shows that item, so an
+ * `open-properties` after it finds the pane showing and does nothing.
+ *
+ * @param {PageLike} page
+ * @returns {Promise<void>}
+ */
+async function selectFirstOutlineRow(page) {
+  await showPane(page, 'outline');
+  await page.locator(`${OUTLINE_ROW} .wb-outline-row__name`).first().click();
+  await page.locator(`${OUTLINE_ROW}--selected`).first().waitFor();
+  await page.locator(`${INSPECTOR}[data-level=item]`).first().waitFor();
+}
+
+/**
+ * The setup that selects the Inspector tab `id` (`inspector-tab-<id>`), clicking it only when it
+ * is not selected yet. Runs after `open-properties`. The runner looks setups up by name, so each
+ * tab a row needs is one export below.
+ *
+ * @param {string} id
+ * @returns {(page: PageLike) => Promise<void>}
+ */
+function inspectorTab(id) {
+  const tab = `${INSPECTOR} [data-testid=inspector-tab-${id}]`;
+  return async (page) => {
+    const idle = page.locator(`${tab}:not([aria-selected=true])`);
+    if ((await idle.count()) > 0) await idle.first().click();
+    await page.locator(`${tab}[aria-selected=true]`).first().waitFor();
+  };
+}
+
+const inspectorTabAppearance = inspectorTab('appearance');
+const inspectorTabSymbol = inspectorTab('symbol');
 
 /**
  * @param {PageLike} page
@@ -151,6 +233,9 @@ async function openViewMenu(page) {
 }
 
 /**
+ * Opens Data Insight through its action, found by accessible name (the actions bar labels it
+ * `Data Insight (<shortcut>)`), then the overflow menu of the insight tool.
+ *
  * @param {PageLike} page
  * @returns {Promise<void>}
  */
@@ -392,7 +477,11 @@ export {
   openWriteDialog as 'open-write-dialog',
   hover as 'hover',
   focus as 'focus',
-  hoverHeaderAction as 'hover-header-action',
+  hoverAction as 'hover-action',
+  openProperties as 'open-properties',
+  selectFirstOutlineRow as 'select-first-outline-row',
+  inspectorTabAppearance as 'inspector-tab-appearance',
+  inspectorTabSymbol as 'inspector-tab-symbol',
   openScreenTreeMenu as 'open-screen-tree-menu',
   openInsightOverflow as 'open-insight-overflow',
   holdPvCheck as 'hold-pv-check',
