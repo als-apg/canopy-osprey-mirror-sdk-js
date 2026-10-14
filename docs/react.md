@@ -71,7 +71,7 @@ pvService.connect();
 </PVServiceProvider>;
 
 function Readback() {
-  const pv = usePV('BPMS:LI21:233:X'); // value, displayValue, severity, connected, ..., put()
+  const pv = usePV('DEMO:BPM1:X'); // value, displayValue, severity, connected, ..., put()
   return <span>{pv.displayValue}</span>;
 }
 ```

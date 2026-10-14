@@ -19,13 +19,13 @@ describe('canopyFetch', () => {
     const conn: CanopyConnection = { baseUrl: BASE_URL, apiKey: 'secret-key', fetch: fetchFn };
 
     const result = await canopyFetch<{ pvs: string[] }>(conn, '/mole/v1/search', {
-      query: { pattern: 'BPMS.*', archiver: undefined, limit: 5, exact: false },
+      query: { pattern: 'DEMO.*', archiver: undefined, limit: 5, exact: false },
     });
 
     expect(result).toEqual({ pvs: [] });
     const [url, init] = fetchFn.mock.calls[0]!;
     // undefined/null query entries are skipped; the rest are stringified.
-    expect(url).toBe('http://host/mole/v1/search?pattern=BPMS.*&limit=5&exact=false');
+    expect(url).toBe('http://host/mole/v1/search?pattern=DEMO.*&limit=5&exact=false');
     expect(init.method).toBe('GET');
     expect(init.headers).toEqual({ Accept: 'application/json', 'X-API-Key': 'secret-key' });
     expect(init.body).toBeUndefined();

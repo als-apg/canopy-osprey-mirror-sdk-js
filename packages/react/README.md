@@ -32,7 +32,7 @@ function App() {
 }
 
 function Readback() {
-  const pv = usePV('BPMS:LI21:233:X');
+  const pv = usePV('DEMO:BPM1:X');
   return (
     <span data-severity={pv.severity} data-connected={pv.connected}>
       {pv.displayValue}

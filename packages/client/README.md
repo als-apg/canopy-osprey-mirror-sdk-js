@@ -89,15 +89,15 @@ const pvService = new HarePVService({
 
 pvService.connect();
 
-const unsubscribe = pvService.subscribe('BPMS:LI21:233:X', (data) => {
+const unsubscribe = pvService.subscribe('DEMO:BPM1:X', (data) => {
   console.log(data.displayValue, data.severity, data.connected);
 });
 
 // Fire-and-forget write (errors routed to onError):
-pvService.put('BPMS:LI21:233:X', 3.2);
+pvService.put('DEMO:BPM1:X', 3.2);
 
 // Or await the result / pass write options (failures throw CanopyError):
-await pvService.write('BPMS:LI21:233:X', 3.2, { wait: false, timeoutS: 5 });
+await pvService.write('DEMO:BPM1:X', 3.2, { wait: false, timeoutS: 5 });
 
 unsubscribe();
 pvService.disconnect();
@@ -228,7 +228,7 @@ import {
 } from '@slaclab/canopy-client';
 
 const toNs = nowNs();
-const data = await fetchData(conn, 'BPMS:LI21:233:X', {
+const data = await fetchData(conn, 'DEMO:BPM1:X', {
   fromNs: toNs - msToNs(60 * 60 * 1000),
   toNs,
   binning: 'auto',
@@ -236,8 +236,8 @@ const data = await fetchData(conn, 'BPMS:LI21:233:X', {
 });
 if (data.mode === 'binned') console.log(data.points.length, 'buckets');
 
-await fetchMetadata(conn, 'BPMS:LI21:233:X');
-await searchPVs(conn, 'BPMS.*', { limit: 50 });
+await fetchMetadata(conn, 'DEMO:BPM1:X');
+await searchPVs(conn, 'DEMO.*', { limit: 50 });
 await listArchivers(conn);
 ```
 
