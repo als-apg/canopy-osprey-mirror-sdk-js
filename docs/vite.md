@@ -58,9 +58,11 @@ const wsUrl = toWsUrl(connection.baseUrl, '/optimization/v1/ws/runs'); // from @
   Canopy's module-scoped keys it must be scoped `@*` or to each module the
   app uses (in `CANOPY_API_KEYS`, `<token>:<scopes>@<module>+<module>`);
   otherwise those modules answer 403 `insufficient_module_access`.
-- **elog** (opt-in): `elog: { target, accessToken, path }` forwards `/elog`
-  to elog-plus with the prefix stripped and `x-vouch-idp-accesstoken`
-  injected; without a target (`ELOG_BASE_URL`) the route is left out.
+- **elog** (opt-in): `elog: { target, accessToken, path, accessTokenHeader }`
+  forwards `/elog` to elog-plus with the prefix stripped and the token
+  injected in `accessTokenHeader` (default `x-vouch-idp-accesstoken`, or
+  `ELOG_TOKEN_HEADER`); without a target (`ELOG_BASE_URL`) the route is left
+  out.
 
 ## Security
 

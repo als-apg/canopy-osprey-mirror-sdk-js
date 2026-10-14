@@ -65,7 +65,7 @@ const runsWs = toWsUrl(connection.baseUrl, '/optimization/v1/ws/runs'); // ws(s)
 | `apiKey`         | `CANOPY_API_KEY`                                | Sent as `X-API-Key` on proxied requests **and** WebSocket upgrades (`proxyReq` + `proxyReqWs`). Empty or unset: no header is added.  |
 | `basePath`       | `'/api/canopy'` (when `modules` is not given)   | Single-prefix mode: `${basePath}/*` is forwarded to `${target}/*` with the prefix stripped, with `ws: true`.                         |
 | `modules`        | —                                               | Per-module mode (the react-trace/react-squirrel layout): each prefix (`'/hare'`, `'/mole'`, ...) is forwarded unchanged, `ws: true`. |
-| `elog`           | off                                             | `{ path?, target?, accessToken? }`: forwards `path` (default `/elog`) to elog-plus with the prefix stripped.                         |
+| `elog`           | off                                             | `{ path?, target?, accessToken?, accessTokenHeader? }`: forwards `path` (default `/elog`) to elog-plus with the prefix stripped.     |
 | `allowedOrigins` | —                                               | Browser origins besides the dev server's own that may use the proxy, e.g. `['http://localhost:6006']` (see [Security](#security)).   |
 
 Every Canopy route uses `changeOrigin: true`. `basePath` and `modules` can
@@ -84,10 +84,14 @@ canopyDevProxy({
   basePath: '/api/canopy',
   elog: {
     target: env.ELOG_BASE_URL, // default process.env.ELOG_BASE_URL
-    accessToken: env.ELOG_API_KEY, // sent as x-vouch-idp-accesstoken
+    accessToken: env.ELOG_API_KEY, // default process.env.ELOG_API_KEY
   },
 });
 ```
+
+The token is sent in `x-vouch-idp-accesstoken`, the header elog-plus reads
+behind Vouch Proxy. If your elog-plus sits behind a different auth proxy, set
+`accessTokenHeader` (or `ELOG_TOKEN_HEADER`) to the header it expects.
 
 When no elog target is set (neither `elog.target` nor `ELOG_BASE_URL`), the
 elog route is left out, so the app can hide its logbook features.

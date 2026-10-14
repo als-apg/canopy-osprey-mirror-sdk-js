@@ -2,7 +2,8 @@ import { EventEmitter } from 'node:events';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProxyOptions } from 'vite';
-import { canopyDevProxy } from './index.js';
+import { DEFAULT_ELOG_TOKEN_HEADER, canopyDevProxy } from './index.js';
+import type { CanopyElogProxyOptions } from './index.js';
 
 type ProxyServer = Parameters<NonNullable<ProxyOptions['configure']>>[0];
 type Headers = Record<string, string>;
@@ -104,6 +105,7 @@ describe('canopyDevProxy', () => {
     vi.stubEnv('CANOPY_API_KEY', '');
     vi.stubEnv('ELOG_BASE_URL', '');
     vi.stubEnv('ELOG_API_KEY', '');
+    vi.stubEnv('ELOG_TOKEN_HEADER', '');
   });
 
   afterEach(() => {
@@ -393,6 +395,24 @@ describe('canopyDevProxy', () => {
       // No token: forwarded without the header.
       vi.stubEnv('ELOG_API_KEY', '');
       expect(outgoingHeaders(route(canopyDevProxy({ elog: {} }), '/elog/x')).http).toEqual({});
+    });
+
+    it('sends the token in a configurable header (option, then ELOG_TOKEN_HEADER, then the Vouch default)', () => {
+      const headersFor = (elog: CanopyElogProxyOptions) =>
+        outgoingHeaders(route(canopyDevProxy({ elog }), '/elog/x')).http;
+      const base = { target: 'https://elog.example.org', accessToken: 'tok' };
+
+      expect(headersFor(base)).toEqual({ [DEFAULT_ELOG_TOKEN_HEADER]: 'tok' });
+      expect(DEFAULT_ELOG_TOKEN_HEADER).toBe('x-vouch-idp-accesstoken');
+      expect(headersFor({ ...base, accessTokenHeader: 'Authorization' })).toEqual({
+        Authorization: 'tok',
+      });
+
+      vi.stubEnv('ELOG_TOKEN_HEADER', 'x-auth-token');
+      expect(headersFor(base)).toEqual({ 'x-auth-token': 'tok' });
+      // The option wins over the env var; an empty option falls back to it.
+      expect(headersFor({ ...base, accessTokenHeader: 'x-other' })).toEqual({ 'x-other': 'tok' });
+      expect(headersFor({ ...base, accessTokenHeader: '' })).toEqual({ 'x-auth-token': 'tok' });
     });
   });
 });

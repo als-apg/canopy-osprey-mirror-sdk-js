@@ -24,6 +24,9 @@ export const DEFAULT_CANOPY_BASE_PATH = '/api/canopy';
 /** Default path of the elog proxy. */
 export const DEFAULT_ELOG_PATH = '/elog';
 
+/** Default header the elog access token is sent in (elog-plus behind Vouch Proxy). */
+export const DEFAULT_ELOG_TOKEN_HEADER = 'x-vouch-idp-accesstoken';
+
 export interface CanopyElogProxyOptions {
   /** Path prefix proxied to elog, stripped before forwarding. Default `'/elog'`. */
   path?: string;
@@ -32,8 +35,14 @@ export interface CanopyElogProxyOptions {
    * set the elog route is left out (the app can hide its logbook features).
    */
   target?: string;
-  /** Sent as `x-vouch-idp-accesstoken`. Default `process.env.ELOG_API_KEY`. */
+  /** Sent in `accessTokenHeader`. Default `process.env.ELOG_API_KEY`. */
   accessToken?: string;
+  /**
+   * Header the access token is sent in, for an elog-plus behind a different
+   * auth proxy. Default `process.env.ELOG_TOKEN_HEADER`, else
+   * `'x-vouch-idp-accesstoken'`.
+   */
+  accessTokenHeader?: string;
 }
 
 export interface CanopyDevProxyOptions {
@@ -296,12 +305,16 @@ export function canopyDevProxy(options: CanopyDevProxyOptions = {}): Record<stri
     if (elogTarget !== undefined) {
       const elogPath = normalizePrefix(options.elog.path ?? DEFAULT_ELOG_PATH, 'elog.path');
       const accessToken = options.elog.accessToken ?? process.env.ELOG_API_KEY;
+      const tokenHeader =
+        nonEmpty(options.elog.accessTokenHeader) ??
+        nonEmpty(process.env.ELOG_TOKEN_HEADER) ??
+        DEFAULT_ELOG_TOKEN_HEADER;
       proxy[prefixKey(elogPath)] = {
         target: elogTarget,
         changeOrigin: true,
         rewrite: (path) => stripPrefix(path, elogPath),
         bypass,
-        configure: prepareRequests('x-vouch-idp-accesstoken', accessToken, false, allowedOrigins),
+        configure: prepareRequests(tokenHeader, accessToken, false, allowedOrigins),
       };
     }
   }
