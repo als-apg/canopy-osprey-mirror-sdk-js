@@ -174,7 +174,9 @@ async function openProperties(page) {
 async function selectFirstOutlineRow(page) {
   await showPane(page, 'outline');
   await page.locator(`${OUTLINE_ROW} .wb-outline-row__name`).first().click();
-  await page.locator(`${OUTLINE_ROW}--selected`).first().waitFor();
+  // No wait on the Outline after the click: the selection reveals Properties, and in the tabbed
+  // sidebar that hides the Outline pane, so a selected row is never visible. The Inspector at
+  // item level is the proof the selection landed.
   await page.locator(`${INSPECTOR}[data-level=item]`).first().waitFor();
 }
 

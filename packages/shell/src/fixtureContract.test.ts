@@ -628,9 +628,12 @@ describe('setups.mjs', () => {
         'click [data-testid=sidebar-tab-outline][aria-selected=false]',
         'wait .wb-sidebar__pane--outline',
         'click .wb-outline-row .wb-outline-row__name',
-        'wait .wb-outline-row--selected',
         `wait ${INSPECTOR}[data-level=item]`,
       ]);
+      // The click reveals Properties, which hides the Outline in the tabbed sidebar, so no wait
+      // after it may target the Outline (it would never become visible).
+      const afterClick = log.slice(log.indexOf('click .wb-outline-row .wb-outline-row__name') + 1);
+      expect(afterClick.filter((l) => l.startsWith('wait') && l.includes('outline'))).toEqual([]);
     });
 
     it('hover-action hovers the first action until its tooltip shows', async () => {
