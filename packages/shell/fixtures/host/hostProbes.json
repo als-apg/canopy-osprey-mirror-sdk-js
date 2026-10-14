@@ -128,8 +128,8 @@
     },
     {
       "app": "correlation",
-      "selector": "[data-testid=pv-picker-input]",
-      "setup": [],
+      "selector": "[data-testid=outline-add-input]",
+      "setup": ["open-outline"],
       "expect": {
         "height": { "contract": "control-h-sm" },
         "border-top-left-radius": { "contract": "radius-sm" },
@@ -157,8 +157,8 @@
     },
     {
       "app": "correlation",
-      "selector": "[data-testid=pv-picker-select]",
-      "setup": [],
+      "selector": "[data-testid=trigger-source]",
+      "setup": ["open-outline"],
       "expect": {
         "height": { "contract": "control-h-sm" },
         "border-top-left-radius": { "contract": "radius-sm" },
@@ -171,8 +171,9 @@
     },
     {
       "app": "correlation",
-      "selector": "[data-testid=density-y-select]",
-      "setup": ["switch-density-view"],
+      "selector": "#density-y",
+      "page": "/correlation.html?embedded=true&theme={theme}&x=PROBE:X&y=PROBE:Y1&y=PROBE:Y2&dt=1&n=1000&lookback=1h&view=density&axes=shared",
+      "setup": ["open-properties"],
       "expect": {
         "height": { "contract": "control-h-sm" },
         "border-top-left-radius": { "contract": "radius-sm" },
@@ -200,8 +201,8 @@
     },
     {
       "app": "correlation",
-      "selector": "[data-testid=pv-picker-select]",
-      "setup": ["hover"],
+      "selector": "[data-testid=trigger-source]",
+      "setup": ["open-outline", "hover"],
       "expect": {
         "background-color": {
           "mix": "color-mix(in srgb, var(--canopy-bg-field), var(--canopy-text-primary) 8%)",
@@ -299,81 +300,70 @@
     },
     {
       "app": "correlation",
-      "selector": ".correlation-plot__toolbar .cds--btn--tertiary:not(:disabled)",
+      "selector": "[data-testid=actions-bar]",
       "setup": [],
       "expect": {
-        "border-top-color": { "contract": "accent", "standalone": { "carbon": "button-tertiary" } },
-        "color": { "contract": "accent", "standalone": { "carbon": "button-tertiary" } }
+        "height": { "contract": "control-h-sm", "hostOnly": true },
+        "background-color": { "contract": "bg-panel", "standalone": { "carbon": "layer" } },
+        "border-bottom-color": { "contract": "border", "standalone": { "carbon": "border-subtle" } }
       }
     },
     {
       "app": "correlation",
-      "selector": ".correlation-plot__toolbar .cds--btn--tertiary:not(:disabled)",
-      "setup": ["hover"],
+      "selector": "[data-testid=actions-bar] .cds--btn--icon-only",
+      "setup": [],
+      "expect": {
+        "height": { "contract": "control-h-sm", "hostOnly": true },
+        "min-height": { "contract": "control-h-sm", "hostOnly": true },
+        "width": { "contract": "control-h-sm", "hostOnly": true }
+      }
+    },
+    {
+      "app": "correlation",
+      "selector": "[data-testid=actions-bar] .cds--popover-content",
+      "setup": ["hover-action"],
       "expect": {
         "background-color": {
-          "contract": "accent-hover",
-          "standalone": { "carbon": "button-tertiary-hover" }
+          "contract": "text-primary",
+          "standalone": { "carbon": "background-inverse" }
         },
-        "color": { "contract": "on-accent", "standalone": { "carbon": "text-inverse" } }
+        "color": { "contract": "bg-base", "standalone": { "carbon": "text-inverse" } }
       }
     },
     {
       "app": "correlation",
-      "selector": ".correlation-plot__toolbar .cds--btn--tertiary:not(:disabled)",
-      "setup": ["focus"],
+      "selector": "#y-layout .wb-segmented__option + .wb-segmented__option",
+      "setup": ["open-properties"],
       "expect": {
-        "background-color": { "contract": "accent", "standalone": { "carbon": "button-tertiary" } },
-        "color": { "contract": "on-accent", "standalone": { "carbon": "text-inverse" } }
+        "border-left-color": { "contract": "border", "standalone": { "carbon": "border-subtle" } }
       }
     },
     {
       "app": "correlation",
-      "selector": ".cds--content-switcher--selected",
-      "pseudo": "::after",
-      "setup": [],
+      "selector": "#trigger-source",
+      "setup": ["select-trigger-section", "open-properties"],
       "expect": {
-        "background-color": {
-          "contract": "accent",
-          "standalone": { "carbon": "layer-selected-inverse" }
-        }
+        "height": { "contract": "control-h-sm" },
+        "border-top-left-radius": { "contract": "radius-sm" },
+        "background-color": { "contract": "bg-field" },
+        "border-bottom-color": { "contract": "border-strong" },
+        "border-bottom-width": { "literal": "1px" },
+        "font-family": { "contract": "font-ui" },
+        "font-size": { "contract": "text-md" }
       }
     },
     {
       "app": "correlation",
-      "selector": ".cds--content-switcher--selected",
-      "setup": [],
+      "selector": "#role",
+      "setup": ["select-first-outline-row", "open-properties"],
       "expect": {
-        "color": { "contract": "on-accent", "standalone": { "carbon": "text-inverse" } }
-      }
-    },
-    {
-      "app": "correlation",
-      "selector": ".cds--content-switcher-btn:nth-child(3)",
-      "pseudo": "::before",
-      "setup": [],
-      "expect": {
-        "background-color": { "contract": "border", "standalone": { "carbon": "border-subtle" } }
-      }
-    },
-    {
-      "app": "correlation",
-      "selector": ".cds--content-switcher-btn:not(.cds--content-switcher--selected)",
-      "setup": [],
-      "expect": {
-        "border-top-color": {
-          "contract": "border-strong",
-          "standalone": { "carbon": "border-inverse" }
-        }
-      }
-    },
-    {
-      "app": "correlation",
-      "selector": "[data-testid=pv-picker-add]",
-      "setup": ["hold-pv-check"],
-      "stack": false,
-      "expect": {
-        "background-color": { "carbon": "button-disabled" }
+        "height": { "contract": "control-h-sm" },
+        "border-top-left-radius": { "contract": "radius-sm" },
+        "background-color": { "contract": "bg-field" },
+        "border-bottom-color": { "contract": "border-strong" },
+        "border-bottom-width": { "literal": "1px" },
+        "font-family": { "contract": "font-ui" },
+        "font-size": { "contract": "text-md" }
       }
     },
     {

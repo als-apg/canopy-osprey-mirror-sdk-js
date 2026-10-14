@@ -53,12 +53,12 @@ const SETUP_NAMES = [
   'hover-action',
   'open-properties',
   'select-first-outline-row',
+  'open-outline',
+  'select-trigger-section',
   'inspector-tab-appearance',
   'inspector-tab-symbol',
   'open-screen-tree-menu',
   'open-insight-overflow',
-  'hold-pv-check',
-  'switch-density-view',
   'open-trace-tab',
   'open-view-menu',
   'dock-second-tile',
@@ -293,12 +293,12 @@ describe('hostProbes.json', () => {
     expect(rows.map((row) => row.hare)).toEqual([true]);
   });
 
-  it('holds the PV check for the disabled Add button, off the deployed stack', () => {
-    const rows = PROBES.rows.filter((row) => row.setup.includes('hold-pv-check'));
-    expect(rows.map((row) => [row.app, row.selector, row.stack])).toEqual([
-      ['correlation', '[data-testid=pv-picker-add]', false],
-    ]);
-    expect(typeof setups.postconditions['hold-pv-check']).toBe('function');
+  it('holds no PV check: the add row has no Add button to disable (A30)', () => {
+    const exported = setups as unknown as Record<string, unknown>;
+    expect(exported['hold-pv-check']).toBeUndefined();
+    expect(Object.keys(setups.postconditions)).not.toContain('hold-pv-check');
+    // The Hare-hold PV stays: host-smoke's mock still holds it.
+    expect(setups.HOLD_PV).toBe('SR:HOLD');
   });
 
   it('probes the bar and the × of the one tile with no setup, so on the deployed stack too', () => {
@@ -433,9 +433,111 @@ describe('hostProbes.json', () => {
     }
   });
 
-  it('keeps the Trace and Correlation rows as they were', () => {
-    expect(PROBES.rows.filter((row) => row.app === 'correlation').length).toBe(12);
+  it('keeps the Trace page as it was', () => {
     expect(PROBES.defaults.page.trace).toBe('/?embedded=true&theme={theme}&pv=SR:TEST&range=-10m');
+  });
+
+  it('probes Correlation on its workbench, not on PvPicker or the canvas toolbar', () => {
+    const correlation = PROBES.rows.filter((row) => row.app === 'correlation');
+    expect(correlation.map((row) => [row.selector, row.pseudo, row.setup])).toEqual([
+      ['[data-testid=outline-add-input]', undefined, ['open-outline']],
+      ['[data-testid=trigger-source]', undefined, ['open-outline']],
+      ['#density-y', undefined, ['open-properties']],
+      ['[data-testid=trigger-source]', undefined, ['open-outline', 'hover']],
+      ['[data-testid=actions-bar]', undefined, []],
+      ['[data-testid=actions-bar] .cds--btn--icon-only', undefined, []],
+      ['[data-testid=actions-bar] .cds--popover-content', undefined, ['hover-action']],
+      ['#y-layout .wb-segmented__option + .wb-segmented__option', undefined, ['open-properties']],
+      ['#trigger-source', undefined, ['select-trigger-section', 'open-properties']],
+      ['#role', undefined, ['select-first-outline-row', 'open-properties']],
+    ]);
+    const retired = [
+      'pv-picker',
+      'density-y-select',
+      '.correlation-plot__toolbar',
+      '.cds--content-switcher',
+    ];
+    for (const row of correlation) {
+      for (const selector of retired) expect(row.selector, label(row)).not.toContain(selector);
+      expect(row.setup, label(row)).not.toContain('hold-pv-check');
+      expect(row.setup, label(row)).not.toContain('switch-density-view');
+      // Nothing is held any more, so every row runs on the deployed stack too.
+      expect(row.stack, label(row)).toBeUndefined();
+    }
+  });
+
+  it('probes the Correlation fields with the field look of the controls they replace', () => {
+    // The add row's input took the PV picker's input, the Trigger header's inline Source and
+    // Properties' #trigger-source took its Source select, #density-y the toolbar's Density Y.
+    const look = rowsWhere('correlation', '[data-testid=outline-add-input]')[0].expect;
+    expect(Object.keys(look)).toEqual([
+      'height',
+      'border-top-left-radius',
+      'background-color',
+      'border-bottom-color',
+      'border-bottom-width',
+      'font-family',
+      'font-size',
+    ]);
+    for (const selector of ['#density-y', '#trigger-source', '#role']) {
+      expect(
+        rowsWhere('correlation', selector).map((row) => row.expect),
+        selector
+      ).toEqual([look]);
+    }
+    const source = rowsWhere('correlation', '[data-testid=trigger-source]');
+    expect(source.map((row) => row.setup.includes('hover'))).toEqual([false, true]);
+    expect(source[0].expect).toEqual(look);
+    expect(source[1].expect).toEqual({
+      'background-color': {
+        mix: 'color-mix(in srgb, var(--canopy-bg-field), var(--canopy-text-primary) 8%)',
+        standalone: { carbon: 'field-hover-01' },
+      },
+    });
+  });
+
+  it("probes the Correlation actions bar, its action and its tooltip as Trace's (A39)", () => {
+    for (const selector of [
+      '[data-testid=actions-bar]',
+      '[data-testid=actions-bar] .cds--btn--icon-only',
+      '[data-testid=actions-bar] .cds--popover-content',
+    ]) {
+      const trace = rowsWhere('trace', selector).filter((row) => row.viewport === undefined);
+      const correlation = rowsWhere('correlation', selector);
+      expect(correlation.length, selector).toBe(1);
+      expect(
+        correlation.map((row) => [row.setup, row.expect, row.viewport]),
+        selector
+      ).toEqual(trace.map((row) => [row.setup, row.expect, row.viewport]));
+    }
+  });
+
+  it('opens every Correlation page on keys the flat query parser reads', () => {
+    // src/correlation/query.ts: x, y (repeated), dt, n, lookback, view, axes; embedded and
+    // theme are the host's and ignored by the parser.
+    const known = ['embedded', 'theme', 'x', 'y', 'trig', 'dt', 'n', 'lookback', 'view', 'axes'];
+    const pages = [
+      PROBES.defaults.page.correlation,
+      ...PROBES.rows.filter((r) => r.app === 'correlation' && r.page).map((r) => r.page as string),
+    ];
+    expect(pages.length).toBe(2);
+    for (const page of pages) {
+      expect(page.startsWith('/correlation.html?'), page).toBe(true);
+      const query = new URLSearchParams(page.slice(page.indexOf('?') + 1));
+      for (const key of query.keys()) expect(known, `${page}: ${key}`).toContain(key);
+      expect(query.get('embedded')).toBe('true');
+      expect(query.get('theme')).toBe('{theme}');
+      expect(query.getAll('x')).toEqual(['PROBE:X']);
+      expect(query.getAll('y')).toEqual(['PROBE:Y1', 'PROBE:Y2']);
+      expect(['scatter', 'density']).toContain(query.get('view'));
+      expect(['shared', 'overlay', 'split']).toContain(query.get('axes'));
+    }
+    // #density-y shows only in the density view; Y layout only in the scatter view.
+    expect(rowsWhere('correlation', '#density-y')[0].page).toContain('&view=density&');
+    expect(PROBES.defaults.page.correlation).toContain('&view=scatter&');
+    expect(
+      rowsWhere('correlation', '#y-layout .wb-segmented__option + .wb-segmented__option')[0].page
+    ).toBeUndefined();
   });
 
   it('retires only the header-counts row of the Trace header (A39)', () => {
@@ -687,6 +789,32 @@ describe('setups.mjs', () => {
       expect(afterClick.filter((l) => l.startsWith('wait') && l.includes('outline'))).toEqual([]);
     });
 
+    it('open-outline clicks the Outline tab only when it is not selected', async () => {
+      const idle = fakePage(['[data-testid=sidebar-tab-outline][aria-selected=false]']);
+      await run('open-outline', idle.page);
+      expect(idle.log).toEqual([
+        'wait .wb-sidebar',
+        'click [data-testid=sidebar-tab-outline][aria-selected=false]',
+        'wait .wb-sidebar__pane--outline',
+      ]);
+      const shown = fakePage([]);
+      await run('open-outline', shown.page);
+      expect(shown.log).toEqual(['wait .wb-sidebar', 'wait .wb-sidebar__pane--outline']);
+    });
+
+    it('select-trigger-section selects the Trigger section by its gear', async () => {
+      const gear = '.wb-sidebar__pane--outline [data-section-id=trig] .wb-outline-section__gear';
+      const { page, log } = fakePage(['[data-testid=sidebar-tab-outline][aria-selected=false]']);
+      await run('select-trigger-section', page);
+      expect(log).toEqual([
+        'wait .wb-sidebar',
+        'click [data-testid=sidebar-tab-outline][aria-selected=false]',
+        'wait .wb-sidebar__pane--outline',
+        `click ${gear}`,
+        `wait ${INSPECTOR}[data-level=section]`,
+      ]);
+    });
+
     it('hover-action hovers the first action until its tooltip shows', async () => {
       const { page, log } = fakePage([]);
       await run('hover-action', page);
@@ -850,18 +978,31 @@ describe('runner.mjs', () => {
     });
 
     it('runs the postconditions of the row setups last', async () => {
+      // A stand-in postcondition, so the runner is pinned apart from any one setup's hold.
       const page = mount(
         '.probed { border-left-width: 2px; }',
-        '<div class="cds--white"><button class="probed" data-testid="pv-picker-add" disabled></button></div>'
+        '<div class="cds--white"><b class="probed" data-held="true"></b></div>'
       );
-      const probe = row({ 'border-left-width': { literal: '2px' } }, { setup: ['hold-pv-check'] });
-      expect((await runner.checkRow(page, probe)).ok).toBe(true);
+      const posts = setups.postconditions as Record<string, (page: PageLike) => Promise<void>>;
+      const order: string[] = [];
+      posts.focus = async (p) => {
+        order.push('post');
+        if ((await p.locator('.probed[data-held=true]').count()) === 0) {
+          throw new Error('focus: the hold ended; the row was read too late');
+        }
+      };
+      try {
+        const probe = row({ 'border-left-width': { literal: '2px' } }, { setup: ['focus'] });
+        const held = await runner.checkRow(page, probe);
+        expect(held.ok).toBe(true);
+        expect(order).toEqual(['post']);
 
-      (document.querySelector('.probed') as HTMLButtonElement).disabled = false;
-      const late = await runner.checkRow(page, probe, { throwOnFailure: false });
-      expect(late.failures).toEqual([
-        'hold-pv-check: [data-testid=pv-picker-add] is no longer disabled; the row was read too late',
-      ]);
+        document.querySelector('.probed')?.removeAttribute('data-held');
+        const late = await runner.checkRow(page, probe, { throwOnFailure: false });
+        expect(late.failures).toEqual(['focus: the hold ended; the row was read too late']);
+      } finally {
+        delete posts.focus;
+      }
     });
 
     it('fails a drop-highlight row that is read while no drag is held', async () => {
