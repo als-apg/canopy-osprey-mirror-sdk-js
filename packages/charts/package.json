@@ -1,6 +1,6 @@
 {
   "name": "@slaclab/canopy-charts",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "private": false,
   "description": "ECharts helpers for Canopy apps — Carbon g10/g100 chart themes, the CanopyChart wrapper, PNG capture and number formatters",
   "repository": {
