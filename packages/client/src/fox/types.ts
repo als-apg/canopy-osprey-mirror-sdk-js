@@ -10,6 +10,8 @@ export type FormulaKind = 'scalar' | 'timeseries' | 'waveform' | 'table';
 export type FormulaMode = 'raw' | 'binned';
 export type AlignmentMode = 'last' | 'interpolate';
 export type IndexMode = 'union' | 'intersection' | 'grid' | 'first_input';
+/** Trigger edge of a `'first_input'` table (`canopy.contracts.formula.TriggerEdge`). */
+export type TriggerEdge = 'rising' | 'falling';
 
 /**
  * A complete formula request (`canopy.contracts.formula.FormulaSpec`).
@@ -49,6 +51,12 @@ export interface FormulaSpec {
    * binding need not appear in any column.
    */
   trigger?: string | null;
+  /**
+   * `'table'` only, and only when `index` is `'first_input'`: emit a row on a
+   * rising or falling edge of the trigger binding. Absent means every trigger
+   * update emits a row. The server rejects it with any other `index`.
+   */
+  triggerEdge?: TriggerEdge;
 }
 
 export interface ScalarResultDTO {

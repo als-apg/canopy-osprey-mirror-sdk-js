@@ -27,9 +27,15 @@ const FIXTURE_SHA256: Record<string, string> = {
     '726dc8abdc71806c5e97645e5b5771534e6094dd5a6ae9efd9180e0aa214566b',
   'table-spec-reject-max-points-10001.json':
     'd80a26c31964b81fc53c5cd84acff848ff3e71d11b31b46ebebf9f3182d15977',
+  'table-spec-reject-edge-on-grid.json':
+    '35ec841bdff3d6d0b0c2bd058c2f5a939faf1600e919f7f3b50bb3bf2e1cdc51',
   'table-spec-timer.json': 'fc289736da0a01a13a1770c2d3ebf202a0c6d584d6430ef12068cecbd703b6cb',
+  'table-spec-trigger-falling.json':
+    'a8d14d97a170238ca51ffedb4ad2dba2df074d94c81d645b70e39b5b03828c35',
   'table-spec-trigger-plotted.json':
     'b3623eeca40147e1962bb5a803310463931eee48cf41371eede0cbe3a35b2dd3',
+  'table-spec-trigger-rising.json':
+    'e98a02139fa363b96456bef437331b55491785bc0cc72d55bb93b4f6a12a959a',
   'table-spec-trigger.json': '6139acb178013631174b975be3136db85e934de17ca8bc9540047b08dbf183fb',
   'table-spec-x-equals-y.json': 'f002685eb32970e0a2ae86ebaec08ccddea4ed77f77b9058b90309759a12ddf2',
 };
@@ -136,6 +142,49 @@ describe('canopy-client table protocol', () => {
       expect(spec.trigger).toBe('trig');
       expect(spec.columns).toEqual({ x: '{x}', y1: '{y1}', y2: '{y2} * 1000' });
       expect(spec.maxPoints).toBe(1000);
+      // Absent triggerEdge means every trigger update emits a row.
+      expect(spec).not.toHaveProperty('triggerEdge');
+    });
+
+    it.each([
+      ['table-spec-trigger-rising.json', 'rising'],
+      ['table-spec-trigger-falling.json', 'falling'],
+    ] as const)('sends the triggerEdge of %s unchanged', (name, edge) => {
+      const message = fixture<FoxSubscribeMessage>(name);
+      expect(message.spec.index).toBe('first_input');
+      expect(message.spec.trigger).toBe('trig');
+      expect(message.spec.triggerEdge).toBe(edge);
+      const { service, socket } = connectedFox();
+
+      service.subscribe(message.spec, { t0Ns: message.t0Ns, onResult: vi.fn() });
+
+      const sent = socket.parsedSent().at(-1) as FoxSubscribeMessage;
+      expect(sent.spec).toEqual(message.spec);
+      expect(sent.spec.triggerEdge).toBe(edge);
+    });
+
+    it('sends a triggerEdge on a grid spec as written and surfaces the server reject', () => {
+      const message = fixture<FoxSubscribeMessage>('table-spec-reject-edge-on-grid.json');
+      expect(message.spec.index).toBe('grid');
+      expect(message.spec.triggerEdge).toBe('rising');
+      const { service, socket } = connectedFox();
+      const onError = vi.fn<(error: FoxError) => void>();
+
+      service.subscribe(message.spec, { t0Ns: message.t0Ns, onResult: vi.fn(), onError });
+
+      const sent = socket.parsedSent().at(-1) as FoxSubscribeMessage;
+      expect(sent.spec).toEqual(message.spec);
+      socket.message({
+        type: 'error',
+        code: 'invalid_spec',
+        message: "'triggerEdge' requires index 'first_input'",
+        retryable: false,
+      });
+      expect(onError).toHaveBeenCalledExactlyOnceWith({
+        code: 'invalid_spec',
+        message: "'triggerEdge' requires index 'first_input'",
+        retryable: false,
+      });
     });
   });
 

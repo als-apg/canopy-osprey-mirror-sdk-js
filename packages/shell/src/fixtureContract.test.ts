@@ -50,11 +50,15 @@ const SETUP_NAMES = [
   'open-write-dialog',
   'hover',
   'focus',
-  'hover-header-action',
+  'hover-action',
+  'open-properties',
+  'select-first-outline-row',
+  'open-outline',
+  'select-trigger-section',
+  'inspector-tab-appearance',
+  'inspector-tab-symbol',
   'open-screen-tree-menu',
   'open-insight-overflow',
-  'hold-pv-check',
-  'switch-density-view',
   'open-trace-tab',
   'open-view-menu',
   'dock-second-tile',
@@ -121,11 +125,16 @@ const RULES = parseRules(HOST_CSS);
 
 describe('hostProbes.json', () => {
   it('names a default page for each app, and nothing else', () => {
-    expect(Object.keys(PROBES.defaults.page).sort()).toEqual(['correlation', 'trace', 'viewer']);
+    expect(Object.keys(PROBES.defaults.page).sort()).toEqual([
+      'correlation',
+      'trace',
+      'viewer',
+      'waveform',
+    ]);
   });
 
   it('has rows for every app', () => {
-    for (const app of ['viewer', 'trace', 'correlation']) {
+    for (const app of ['viewer', 'trace', 'correlation', 'waveform']) {
       expect(PROBES.rows.filter((row) => row.app === app).length, app).toBeGreaterThan(0);
     }
   });
@@ -284,12 +293,12 @@ describe('hostProbes.json', () => {
     expect(rows.map((row) => row.hare)).toEqual([true]);
   });
 
-  it('holds the PV check for the disabled Add button, off the deployed stack', () => {
-    const rows = PROBES.rows.filter((row) => row.setup.includes('hold-pv-check'));
-    expect(rows.map((row) => [row.app, row.selector, row.stack])).toEqual([
-      ['correlation', '[data-testid=pv-picker-add]', false],
-    ]);
-    expect(typeof setups.postconditions['hold-pv-check']).toBe('function');
+  it('holds no PV check: the add row has no Add button to disable (A30)', () => {
+    const exported = setups as unknown as Record<string, unknown>;
+    expect(exported['hold-pv-check']).toBeUndefined();
+    expect(Object.keys(setups.postconditions)).not.toContain('hold-pv-check');
+    // The Hare-hold PV stays: host-smoke's mock still holds it.
+    expect(setups.HOLD_PV).toBe('SR:HOLD');
   });
 
   it('probes the bar and the × of the one tile with no setup, so on the deployed stack too', () => {
@@ -346,9 +355,244 @@ describe('hostProbes.json', () => {
     expect(NAMES.length).toBe(27);
   });
 
-  it('probes the Trace header action at a 600 px viewport too', () => {
-    const rows = rowsWhere('trace', '.cds--header__action');
+  it('probes the Trace action at a 600 px viewport too', () => {
+    const rows = rowsWhere('trace', '[data-testid=actions-bar] .cds--btn--icon-only');
     expect(rows.map((row) => row.viewport?.width)).toEqual([undefined, 600]);
+  });
+
+  it('probes no Trace chrome the workbench retired', () => {
+    // The side panels, the Carbon header and its Live/Archive counts are gone (A12, A39).
+    const retired = [
+      '.properties-panel',
+      '.layers-panel',
+      '.trace-resize-handle',
+      '.trace-header',
+      'header[aria-label=Trace]',
+      '.cds--header',
+    ];
+    for (const row of PROBES.rows.filter((r) => r.app === 'trace')) {
+      for (const selector of retired) expect(row.selector, label(row)).not.toContain(selector);
+      expect(row.setup, label(row)).not.toContain('hover-header-action');
+    }
+  });
+
+  it('probes the Trace actions bar, its action and its tooltip as the header rows were (A39)', () => {
+    const bar = rowsWhere('trace', '[data-testid=actions-bar]');
+    expect(bar.map((row) => [row.setup, row.expect])).toEqual([
+      [
+        [],
+        {
+          height: { contract: 'control-h-sm', hostOnly: true },
+          // The bar paints Carbon's layer, not its background, when no host is present.
+          'background-color': { contract: 'bg-panel', standalone: { carbon: 'layer' } },
+          'border-bottom-color': { contract: 'border', standalone: { carbon: 'border-subtle' } },
+        },
+      ],
+    ]);
+    const size = { contract: 'control-h-sm', hostOnly: true };
+    for (const row of rowsWhere('trace', '[data-testid=actions-bar] .cds--btn--icon-only')) {
+      expect(row.setup, label(row)).toEqual([]);
+      expect(row.expect, label(row)).toEqual({ height: size, 'min-height': size, width: size });
+    }
+    const tooltip = rowsWhere('trace', '[data-testid=actions-bar] .cds--popover-content');
+    expect(tooltip.map((row) => row.setup)).toEqual([['hover-action']]);
+    expect(rowsWhere('trace', '.cds--overflow-menu-options').map((row) => row.setup)).toEqual([
+      ['open-insight-overflow'],
+    ]);
+  });
+
+  it('opens Waveform beside the Trace pages, embedded, themed and with a live PV', () => {
+    const page = PROBES.defaults.page.waveform;
+    expect(page.startsWith('/waveform.html?')).toBe(true);
+    const query = new URLSearchParams(page.slice(page.indexOf('?') + 1));
+    expect(query.get('embedded')).toBe('true');
+    expect(query.get('theme')).toBe('{theme}');
+    expect(query.getAll('pv').length).toBeGreaterThan(0);
+    for (const pv of query.getAll('pv')) expect(pv).not.toBe('');
+    // The page renders from the Hare mock alone: no row needs a page of its own or a backend.
+    for (const row of PROBES.rows.filter((r) => r.app === 'waveform')) {
+      expect(row.page, label(row)).toBeUndefined();
+      expect(row.hare, label(row)).toBeUndefined();
+    }
+  });
+
+  it("probes the Waveform actions bar, its action and its tooltip as Trace's (A39)", () => {
+    // Same place, same widget: a third tool's bar holds the very rows Trace's does.
+    for (const selector of [
+      '[data-testid=actions-bar]',
+      '[data-testid=actions-bar] .cds--btn--icon-only',
+      '[data-testid=actions-bar] .cds--popover-content',
+    ]) {
+      const trace = rowsWhere('trace', selector).filter((row) => row.viewport === undefined);
+      const waveform = rowsWhere('waveform', selector);
+      expect(waveform.length, selector).toBe(1);
+      expect(
+        waveform.map((row) => [row.setup, row.expect, row.viewport]),
+        selector
+      ).toEqual(trace.map((row) => [row.setup, row.expect, row.viewport]));
+    }
+  });
+
+  it('keeps the Trace page as it was', () => {
+    expect(PROBES.defaults.page.trace).toBe('/?embedded=true&theme={theme}&pv=SR:TEST&range=-10m');
+  });
+
+  it('probes Correlation on its workbench, not on PvPicker or the canvas toolbar', () => {
+    const correlation = PROBES.rows.filter((row) => row.app === 'correlation');
+    expect(correlation.map((row) => [row.selector, row.pseudo, row.setup])).toEqual([
+      ['[data-testid=outline-add-input]', undefined, ['open-outline']],
+      ['[data-testid=trigger-source]', undefined, ['open-outline']],
+      ['#density-y', undefined, ['open-properties']],
+      ['[data-testid=trigger-source]', undefined, ['open-outline', 'hover']],
+      ['[data-testid=actions-bar]', undefined, []],
+      ['[data-testid=actions-bar] .cds--btn--icon-only', undefined, []],
+      ['[data-testid=actions-bar] .cds--popover-content', undefined, ['hover-action']],
+      ['#y-layout .wb-segmented__option + .wb-segmented__option', undefined, ['open-properties']],
+      ['#trigger-source', undefined, ['select-trigger-section', 'open-properties']],
+      ['#role', undefined, ['select-first-outline-row', 'open-properties']],
+    ]);
+    const retired = [
+      'pv-picker',
+      'density-y-select',
+      '.correlation-plot__toolbar',
+      '.cds--content-switcher',
+    ];
+    for (const row of correlation) {
+      for (const selector of retired) expect(row.selector, label(row)).not.toContain(selector);
+      expect(row.setup, label(row)).not.toContain('hold-pv-check');
+      expect(row.setup, label(row)).not.toContain('switch-density-view');
+      // Nothing is held any more, so every row runs on the deployed stack too.
+      expect(row.stack, label(row)).toBeUndefined();
+    }
+  });
+
+  it('probes the Correlation fields with the field look of the controls they replace', () => {
+    // The add row's input took the PV picker's input, the Trigger header's inline Source and
+    // Properties' #trigger-source took its Source select, #density-y the toolbar's Density Y.
+    const look = rowsWhere('correlation', '[data-testid=outline-add-input]')[0].expect;
+    expect(Object.keys(look)).toEqual([
+      'height',
+      'border-top-left-radius',
+      'background-color',
+      'border-bottom-color',
+      'border-bottom-width',
+      'font-family',
+      'font-size',
+    ]);
+    for (const selector of ['#density-y', '#trigger-source', '#role']) {
+      expect(
+        rowsWhere('correlation', selector).map((row) => row.expect),
+        selector
+      ).toEqual([look]);
+    }
+    const source = rowsWhere('correlation', '[data-testid=trigger-source]');
+    expect(source.map((row) => row.setup.includes('hover'))).toEqual([false, true]);
+    expect(source[0].expect).toEqual(look);
+    expect(source[1].expect).toEqual({
+      'background-color': {
+        mix: 'color-mix(in srgb, var(--canopy-bg-field), var(--canopy-text-primary) 8%)',
+        standalone: { carbon: 'field-hover-01' },
+      },
+    });
+  });
+
+  it("probes the Correlation actions bar, its action and its tooltip as Trace's (A39)", () => {
+    for (const selector of [
+      '[data-testid=actions-bar]',
+      '[data-testid=actions-bar] .cds--btn--icon-only',
+      '[data-testid=actions-bar] .cds--popover-content',
+    ]) {
+      const trace = rowsWhere('trace', selector).filter((row) => row.viewport === undefined);
+      const correlation = rowsWhere('correlation', selector);
+      expect(correlation.length, selector).toBe(1);
+      expect(
+        correlation.map((row) => [row.setup, row.expect, row.viewport]),
+        selector
+      ).toEqual(trace.map((row) => [row.setup, row.expect, row.viewport]));
+    }
+  });
+
+  it('opens every Correlation page on keys the flat query parser reads', () => {
+    // src/correlation/query.ts: x, y (repeated), dt, n, lookback, view, axes; embedded and
+    // theme are the host's and ignored by the parser.
+    const known = ['embedded', 'theme', 'x', 'y', 'trig', 'dt', 'n', 'lookback', 'view', 'axes'];
+    const pages = [
+      PROBES.defaults.page.correlation,
+      ...PROBES.rows.filter((r) => r.app === 'correlation' && r.page).map((r) => r.page as string),
+    ];
+    expect(pages.length).toBe(2);
+    for (const page of pages) {
+      expect(page.startsWith('/correlation.html?'), page).toBe(true);
+      const query = new URLSearchParams(page.slice(page.indexOf('?') + 1));
+      for (const key of query.keys()) expect(known, `${page}: ${key}`).toContain(key);
+      expect(query.get('embedded')).toBe('true');
+      expect(query.get('theme')).toBe('{theme}');
+      expect(query.getAll('x')).toEqual(['PROBE:X']);
+      expect(query.getAll('y')).toEqual(['PROBE:Y1', 'PROBE:Y2']);
+      expect(['scatter', 'density']).toContain(query.get('view'));
+      expect(['shared', 'overlay', 'split']).toContain(query.get('axes'));
+    }
+    // #density-y shows only in the density view; Y layout only in the scatter view.
+    expect(rowsWhere('correlation', '#density-y')[0].page).toContain('&view=density&');
+    expect(PROBES.defaults.page.correlation).toContain('&view=scatter&');
+    expect(
+      rowsWhere('correlation', '#y-layout .wb-segmented__option + .wb-segmented__option')[0].page
+    ).toBeUndefined();
+  });
+
+  it('retires only the header-counts row of the Trace header (A39)', () => {
+    expect(PROBES.rows.filter((row) => row.selector.includes('counts'))).toEqual([]);
+    expect(PROBES.rows.filter((row) => row.app === 'trace').length).toBe(14);
+  });
+
+  it('opens the plot-level Trace rows on a page with no curve, so Properties shows the plot', () => {
+    // With a PV the opening selection is its curve, whose Properties hold no plot field.
+    for (const selector of ['#plot-title', '#grid-style']) {
+      const rows = PROBES.rows.filter((row) => row.app === 'trace' && row.selector === selector);
+      expect(rows.length, selector).toBe(1);
+      expect(rows[0].page, selector).toBe('/?embedded=true&theme={theme}&range=-10m');
+    }
+  });
+
+  it('opens Properties, then the tab when not the first, for every Trace Properties row', () => {
+    // A field lives in Properties under its #id (the swatch under its testid); a curve field
+    // needs the curve selected first. The composed setups are idempotent (r2 CC-10).
+    const curve = ['select-first-outline-row', 'open-properties'];
+    const expected: [string, string | undefined, string[]][] = [
+      ['#plot-title', undefined, ['open-properties']],
+      ['#grid-style', undefined, ['open-properties', 'inspector-tab-appearance']],
+      [
+        '.cds--toggle:has(#show-symbols) .cds--toggle__switch',
+        undefined,
+        [...curve, 'inspector-tab-symbol'],
+      ],
+      [
+        '.cds--toggle:has(#show-symbols) .cds--toggle__switch',
+        '::before',
+        [...curve, 'inspector-tab-symbol'],
+      ],
+      ['[data-testid=trace-color-swatch]', undefined, curve],
+    ];
+    const properties = PROBES.rows.filter(
+      (row) => row.app === 'trace' && row.setup.includes('open-properties')
+    );
+    expect(properties.map((row) => [row.selector, row.pseudo, row.setup])).toEqual(expected);
+    for (const row of PROBES.rows) {
+      const at = row.setup.indexOf('open-properties');
+      const tabs = row.setup.filter((name) => name.startsWith('inspector-tab-'));
+      if (tabs.length === 0) continue;
+      expect(at, label(row)).toBeGreaterThanOrEqual(0);
+      expect(row.setup.slice(at + 1, at + 1 + tabs.length), label(row)).toEqual(tabs);
+    }
+  });
+
+  it('probes the workbench sidebar chrome with no setup', () => {
+    for (const selector of ['.wb-split__edge', '.wb-sidebar__tabbar']) {
+      expect(
+        rowsWhere('trace', selector).map((row) => row.setup),
+        selector
+      ).toEqual([[]]);
+    }
   });
 });
 
@@ -453,6 +697,132 @@ describe('setups.mjs', () => {
 
   it('has postconditions only for setups it exports', () => {
     for (const name of Object.keys(setups.postconditions)) expect(SETUP_NAMES).toContain(name);
+  });
+
+  describe('the workbench setups', () => {
+    /** A page whose DOM holds `present`; every click and wait is recorded in order. */
+    function fakePage(present: string[]) {
+      const log: string[] = [];
+      const locator = (selector: string): unknown => ({
+        first: () => locator(selector),
+        count: async () => (present.includes(selector) ? 1 : 0),
+        click: async () => void log.push(`click ${selector}`),
+        hover: async () => void log.push(`hover ${selector}`),
+        waitFor: async () => void log.push(`wait ${selector}`),
+      });
+      const page = { locator } as unknown as PageLike;
+      return { page, log };
+    }
+    const run = (name: string, page: PageLike) =>
+      (setups as unknown as Record<string, (p: PageLike, c: object) => Promise<void>>)[name](
+        page,
+        {}
+      );
+    const INSPECTOR = '.wb-sidebar__pane--properties .wb-inspector';
+
+    it('open-properties clicks the Properties tab only when it is not selected', async () => {
+      const idle = fakePage(['[data-testid=sidebar-tab-properties][aria-selected=false]']);
+      await run('open-properties', idle.page);
+      expect(idle.log).toEqual([
+        'wait .wb-sidebar',
+        'click [data-testid=sidebar-tab-properties][aria-selected=false]',
+        'wait .wb-sidebar__pane--properties',
+        `wait ${INSPECTOR}`,
+      ]);
+
+      // Selected already: a click would collapse the sidebar, so none is made.
+      const shown = fakePage([]);
+      await run('open-properties', shown.page);
+      expect(shown.log.filter((entry) => entry.startsWith('click'))).toEqual([]);
+      expect(shown.log.at(-1)).toBe(`wait ${INSPECTOR}`);
+    });
+
+    it('open-properties expands a collapsed sidebar through the rail target', async () => {
+      const { page, log } = fakePage([
+        '.wb-sidebar__rail-target[data-pane=properties]',
+        '[data-testid=sidebar-tab-properties][aria-selected=false]',
+      ]);
+      await run('open-properties', page);
+      expect(log.filter((entry) => entry.startsWith('click'))).toEqual([
+        'click .wb-sidebar__rail-target[data-pane=properties]',
+      ]);
+    });
+
+    it('open-properties expands a collapsed stacked pane by its header', async () => {
+      const { page, log } = fakePage([
+        '.wb-sidebar__header[data-pane=properties][aria-expanded=false]',
+      ]);
+      await run('open-properties', page);
+      expect(log.filter((entry) => entry.startsWith('click'))).toEqual([
+        'click .wb-sidebar__header[data-pane=properties][aria-expanded=false]',
+      ]);
+    });
+
+    it('inspector-tab-<id> clicks the tab only when it is not selected', async () => {
+      const tab = `${INSPECTOR} [data-testid=inspector-tab-appearance]`;
+      const idle = fakePage([`${tab}:not([aria-selected=true])`]);
+      await run('inspector-tab-appearance', idle.page);
+      expect(idle.log).toEqual([
+        `click ${tab}:not([aria-selected=true])`,
+        `wait ${tab}[aria-selected=true]`,
+      ]);
+      const selected = fakePage([]);
+      await run('inspector-tab-symbol', selected.page);
+      expect(selected.log).toEqual([
+        `wait ${INSPECTOR} [data-testid=inspector-tab-symbol][aria-selected=true]`,
+      ]);
+    });
+
+    it('select-first-outline-row shows the Outline, selects, and waits for the item', async () => {
+      const { page, log } = fakePage(['[data-testid=sidebar-tab-outline][aria-selected=false]']);
+      await run('select-first-outline-row', page);
+      expect(log).toEqual([
+        'wait .wb-sidebar',
+        'click [data-testid=sidebar-tab-outline][aria-selected=false]',
+        'wait .wb-sidebar__pane--outline',
+        'click .wb-outline-row .wb-outline-row__name',
+        `wait ${INSPECTOR}[data-level=item]`,
+      ]);
+      // The click reveals Properties, which hides the Outline in the tabbed sidebar, so no wait
+      // after it may target the Outline (it would never become visible).
+      const afterClick = log.slice(log.indexOf('click .wb-outline-row .wb-outline-row__name') + 1);
+      expect(afterClick.filter((l) => l.startsWith('wait') && l.includes('outline'))).toEqual([]);
+    });
+
+    it('open-outline clicks the Outline tab only when it is not selected', async () => {
+      const idle = fakePage(['[data-testid=sidebar-tab-outline][aria-selected=false]']);
+      await run('open-outline', idle.page);
+      expect(idle.log).toEqual([
+        'wait .wb-sidebar',
+        'click [data-testid=sidebar-tab-outline][aria-selected=false]',
+        'wait .wb-sidebar__pane--outline',
+      ]);
+      const shown = fakePage([]);
+      await run('open-outline', shown.page);
+      expect(shown.log).toEqual(['wait .wb-sidebar', 'wait .wb-sidebar__pane--outline']);
+    });
+
+    it('select-trigger-section selects the Trigger section by its gear', async () => {
+      const gear = '.wb-sidebar__pane--outline [data-section-id=trig] .wb-outline-section__gear';
+      const { page, log } = fakePage(['[data-testid=sidebar-tab-outline][aria-selected=false]']);
+      await run('select-trigger-section', page);
+      expect(log).toEqual([
+        'wait .wb-sidebar',
+        'click [data-testid=sidebar-tab-outline][aria-selected=false]',
+        'wait .wb-sidebar__pane--outline',
+        `click ${gear}`,
+        `wait ${INSPECTOR}[data-level=section]`,
+      ]);
+    });
+
+    it('hover-action hovers the first action until its tooltip shows', async () => {
+      const { page, log } = fakePage([]);
+      await run('hover-action', page);
+      expect(log).toEqual([
+        'hover [data-testid=actions-bar] .cds--btn--icon-only',
+        'wait [data-testid=actions-bar] .cds--popover-content',
+      ]);
+    });
   });
 });
 
@@ -608,18 +978,31 @@ describe('runner.mjs', () => {
     });
 
     it('runs the postconditions of the row setups last', async () => {
+      // A stand-in postcondition, so the runner is pinned apart from any one setup's hold.
       const page = mount(
         '.probed { border-left-width: 2px; }',
-        '<div class="cds--white"><button class="probed" data-testid="pv-picker-add" disabled></button></div>'
+        '<div class="cds--white"><b class="probed" data-held="true"></b></div>'
       );
-      const probe = row({ 'border-left-width': { literal: '2px' } }, { setup: ['hold-pv-check'] });
-      expect((await runner.checkRow(page, probe)).ok).toBe(true);
+      const posts = setups.postconditions as Record<string, (page: PageLike) => Promise<void>>;
+      const order: string[] = [];
+      posts.focus = async (p) => {
+        order.push('post');
+        if ((await p.locator('.probed[data-held=true]').count()) === 0) {
+          throw new Error('focus: the hold ended; the row was read too late');
+        }
+      };
+      try {
+        const probe = row({ 'border-left-width': { literal: '2px' } }, { setup: ['focus'] });
+        const held = await runner.checkRow(page, probe);
+        expect(held.ok).toBe(true);
+        expect(order).toEqual(['post']);
 
-      (document.querySelector('.probed') as HTMLButtonElement).disabled = false;
-      const late = await runner.checkRow(page, probe, { throwOnFailure: false });
-      expect(late.failures).toEqual([
-        'hold-pv-check: [data-testid=pv-picker-add] is no longer disabled; the row was read too late',
-      ]);
+        document.querySelector('.probed')?.removeAttribute('data-held');
+        const late = await runner.checkRow(page, probe, { throwOnFailure: false });
+        expect(late.failures).toEqual(['focus: the hold ended; the row was read too late']);
+      } finally {
+        delete posts.focus;
+      }
     });
 
     it('fails a drop-highlight row that is read while no drag is held', async () => {

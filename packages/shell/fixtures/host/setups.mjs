@@ -17,6 +17,7 @@
  * @property {(key: string, options?: object) => Promise<void>} press
  * @property {(options?: object) => Promise<void>} waitFor
  * @property {(options?: object) => Promise<boolean>} isDisabled
+ * @property {() => Promise<number>} count
  * @property {(selector: string) => LocatorLike} locator
  * @property {(pageFunction: Function, arg?: unknown) => Promise<unknown>} evaluate Runs
  *   `pageFunction(element, arg)` in the page; the synthetic tab drag needs it.
@@ -44,17 +45,25 @@ export const WRITE_PROBE_PAGE = '/embed/drafts/write-probe?embedded=true&theme={
 /** A PV the Trace hare mock never answers, so its metadata check stays pending. */
 export const HOLD_PV = 'SR:HOLD';
 
-const PV_PICKER_INPUT = '[data-testid=pv-picker-input]';
-const PV_PICKER_ADD = '[data-testid=pv-picker-add]';
-
-/** How long `hold-pv-check` waits for the Add button to disable; below the 3 s metadata timeout. */
-const HOLD_DISABLED_TIMEOUT_MS = 2000;
-
 const TAB_STRIP = '.tab-strip';
 const DOCKED_TAB = `${TAB_STRIP} [role=tab][data-docked=true]`;
 const UNDOCKED_TAB = `${TAB_STRIP} [role=tab][data-docked=false]`;
 /** The dock root while it lists two or more docked keys (`data-docked` is a JSON array). */
 const TWO_TILES = `[data-testid=workspace-dock][data-docked*='","']`;
+
+/** The workbench sidebar of a tool (react-trace `src/workbench/`), and its two panes. */
+const SIDEBAR = '.wb-sidebar';
+/** @param {'outline' | 'properties'} pane */
+const PANE = (pane) => `.wb-sidebar__pane--${pane}`;
+/** The Inspector of the Properties pane: what every Properties row reads inside. */
+const INSPECTOR = `${PANE('properties')} .wb-inspector`;
+const OUTLINE_ROW = '.wb-outline-row';
+/** The section gear of an Outline section (`data-section-id` is the section id), which selects it. */
+const SECTION_GEAR = (/** @type {string} */ id) =>
+  `.wb-sidebar__pane--outline [data-section-id=${id}] .wb-outline-section__gear`;
+/** The tool's actions bar, and one of its actions (a Carbon IconButton). */
+const ACTIONS_BAR = '[data-testid=actions-bar]';
+const ACTION = `${ACTIONS_BAR} .cds--btn--icon-only`;
 
 /** The tile edge `hold-tab-drag` holds the drag at. */
 const HOLD_EDGE = 'bottom';
@@ -108,13 +117,111 @@ async function focus(_page, ctx) {
 }
 
 /**
+ * Hovers the first action of the actions bar until its tooltip shows.
+ *
  * @param {PageLike} page
  * @returns {Promise<void>}
  */
-async function hoverHeaderAction(page) {
-  await page.locator('.cds--header__action').first().hover();
-  await page.locator('.cds--header__global .cds--popover-content').first().waitFor();
+async function hoverAction(page) {
+  await page.locator(ACTION).first().hover();
+  await page.locator(`${ACTIONS_BAR} .cds--popover-content`).first().waitFor();
 }
+
+/**
+ * Shows one pane of the workbench sidebar, whatever the stored arrangement left it as: the rail
+ * (every pane collapsed) is expanded through its target for the pane; in tabbed mode the pane's
+ * tab is clicked only when it is not the selected one, because clicking the selected tab
+ * collapses the sidebar; in stacked mode a collapsed pane's header is clicked. A pane already
+ * showing is left alone, so the step is idempotent and composes after a setup that revealed it.
+ *
+ * @param {PageLike} page
+ * @param {'outline' | 'properties'} pane
+ * @returns {Promise<void>}
+ */
+async function showPane(page, pane) {
+  await page.locator(SIDEBAR).first().waitFor();
+  const rail = page.locator(`.wb-sidebar__rail-target[data-pane=${pane}]`);
+  const tab = page.locator(`[data-testid=sidebar-tab-${pane}][aria-selected=false]`);
+  const header = page.locator(`.wb-sidebar__header[data-pane=${pane}][aria-expanded=false]`);
+  if ((await rail.count()) > 0) await rail.first().click();
+  else if ((await tab.count()) > 0) await tab.first().click();
+  else if ((await header.count()) > 0) await header.first().click();
+  await page.locator(PANE(pane)).first().waitFor();
+}
+
+/**
+ * Shows the Properties pane and waits for its Inspector. Idempotent (see `showPane`).
+ *
+ * @param {PageLike} page
+ * @returns {Promise<void>}
+ */
+async function openProperties(page) {
+  await showPane(page, 'properties');
+  await page.locator(INSPECTOR).first().waitFor();
+}
+
+/**
+ * Shows the Outline pane. Idempotent (see `showPane`).
+ *
+ * @param {PageLike} page
+ * @returns {Promise<void>}
+ */
+async function openOutline(page) {
+  await showPane(page, 'outline');
+}
+
+/**
+ * Selects Correlation's Trigger section through its gear, a user selection, which reveals
+ * Properties by itself; it waits until the Inspector shows a section, so an `open-properties`
+ * after it finds the pane showing and does nothing. The section's own fields (`#trigger-source`)
+ * live in Properties only while it is selected.
+ *
+ * @param {PageLike} page
+ * @returns {Promise<void>}
+ */
+async function selectTriggerSection(page) {
+  await showPane(page, 'outline');
+  await page.locator(SECTION_GEAR('trig')).first().click();
+  // As after a row click: the selection may hide the Outline, so the wait is on the Inspector.
+  await page.locator(`${INSPECTOR}[data-level=section]`).first().waitFor();
+}
+
+/**
+ * Selects the first row of the Outline (in Trace, the first curve), a user selection, which
+ * reveals Properties by itself; it waits until the Inspector shows that item, so an
+ * `open-properties` after it finds the pane showing and does nothing.
+ *
+ * @param {PageLike} page
+ * @returns {Promise<void>}
+ */
+async function selectFirstOutlineRow(page) {
+  await showPane(page, 'outline');
+  await page.locator(`${OUTLINE_ROW} .wb-outline-row__name`).first().click();
+  // No wait on the Outline after the click: the selection reveals Properties, and in the tabbed
+  // sidebar that hides the Outline pane, so a selected row is never visible. The Inspector at
+  // item level is the proof the selection landed.
+  await page.locator(`${INSPECTOR}[data-level=item]`).first().waitFor();
+}
+
+/**
+ * The setup that selects the Inspector tab `id` (`inspector-tab-<id>`), clicking it only when it
+ * is not selected yet. Runs after `open-properties`. The runner looks setups up by name, so each
+ * tab a row needs is one export below.
+ *
+ * @param {string} id
+ * @returns {(page: PageLike) => Promise<void>}
+ */
+function inspectorTab(id) {
+  const tab = `${INSPECTOR} [data-testid=inspector-tab-${id}]`;
+  return async (page) => {
+    const idle = page.locator(`${tab}:not([aria-selected=true])`);
+    if ((await idle.count()) > 0) await idle.first().click();
+    await page.locator(`${tab}[aria-selected=true]`).first().waitFor();
+  };
+}
+
+const inspectorTabAppearance = inspectorTab('appearance');
+const inspectorTabSymbol = inspectorTab('symbol');
 
 /**
  * @param {PageLike} page
@@ -151,6 +258,9 @@ async function openViewMenu(page) {
 }
 
 /**
+ * Opens Data Insight through its action, found by accessible name (the actions bar labels it
+ * `Data Insight (<shortcut>)`), then the overflow menu of the insight tool.
+ *
  * @param {PageLike} page
  * @returns {Promise<void>}
  */
@@ -160,49 +270,6 @@ async function openInsightOverflow(page) {
   await actions.waitFor();
   await actions.locator('.cds--overflow-menu').first().click();
   await page.locator('.cds--overflow-menu-options').first().waitFor();
-}
-
-/**
- * Resolves once the picker's Add button is disabled.
- *
- * @param {PageLike} page
- * @param {number} timeoutMs
- * @returns {Promise<boolean>} Whether it was disabled within the timeout.
- */
-async function addDisabledWithin(page, timeoutMs) {
-  const add = page.locator(PV_PICKER_ADD).first();
-  const deadline = Date.now() + timeoutMs;
-  for (;;) {
-    if (await add.isDisabled()) return true;
-    if (Date.now() >= deadline) return false;
-    await new Promise((resolve) => setTimeout(resolve, 25));
-  }
-}
-
-/**
- * Submits a PV whose metadata check never completes, which holds the Add button disabled. The
- * hold ends after the picker's metadata timeout (3 s), so a row using this setup is checked at
- * once and re-checked by `postconditions['hold-pv-check']`.
- *
- * @param {PageLike} page
- * @returns {Promise<void>}
- */
-async function holdPvCheck(page) {
-  const input = page.locator(PV_PICKER_INPUT).first();
-  await input.fill(HOLD_PV);
-  await input.press('Enter');
-  if (!(await addDisabledWithin(page, HOLD_DISABLED_TIMEOUT_MS))) {
-    throw new Error(`hold-pv-check: ${PV_PICKER_ADD} did not become disabled`);
-  }
-}
-
-/**
- * @param {PageLike} page
- * @returns {Promise<void>}
- */
-async function switchDensityView(page) {
-  await page.locator(".correlation-plot__toolbar button:has-text('Density')").first().click();
-  await page.locator('[data-testid=density-y-select]').first().waitFor();
 }
 
 /**
@@ -370,15 +437,6 @@ async function holdTabDrag(page) {
  * @type {Record<string, (page: PageLike) => Promise<void>>}
  */
 export const postconditions = {
-  // A check that outlived the metadata timeout re-enables the button; the row then read an
-  // enabled button and its colours mean nothing.
-  'hold-pv-check': async (page) => {
-    if (!(await page.locator(PV_PICKER_ADD).first().isDisabled())) {
-      throw new Error(
-        `hold-pv-check: ${PV_PICKER_ADD} is no longer disabled; the row was read too late`
-      );
-    }
-  },
   // The held drag is released without a drop (dragleave, then dragend on the tab), so the two
   // tiles stay as they were. A highlight that was gone by now means the row read nothing.
   'hold-tab-drag': async (page) => {
@@ -392,11 +450,15 @@ export {
   openWriteDialog as 'open-write-dialog',
   hover as 'hover',
   focus as 'focus',
-  hoverHeaderAction as 'hover-header-action',
+  hoverAction as 'hover-action',
+  openProperties as 'open-properties',
+  selectFirstOutlineRow as 'select-first-outline-row',
+  openOutline as 'open-outline',
+  selectTriggerSection as 'select-trigger-section',
+  inspectorTabAppearance as 'inspector-tab-appearance',
+  inspectorTabSymbol as 'inspector-tab-symbol',
   openScreenTreeMenu as 'open-screen-tree-menu',
   openInsightOverflow as 'open-insight-overflow',
-  holdPvCheck as 'hold-pv-check',
-  switchDensityView as 'switch-density-view',
   openTraceTab as 'open-trace-tab',
   openViewMenu as 'open-view-menu',
   dockSecondTile as 'dock-second-tile',

@@ -49,7 +49,11 @@ export type SetupName =
   | 'open-write-dialog'
   | 'hover'
   | 'focus'
-  | 'hover-header-action'
+  | 'hover-action'
+  | 'open-properties'
+  | 'select-first-outline-row'
+  | 'inspector-tab-appearance'
+  | 'inspector-tab-symbol'
   | 'open-screen-tree-menu'
   | 'open-insight-overflow'
   | 'hold-pv-check'
@@ -75,7 +79,11 @@ declare const selectFirstNavRow: Setup;
 declare const openWriteDialog: Setup;
 declare const hover: Setup;
 declare const focus: Setup;
-declare const hoverHeaderAction: Setup;
+declare const hoverAction: Setup;
+declare const openProperties: Setup;
+declare const selectFirstOutlineRow: Setup;
+declare const inspectorTabAppearance: Setup;
+declare const inspectorTabSymbol: Setup;
 declare const openScreenTreeMenu: Setup;
 declare const openInsightOverflow: Setup;
 declare const holdPvCheck: Setup;
@@ -90,7 +98,11 @@ export {
   openWriteDialog as 'open-write-dialog',
   hover as 'hover',
   focus as 'focus',
-  hoverHeaderAction as 'hover-header-action',
+  hoverAction as 'hover-action',
+  openProperties as 'open-properties',
+  selectFirstOutlineRow as 'select-first-outline-row',
+  inspectorTabAppearance as 'inspector-tab-appearance',
+  inspectorTabSymbol as 'inspector-tab-symbol',
   openScreenTreeMenu as 'open-screen-tree-menu',
   openInsightOverflow as 'open-insight-overflow',
   holdPvCheck as 'hold-pv-check',
