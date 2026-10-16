@@ -52,12 +52,12 @@ export type SetupName =
   | 'hover-action'
   | 'open-properties'
   | 'select-first-outline-row'
+  | 'open-outline'
+  | 'select-trigger-section'
   | 'inspector-tab-appearance'
   | 'inspector-tab-symbol'
   | 'open-screen-tree-menu'
   | 'open-insight-overflow'
-  | 'hold-pv-check'
-  | 'switch-density-view'
   | 'open-trace-tab'
   | 'open-view-menu'
   | 'dock-second-tile'
@@ -82,12 +82,12 @@ declare const focus: Setup;
 declare const hoverAction: Setup;
 declare const openProperties: Setup;
 declare const selectFirstOutlineRow: Setup;
+declare const openOutline: Setup;
+declare const selectTriggerSection: Setup;
 declare const inspectorTabAppearance: Setup;
 declare const inspectorTabSymbol: Setup;
 declare const openScreenTreeMenu: Setup;
 declare const openInsightOverflow: Setup;
-declare const holdPvCheck: Setup;
-declare const switchDensityView: Setup;
 declare const openTraceTab: Setup;
 declare const openViewMenu: Setup;
 declare const dockSecondTile: Setup;
@@ -101,12 +101,12 @@ export {
   hoverAction as 'hover-action',
   openProperties as 'open-properties',
   selectFirstOutlineRow as 'select-first-outline-row',
+  openOutline as 'open-outline',
+  selectTriggerSection as 'select-trigger-section',
   inspectorTabAppearance as 'inspector-tab-appearance',
   inspectorTabSymbol as 'inspector-tab-symbol',
   openScreenTreeMenu as 'open-screen-tree-menu',
   openInsightOverflow as 'open-insight-overflow',
-  holdPvCheck as 'hold-pv-check',
-  switchDensityView as 'switch-density-view',
   openTraceTab as 'open-trace-tab',
   openViewMenu as 'open-view-menu',
   dockSecondTile as 'dock-second-tile',

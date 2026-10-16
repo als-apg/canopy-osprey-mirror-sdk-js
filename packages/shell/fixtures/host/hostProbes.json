@@ -43,6 +43,23 @@
     },
     {
       "app": "viewer",
+      "selector": ".screen-tree [data-screen-key] > .nav-tree__row",
+      "setup": [],
+      "expect": {
+        "height": { "contract": "control-h-xs" },
+        "font-size": { "contract": "text-md" }
+      }
+    },
+    {
+      "app": "viewer",
+      "selector": ".screen-tree .canopy-section-heading",
+      "setup": [],
+      "expect": {
+        "font-size": { "contract": "text-sm" }
+      }
+    },
+    {
+      "app": "viewer",
       "selector": "[data-testid=screen-header] .cds--header",
       "setup": [],
       "expect": {
@@ -452,6 +469,47 @@
       "setup": [],
       "expect": {
         "border-bottom-color": { "contract": "border", "standalone": { "carbon": "border-subtle" } }
+      }
+    },
+    {
+      "app": "trace",
+      "selector": ".wb-sidebar__tab",
+      "setup": [],
+      "expect": {
+        "font-size": { "contract": "text-sm" }
+      }
+    },
+    {
+      "app": "trace",
+      "selector": ".wb-outline-section__title",
+      "setup": ["open-outline"],
+      "expect": {
+        "font-size": { "contract": "text-sm" }
+      }
+    },
+    {
+      "app": "trace",
+      "selector": ".wb-outline-row",
+      "setup": ["open-outline"],
+      "expect": {
+        "height": { "contract": "control-h-xs" },
+        "font-size": { "contract": "text-md" }
+      }
+    },
+    {
+      "app": "trace",
+      "selector": ".wb-outline-row__name",
+      "setup": ["open-outline"],
+      "expect": {
+        "font-size": { "contract": "text-md" }
+      }
+    },
+    {
+      "app": "trace",
+      "selector": ".wb-inspector .wb-field__label",
+      "setup": ["open-properties"],
+      "expect": {
+        "font-size": { "contract": "text-sm" }
       }
     },
     {

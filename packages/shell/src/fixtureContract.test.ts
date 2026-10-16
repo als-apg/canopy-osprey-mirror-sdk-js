@@ -542,7 +542,7 @@ describe('hostProbes.json', () => {
 
   it('retires only the header-counts row of the Trace header (A39)', () => {
     expect(PROBES.rows.filter((row) => row.selector.includes('counts'))).toEqual([]);
-    expect(PROBES.rows.filter((row) => row.app === 'trace').length).toBe(14);
+    expect(PROBES.rows.filter((row) => row.app === 'trace').length).toBe(19);
   });
 
   it('opens the plot-level Trace rows on a page with no curve, so Properties shows the plot', () => {
@@ -571,6 +571,7 @@ describe('hostProbes.json', () => {
         '::before',
         [...curve, 'inspector-tab-symbol'],
       ],
+      ['.wb-inspector .wb-field__label', undefined, ['open-properties']],
       ['[data-testid=trace-color-swatch]', undefined, curve],
     ];
     const properties = PROBES.rows.filter(
@@ -584,6 +585,44 @@ describe('hostProbes.json', () => {
       expect(at, label(row)).toBeGreaterThanOrEqual(0);
       expect(row.setup.slice(at + 1, at + 1 + tabs.length), label(row)).toEqual(tabs);
     }
+  });
+
+  it('probes the row and section-heading recipes on every adopted surface', () => {
+    // Rows read text-md at the tree height, headings, tabs and labels text-sm. The viewer
+    // selectors hold in today's tree and in the Browse tree: a member row by the data-screen-key
+    // its treeitem carries, a top-level branch by the recipe class.
+    const rows = {
+      text: 'text-md',
+      height: 'control-h-xs',
+    };
+    const expected: [string, string, Record<string, string>][] = [
+      [
+        'viewer',
+        '.screen-tree [data-screen-key] > .nav-tree__row',
+        { height: rows.height, 'font-size': rows.text },
+      ],
+      ['viewer', '.screen-tree .canopy-section-heading', { 'font-size': 'text-sm' }],
+      ['trace', '.wb-sidebar__tab', { 'font-size': 'text-sm' }],
+      ['trace', '.wb-outline-section__title', { 'font-size': 'text-sm' }],
+      ['trace', '.wb-outline-row', { height: rows.height, 'font-size': rows.text }],
+      ['trace', '.wb-outline-row__name', { 'font-size': rows.text }],
+      ['trace', '.wb-inspector .wb-field__label', { 'font-size': 'text-sm' }],
+    ];
+    for (const [app, selector, contracts] of expected) {
+      const found = rowsWhere(app, selector);
+      expect(found.length, selector).toBe(1);
+      expect(
+        Object.fromEntries(
+          targets(found[0]).map(([property, target]) => [
+            property,
+            'contract' in target ? target.contract : undefined,
+          ])
+        ),
+        selector
+      ).toEqual(contracts);
+    }
+    // The tree row probe of before stays.
+    expect(rowsWhere('viewer', '.nav-tree__row').length).toBe(1);
   });
 
   it('probes the workbench sidebar chrome with no setup', () => {
