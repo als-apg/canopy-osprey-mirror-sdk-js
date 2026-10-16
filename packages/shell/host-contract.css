@@ -592,6 +592,51 @@ html[data-canopy-host] .cds--g100 {
   outline-offset: -2px;
 }
 
+/* The list row: one line at the tree height. Rows read text-md, their meta and the section
+   heading read text-sm, and the line-height is unitless so it scales with either size. The
+   indent of a nested row is the app's own constant, not a contract name. */
+.canopy-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-sizing: border-box;
+  block-size: var(--canopy-control-h-xs);
+  font-size: var(--canopy-text-md);
+  line-height: 1.25;
+  color: var(--canopy-text-primary);
+}
+
+.canopy-row__label {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canopy-row__meta {
+  flex: 0 0 auto;
+  font-size: var(--canopy-text-sm);
+  line-height: 1.25;
+  color: var(--canopy-text-muted);
+}
+
+.canopy-row__icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  color: var(--canopy-text-secondary);
+}
+
+/* The section heading above a group of rows. */
+.canopy-section-heading {
+  margin: 0;
+  font-size: var(--canopy-text-sm);
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--canopy-text-secondary);
+}
+
 /* The anchor is opaque and fills the viewport; body keeps its document default. */
 html[data-canopy-host] [data-canopy-host-root] {
   font-family: var(--canopy-font-ui);

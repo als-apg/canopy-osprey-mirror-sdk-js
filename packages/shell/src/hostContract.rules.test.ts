@@ -75,6 +75,9 @@ function rule(selector: string): Declarations {
 const v = (name: string) => `var(--canopy-${name})`;
 const ALPHA_ACCENT = `color-mix(in srgb, ${v('accent')} 25%, transparent)`;
 
+/** The ungated classes an app opts into; everything else applies under the host gate only. */
+const RECIPES = ['.canopy-btn', '.canopy-row', '.canopy-section-heading'];
+
 const DANGER_READERS = [
   '.cds--btn--danger',
   '.cds--btn--danger:hover',
@@ -118,11 +121,28 @@ describe('the hand-written section of host-contract.css', () => {
     expect(HAND_CSS.match(/--cds-/g)).toHaveLength(1);
   });
 
-  it('gates every rule except the .canopy-btn recipe', () => {
+  it('gates every rule except the three recipes', () => {
     for (const selector of RULES.keys()) {
-      if (selector.startsWith('.canopy-btn')) continue;
+      if (RECIPES.some((recipe) => selector.startsWith(recipe))) continue;
       expect(selector.startsWith(`${GATE} `), selector).toBe(true);
     }
+  });
+
+  it('defines no recipe besides .canopy-btn, .canopy-row and .canopy-section-heading', () => {
+    const ungated = [...RULES.keys()].filter((selector) => !selector.startsWith(`${GATE} `));
+    expect(ungated.sort()).toEqual(
+      [
+        '.canopy-btn',
+        '.canopy-btn:hover',
+        ".canopy-btn[aria-pressed='true']",
+        '.canopy-btn:focus-visible',
+        '.canopy-row',
+        '.canopy-row__label',
+        '.canopy-row__meta',
+        '.canopy-row__icon',
+        '.canopy-section-heading',
+      ].sort()
+    );
   });
 
   it('ships no fonts and no at-rules', () => {
@@ -159,6 +179,79 @@ describe('the .canopy-btn recipe', () => {
       outline: `2px solid ${v('focus')}`,
       'outline-offset': '-2px',
     });
+  });
+});
+
+describe('the .canopy-row recipe', () => {
+  it('is a single-line row at the tree height, in text-md with a unitless line-height', () => {
+    expect(rule('.canopy-row')).toEqual({
+      display: 'flex',
+      'align-items': 'center',
+      gap: '4px',
+      'box-sizing': 'border-box',
+      'block-size': v('control-h-xs'),
+      'font-size': v('text-md'),
+      'line-height': '1.25',
+      color: v('text-primary'),
+    });
+  });
+
+  it('truncates its label instead of wrapping or growing the row', () => {
+    expect(rule('.canopy-row__label')).toEqual({
+      flex: '1 1 auto',
+      'min-inline-size': '0',
+      overflow: 'hidden',
+      'text-overflow': 'ellipsis',
+      'white-space': 'nowrap',
+    });
+  });
+
+  it('sets its meta in text-sm and the muted text colour', () => {
+    expect(rule('.canopy-row__meta')).toEqual({
+      flex: '0 0 auto',
+      'font-size': v('text-sm'),
+      'line-height': '1.25',
+      color: v('text-muted'),
+    });
+  });
+
+  it('keeps its icon at its own size in the secondary text colour', () => {
+    expect(rule('.canopy-row__icon')).toEqual({
+      flex: '0 0 auto',
+      display: 'inline-flex',
+      'align-items': 'center',
+      color: v('text-secondary'),
+    });
+  });
+});
+
+describe('the .canopy-section-heading recipe', () => {
+  it('is a text-sm heading with a unitless line-height and no margin', () => {
+    expect(rule('.canopy-section-heading')).toEqual({
+      margin: '0',
+      'font-size': v('text-sm'),
+      'font-weight': '600',
+      'line-height': '1.25',
+      color: v('text-secondary'),
+    });
+  });
+});
+
+describe('the recipes read existing contract names only', () => {
+  it.each(RECIPES)('%s reads only names of tokens.json', (recipe) => {
+    const recipeRules = [...RULES].filter(([selector]) => selector.startsWith(recipe));
+    expect(recipeRules.length).toBeGreaterThan(0);
+    for (const [, declarations] of recipeRules) {
+      for (const value of Object.values(declarations)) {
+        for (const [, name] of value.matchAll(/var\(\s*--canopy-([a-z0-9-]+)/g)) {
+          expect(NAMES, name).toContain(name);
+        }
+      }
+    }
+  });
+
+  it('keeps the contract at 27 names', () => {
+    expect(NAMES).toHaveLength(27);
   });
 });
 
