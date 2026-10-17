@@ -798,3 +798,30 @@ describe('the pinned @carbon/styles', () => {
     expect(spliceBlocks(sheet, renderBlocks(tokens, wiring))).toBe(sheet);
   });
 });
+
+// Read-only: the contrast a header action reads at, on the committed contract (B1).
+describe('the contrast of text-secondary on bg-panel', () => {
+  /** WCAG 2 relative luminance of a #rrggbb colour. */
+  const luminance = (hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((i) => {
+      const c = Number.parseInt(hex.slice(i, i + 2), 16) / 255;
+      return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const contrast = (a: string, b: string) => {
+    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+
+  it('reaches 4.5:1 in Main light, where the header actions read text-secondary', () => {
+    // OSPREY's Main light theme as its canopy-host.css hands it over (--canopy-host-text-secondary:
+    // var(--text-secondary), --canopy-host-bg-panel: var(--bg-panel)), from
+    // design_system/static/css/tokens.css [data-theme="light"]. The header zone takes these host
+    // values once the header actions follow the contract.
+    const mainLight = { 'text-secondary': '#6e6e77', 'bg-panel': '#fafbfc' };
+    expect(contrast(mainLight['text-secondary'], mainLight['bg-panel'])).toBeGreaterThanOrEqual(
+      4.5
+    );
+  });
+});

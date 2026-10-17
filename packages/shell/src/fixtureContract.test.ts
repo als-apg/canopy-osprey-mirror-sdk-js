@@ -60,6 +60,7 @@ const SETUP_NAMES = [
   'open-screen-tree-menu',
   'open-insight-overflow',
   'open-trace-tab',
+  'open-save-view-dialog',
   'open-view-menu',
   'dock-second-tile',
   'hold-tab-drag',
@@ -74,6 +75,7 @@ const LONGHANDS = [
   'border-top-color',
   'border-top-left-radius',
   'color',
+  'fill',
   'font-family',
   'font-size',
   'height',
@@ -177,7 +179,9 @@ describe('hostProbes.json', () => {
     for (const row of PROBES.rows) {
       for (const [property, target] of targets(row)) {
         const at = `${label(row)}: ${property}`;
-        const kinds = ['contract', 'carbon', 'literal', 'mix'].filter((kind) => kind in target);
+        const kinds = ['contract', 'carbon', 'literal', 'mix', 'inside'].filter(
+          (kind) => kind in target
+        );
         expect(kinds.length, at).toBe(1);
         const extra = Object.keys(target).filter(
           (key) => key !== kinds[0] && key !== 'hostOnly' && key !== 'standalone'
@@ -191,6 +195,11 @@ describe('hostProbes.json', () => {
         if ('standalone' in target) {
           expect(['contract', 'mix'], at).toContain(kinds[0]);
           expect(Object.keys(target.standalone ?? {}), at).toEqual(['carbon']);
+        }
+        // Geometry reads the element's box, which a pseudo-element has none of in the DOM.
+        if (kinds[0] === 'inside') {
+          expect(property, at).toBe('width');
+          expect(row.pseudo, at).toBeUndefined();
         }
       }
     }
@@ -542,7 +551,7 @@ describe('hostProbes.json', () => {
 
   it('retires only the header-counts row of the Trace header (A39)', () => {
     expect(PROBES.rows.filter((row) => row.selector.includes('counts'))).toEqual([]);
-    expect(PROBES.rows.filter((row) => row.app === 'trace').length).toBe(19);
+    expect(PROBES.rows.filter((row) => row.app === 'trace').length).toBe(21);
   });
 
   it('opens the plot-level Trace rows on a page with no curve, so Properties shows the plot', () => {
@@ -569,6 +578,12 @@ describe('hostProbes.json', () => {
       [
         '.cds--toggle:has(#show-symbols) .cds--toggle__switch',
         '::before',
+        [...curve, 'inspector-tab-symbol'],
+      ],
+      ['#display-name', undefined, curve],
+      [
+        '.cds--toggle:has(#show-symbols) .cds--toggle__text',
+        undefined,
         [...curve, 'inspector-tab-symbol'],
       ],
       ['.wb-inspector .wb-field__label', undefined, ['open-properties']],
@@ -623,6 +638,58 @@ describe('hostProbes.json', () => {
     }
     // The tree row probe of before stays.
     expect(rowsWhere('viewer', '.nav-tree__row').length).toBe(1);
+  });
+
+  it('keeps both footer buttons of the Save-view dialog inside its box (A2)', () => {
+    // Carbon's `.cds--btn-set .cds--btn { inline-size: 100% }` pushed Cancel off the left edge.
+    // The Save dialog and its Replace state are one dialog; the setup never saves.
+    const footer = '.cds--modal.is-visible .cds--modal-footer';
+    const rows = PROBES.rows.filter((row) => row.setup.includes('open-save-view-dialog'));
+    expect(rows.map((row) => [row.app, row.selector, row.setup, row.stack, row.expect])).toEqual(
+      ['secondary', 'primary'].map((kind) => [
+        'viewer',
+        `${footer} .cds--btn--${kind}`,
+        ['open-save-view-dialog'],
+        false,
+        { width: { inside: '.cds--modal-container' } },
+      ])
+    );
+    // No Delete-confirm row: that dialog is removed (A9).
+    expect(PROBES.rows.filter((row) => row.selector.includes('delete'))).toEqual([]);
+  });
+
+  it('colours the screen header actions and their icons from the contract (B1)', () => {
+    const action = '[data-testid=screen-header] .cds--header__action';
+    const rows = PROBES.rows.filter((row) => row.selector.startsWith(action));
+    expect(rows.map((row) => [row.app, row.selector, row.setup, row.expect])).toEqual([
+      ['viewer', action, [], { color: { contract: 'text-secondary', hostOnly: true } }],
+      ['viewer', `${action} svg`, [], { fill: { contract: 'text-secondary', hostOnly: true } }],
+      ['viewer', action, ['hover'], { color: { contract: 'text-primary', hostOnly: true } }],
+      [
+        'viewer',
+        `${action} svg`,
+        ['hover'],
+        { fill: { contract: 'text-primary', hostOnly: true } },
+      ],
+    ]);
+    // Trace has no Carbon header any more (A39): the viewer's is the one the rule reaches.
+    expect(
+      PROBES.rows.filter((r) => r.app !== 'viewer' && r.selector.includes('header__action'))
+    ).toEqual([]);
+  });
+
+  it('probes the Trace sidebar and Inspector density (B9)', () => {
+    expect(rowsWhere('trace', '.wb-sidebar__tabbar')[0].expect.height).toEqual({
+      contract: 'control-h-xs',
+    });
+    expect(rowsWhere('trace', '#display-name').map((row) => row.expect)).toEqual([
+      { height: { contract: 'control-h-sm' } },
+    ]);
+    expect(
+      rowsWhere('trace', '.cds--toggle:has(#show-symbols) .cds--toggle__text').map(
+        (row) => row.expect
+      )
+    ).toEqual([{ 'font-size': { contract: 'text-sm' } }]);
   });
 
   it('probes the workbench sidebar chrome with no setup', () => {
@@ -854,6 +921,35 @@ describe('setups.mjs', () => {
       ]);
     });
 
+    it('open-save-view-dialog asks the stand-in Trace for a query only while Save is disabled', async () => {
+      const log: string[] = [];
+      let disabled = true;
+      const locator = (selector: string): unknown => ({
+        first: () => locator(selector),
+        count: async () => 1,
+        isDisabled: async () => disabled,
+        click: async () => void log.push(`click ${selector}`),
+        waitFor: async () => void log.push(`wait ${selector}`),
+        evaluate: async (_fn: unknown, arg: unknown) => {
+          log.push(`post ${selector} ${String(arg)}`);
+          return null;
+        },
+      });
+      const page = { locator } as unknown as PageLike;
+      await run('open-save-view-dialog', page);
+      expect(log).toEqual([
+        'click .screen-tree [data-tool=trace]',
+        'wait .save-view__button',
+        `post iframe.workspace-trace ${setups.SAVE_VIEW_QUERY}`,
+        'click .save-view__button',
+        'wait .cds--modal.is-visible .cds--modal-container',
+      ]);
+      log.length = 0;
+      disabled = false;
+      await run('open-save-view-dialog', page);
+      expect(log.filter((entry) => entry.startsWith('post'))).toEqual([]);
+    });
+
     it('hover-action hovers the first action until its tooltip shows', async () => {
       const { page, log } = fakePage([]);
       await run('hover-action', page);
@@ -1014,6 +1110,81 @@ describe('runner.mjs', () => {
       const hosted = await runner.checkRow(page, probe, { hosted: true, throwOnFailure: false });
       expect(hosted.skipped).toEqual([]);
       expect(hosted.failures).toEqual(['padding-top is 4, expected 0 (the literal: 0px)']);
+    });
+
+    it('compares fill as a colour', async () => {
+      const page = mount(
+        '.probed { fill: #102030; }',
+        '<div class="cds--white"><svg><rect class="probed"></rect></svg></div>'
+      );
+      expect((await runner.checkRow(page, row({ fill: { literal: '#102030' } }))).ok).toBe(true);
+      const fail = await runner.checkRow(page, row({ fill: { literal: '#ffffff' } }), {
+        throwOnFailure: false,
+      });
+      expect(fail.failures).toEqual([
+        'fill is rgb(16, 32, 48), expected rgb(255, 255, 255) (the literal: #ffffff)',
+      ]);
+    });
+
+    describe('an inside target', () => {
+      /** Stubs the boxes jsdom does not lay out: the element's and each of its ancestors'. */
+      function boxes(map: Record<string, [left: number, right: number]>) {
+        for (const [selector, [left, right]] of Object.entries(map)) {
+          const el = document.querySelector(selector) as Element;
+          el.getBoundingClientRect = () =>
+            ({ left, right, width: right - left, x: left, top: 0, bottom: 10 }) as DOMRect;
+        }
+      }
+      const inside = row({ width: { inside: '.box' } });
+      const html =
+        '<div class="cds--white"><div class="box"><div class="foot"><b class="probed"></b></div></div></div>';
+
+      it('passes when both inline edges lie within the ancestor', async () => {
+        const page = mount('', html);
+        boxes({ '.box': [100, 500], '.probed': [100.4, 499.6] });
+        const result = await runner.checkRow(page, inside);
+        expect(result.ok).toBe(true);
+        expect(result.checks[0].comparisons.map((c) => c.against)).toEqual([
+          'the inline edges of .box',
+        ]);
+      });
+
+      it('fails an element that starts left of the ancestor, as Cancel did (A2)', async () => {
+        const page = mount('', html);
+        boxes({ '.box': [100, 500], '.probed': [-197, 60] });
+        const result = await runner.checkRow(page, inside, { throwOnFailure: false });
+        expect(result.failures).toEqual([
+          'the box is -197..60, expected within 100..500 (the inline edges of .box)',
+        ]);
+      });
+
+      it('fails an element past the right edge, an empty box, or one with no such ancestor', async () => {
+        const page = mount('', html);
+        const options = { throwOnFailure: false };
+        boxes({ '.box': [100, 500], '.probed': [400, 501] });
+        expect((await runner.checkRow(page, inside, options)).ok).toBe(false);
+        boxes({ '.probed': [200, 200] });
+        expect((await runner.checkRow(page, inside, options)).ok).toBe(false);
+        const orphan = await runner.checkRow(page, row({ width: { inside: '.absent' } }), options);
+        expect(orphan.failures).toEqual([
+          'the box is 200..200, expected within .absent (no ancestor matches .absent)',
+        ]);
+      });
+
+      it('never takes the element itself for its ancestor', async () => {
+        const page = mount('', '<div class="cds--white"><b class="probed box"></b></div>');
+        boxes({ '.probed': [0, 10] });
+        const result = await runner.checkRow(page, inside, { throwOnFailure: false });
+        expect(result.ok).toBe(false);
+      });
+
+      it('checks the geometry standalone and hosted alike', async () => {
+        const page = mount('', html);
+        boxes({ '.box': [100, 500], '.probed': [150, 450] });
+        document.documentElement.setAttribute('data-canopy-host', '');
+        const hosted = await runner.checkRow(page, inside, { hosted: true });
+        expect([hosted.ok, hosted.skipped]).toEqual([true, []]);
+      });
     });
 
     it('runs the postconditions of the row setups last', async () => {
