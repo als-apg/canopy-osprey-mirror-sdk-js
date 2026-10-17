@@ -103,7 +103,11 @@ async function evaluateRow(el, arg) {
   const style = view.getComputedStyle(el, arg.pseudo ?? undefined);
 
   const kindOf = (property) =>
-    property === 'font-family' ? 'font' : /color$/.test(property) ? 'colour' : 'length';
+    property === 'font-family'
+      ? 'font'
+      : /color$/.test(property) || property === 'fill'
+        ? 'colour'
+        : 'length';
   const norm = (kind, value) =>
     kind === 'font'
       ? normalizeFont(value)
@@ -162,6 +166,30 @@ async function evaluateRow(el, arg) {
       compare(`var(${token})`, variable(token));
     } else if (typeof target.literal === 'string') {
       compare('the literal', target.literal);
+    } else if (typeof target.inside === 'string') {
+      // Geometry, not style: both inline edges of the element's box lie within the box of its
+      // nearest ancestor matching the selector (half a pixel of rounding allowed).
+      const box = el.getBoundingClientRect();
+      const outer = el.parentElement ? el.parentElement.closest(target.inside) : null;
+      const edges = (r) => `${Math.round(r.left)}..${Math.round(r.right)}`;
+      if (outer === null) {
+        check.comparisons.push({
+          against: `no ancestor matches ${target.inside}`,
+          subject: 'the box',
+          actual: edges(box),
+          expected: `within ${target.inside}`,
+          pass: false,
+        });
+      } else {
+        const o = outer.getBoundingClientRect();
+        check.comparisons.push({
+          against: `the inline edges of ${target.inside}`,
+          subject: 'the box',
+          actual: edges(box),
+          expected: `within ${edges(o)}`,
+          pass: box.width > 0 && box.left >= o.left - 0.5 && box.right <= o.right + 0.5,
+        });
+      }
     } else if (typeof target.mix === 'string') {
       if (!gated && target.standalone && typeof target.standalone.carbon === 'string') {
         // Standalone, Carbon paints its own token: the opaque replacement is gated.
@@ -288,6 +316,10 @@ const show = (/** @type {unknown} */ v) => (v === '' ? '(unparsable)' : String(v
  *  - `carbon`: the property equals the zone's `--cds-<token>`.
  *  - `literal`, `mix`: the property equals the value, resolved inside the zone. Standalone, a
  *    `mix` with a `standalone.carbon` branch is compared to the zone's `--cds-<token>` instead.
+ *  - `inside`: geometry, under `width` only: the element's left and right edges lie within the
+ *    box of its nearest ancestor matching the selector, and its box is not empty. Hosted or
+ *    standalone alike; the property's own value is not compared.
+ *  - `fill` is compared as a colour, like every `*-color` property.
  *  - `hostOnly` targets are skipped standalone.
  *
  * Hosted is what the document says (`data-canopy-host` on `<html>`); `hosted` is what the caller

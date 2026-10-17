@@ -243,6 +243,57 @@ async function openTraceTab(page) {
   await page.locator('.save-view__button').first().waitFor();
 }
 
+/** The Trace frame of a tool tab, the Save-view button, and the open dialog's box. */
+const TRACE_FRAME = 'iframe.workspace-trace';
+const SAVE_VIEW_BUTTON = '.save-view__button';
+const OPEN_MODAL = '.cds--modal.is-visible .cds--modal-container';
+/** The query the stand-in Trace reports when the opened tab has none, so there is a view to save. */
+export const SAVE_VIEW_QUERY = 'pv=PROBE:SAVE&range=-1h';
+
+/**
+ * Asks the stand-in Trace in `frame` to report `query` as its view; runs in the page, on the
+ * iframe. Waits for the frame's hook (`__postQuery`) to be installed.
+ *
+ * @param {Element} frame
+ * @param {string} query
+ * @returns {Promise<string | null>} Why the query was not reported, or null when it was.
+ */
+async function postTraceQueryInPage(frame, query) {
+  const view = /** @type {any} */ (frame.ownerDocument.defaultView);
+  const deadline = view.performance.now() + 5000;
+  for (;;) {
+    const inner = /** @type {any} */ (frame).contentWindow;
+    if (inner && typeof inner.__postQuery === 'function') {
+      inner.__postQuery(query);
+      return null;
+    }
+    if (view.performance.now() > deadline) return 'the Trace frame never offered __postQuery';
+    await new Promise((r) => view.setTimeout(r, 50));
+  }
+}
+
+/**
+ * Opens the Save-view dialog of a Trace tab (whose primary button reads Save, or Replace over
+ * a view of the same name) and stops there: it never saves. The button is disabled while the
+ * tab has no query, so a stand-in Trace is asked to report one first.
+ *
+ * @param {PageLike} page
+ * @returns {Promise<void>}
+ */
+async function openSaveViewDialog(page) {
+  await openTraceTab(page);
+  const button = page.locator(SAVE_VIEW_BUTTON).first();
+  if (await button.isDisabled()) {
+    const failure = await page
+      .locator(TRACE_FRAME)
+      .first()
+      .evaluate(postTraceQueryInPage, SAVE_VIEW_QUERY);
+    if (failure !== null) throw new Error(`open-save-view-dialog: ${failure}`);
+  }
+  await button.click();
+  await page.locator(OPEN_MODAL).first().waitFor();
+}
+
 /**
  * Opens the context menu of the first saved view. The page needs one: the caller seeds it.
  *
@@ -460,6 +511,7 @@ export {
   openScreenTreeMenu as 'open-screen-tree-menu',
   openInsightOverflow as 'open-insight-overflow',
   openTraceTab as 'open-trace-tab',
+  openSaveViewDialog as 'open-save-view-dialog',
   openViewMenu as 'open-view-menu',
   dockSecondTile as 'dock-second-tile',
   holdTabDrag as 'hold-tab-drag',

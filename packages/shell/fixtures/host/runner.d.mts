@@ -19,6 +19,7 @@ export type ProbeProperty =
   | 'border-top-color'
   | 'border-top-left-radius'
   | 'color'
+  | 'fill'
   | 'font-family'
   | 'font-size'
   | 'height'
@@ -57,7 +58,16 @@ export interface MixTarget {
   standalone?: { carbon: string };
 }
 
-export type Target = ContractTarget | CarbonTarget | LiteralTarget | MixTarget;
+/**
+ * Geometry, under `width` only: both inline edges of the element lie within the box of its
+ * nearest ancestor matching `inside`, and its box is not empty.
+ */
+export interface InsideTarget {
+  /** A selector of an ancestor of the element. */
+  inside: string;
+}
+
+export type Target = ContractTarget | CarbonTarget | LiteralTarget | MixTarget | InsideTarget;
 
 export interface ProbeRow {
   app: ProbeApp;
@@ -72,6 +82,7 @@ export interface ProbeRow {
   stack?: false;
   /** The page needs a hare backend (implied by the `open-write-dialog` setup). */
   hare?: true;
+  /** `InsideTarget` is allowed under `width` only. */
   expect: Partial<Record<ProbeProperty, Target>>;
 }
 

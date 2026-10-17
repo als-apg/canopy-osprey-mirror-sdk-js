@@ -70,6 +70,38 @@
     },
     {
       "app": "viewer",
+      "selector": "[data-testid=screen-header] .cds--header__action",
+      "setup": [],
+      "expect": {
+        "color": { "contract": "text-secondary", "hostOnly": true }
+      }
+    },
+    {
+      "app": "viewer",
+      "selector": "[data-testid=screen-header] .cds--header__action svg",
+      "setup": [],
+      "expect": {
+        "fill": { "contract": "text-secondary", "hostOnly": true }
+      }
+    },
+    {
+      "app": "viewer",
+      "selector": "[data-testid=screen-header] .cds--header__action",
+      "setup": ["hover"],
+      "expect": {
+        "color": { "contract": "text-primary", "hostOnly": true }
+      }
+    },
+    {
+      "app": "viewer",
+      "selector": "[data-testid=screen-header] .cds--header__action svg",
+      "setup": ["hover"],
+      "expect": {
+        "fill": { "contract": "text-primary", "hostOnly": true }
+      }
+    },
+    {
+      "app": "viewer",
       "selector": "[data-testid=screen-header] .screen-header__button",
       "setup": [],
       "expect": {
@@ -316,6 +348,24 @@
       }
     },
     {
+      "app": "viewer",
+      "selector": ".cds--modal.is-visible .cds--modal-footer .cds--btn--secondary",
+      "setup": ["open-save-view-dialog"],
+      "stack": false,
+      "expect": {
+        "width": { "inside": ".cds--modal-container" }
+      }
+    },
+    {
+      "app": "viewer",
+      "selector": ".cds--modal.is-visible .cds--modal-footer .cds--btn--primary",
+      "setup": ["open-save-view-dialog"],
+      "stack": false,
+      "expect": {
+        "width": { "inside": ".cds--modal-container" }
+      }
+    },
+    {
       "app": "correlation",
       "selector": "[data-testid=actions-bar]",
       "setup": [],
@@ -401,6 +451,22 @@
       }
     },
     {
+      "app": "trace",
+      "selector": "#display-name",
+      "setup": ["select-first-outline-row", "open-properties"],
+      "expect": {
+        "height": { "contract": "control-h-sm" }
+      }
+    },
+    {
+      "app": "trace",
+      "selector": ".cds--toggle:has(#show-symbols) .cds--toggle__text",
+      "setup": ["select-first-outline-row", "open-properties", "inspector-tab-symbol"],
+      "expect": {
+        "font-size": { "contract": "text-sm" }
+      }
+    },
+    {
       "app": "viewer",
       "selector": ".target-badge[role=status]",
       "setup": [],
@@ -468,6 +534,7 @@
       "selector": ".wb-sidebar__tabbar",
       "setup": [],
       "expect": {
+        "height": { "contract": "control-h-xs" },
         "border-bottom-color": { "contract": "border", "standalone": { "carbon": "border-subtle" } }
       }
     },

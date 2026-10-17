@@ -728,7 +728,8 @@ html[data-canopy-host] .cds--modal-footer {
 }
 
 /* The :not() selector outranks Carbon's own footer padding, which would push the label of a
-   compact button outside its box. */
+   compact button outside its box. `inline-size: auto` undoes Carbon's
+   `.cds--btn-set .cds--btn { inline-size: 100% }`, which otherwise pushes Cancel off-screen. */
 html[data-canopy-host] .cds--modal-footer .cds--btn,
 html[data-canopy-host] .cds--modal-footer .cds--btn:not(.cds--skeleton) {
   flex: 0 0 auto;
@@ -737,6 +738,7 @@ html[data-canopy-host] .cds--modal-footer .cds--btn:not(.cds--skeleton) {
   min-block-size: var(--canopy-control-h-sm);
   padding-block: 0;
   padding-inline: 12px;
+  inline-size: auto;
   max-inline-size: none;
 }
 
@@ -753,6 +755,20 @@ html[data-canopy-host] .cds--header__action {
   block-size: var(--canopy-control-h-sm);
   inline-size: var(--canopy-control-h-sm);
   min-inline-size: var(--canopy-control-h-sm);
+  color: var(--canopy-text-secondary);
+}
+
+/* Carbon paints header actions, their icons, focus border and hover from its own tokens, which
+   inside the g100 header zone are the dark-theme values: white icons on a light host bar. The
+   colours below come from the contract instead, so every host theme reads. */
+html[data-canopy-host] .cds--header__action:hover {
+  color: var(--canopy-text-primary);
+  background-color: var(--canopy-hover-tint);
+}
+
+html[data-canopy-host] .cds--header__action:focus {
+  border-color: var(--canopy-focus);
+  box-shadow: inset 0 0 0 1px var(--canopy-focus);
 }
 
 html[data-canopy-host] .cds--header__action svg {
@@ -760,7 +776,14 @@ html[data-canopy-host] .cds--header__action svg {
   block-size: 16px;
 }
 
+/* The icon follows the action's colour. Carbon fills it at (0,4,1) on hover, active and the open
+   panel, so this selector needs the extra .cds--header and .cds--btn to win. */
+html[data-canopy-host] .cds--header .cds--btn.cds--header__action svg {
+  fill: currentColor;
+}
+
 html[data-canopy-host] .cds--header__name {
   padding-inline: 0 8px;
   font-size: var(--canopy-text-lg);
+  color: var(--canopy-text-primary);
 }

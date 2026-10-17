@@ -59,6 +59,7 @@ export type SetupName =
   | 'open-screen-tree-menu'
   | 'open-insight-overflow'
   | 'open-trace-tab'
+  | 'open-save-view-dialog'
   | 'open-view-menu'
   | 'dock-second-tile'
   | 'hold-tab-drag';
@@ -68,6 +69,9 @@ export declare const WRITE_PROBE_PAGE: string;
 
 /** A PV the Trace hare mock never answers, so its metadata check stays pending. */
 export declare const HOLD_PV: string;
+
+/** The query the stand-in Trace reports when the opened tab has none, so there is a view to save. */
+export declare const SAVE_VIEW_QUERY: string;
 
 /**
  * Conditions that must still hold when a row's expectations have been read, by setup name, and
@@ -89,6 +93,7 @@ declare const inspectorTabSymbol: Setup;
 declare const openScreenTreeMenu: Setup;
 declare const openInsightOverflow: Setup;
 declare const openTraceTab: Setup;
+declare const openSaveViewDialog: Setup;
 declare const openViewMenu: Setup;
 declare const dockSecondTile: Setup;
 declare const holdTabDrag: Setup;
@@ -108,6 +113,7 @@ export {
   openScreenTreeMenu as 'open-screen-tree-menu',
   openInsightOverflow as 'open-insight-overflow',
   openTraceTab as 'open-trace-tab',
+  openSaveViewDialog as 'open-save-view-dialog',
   openViewMenu as 'open-view-menu',
   dockSecondTile as 'dock-second-tile',
   holdTabDrag as 'hold-tab-drag',

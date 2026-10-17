@@ -72,6 +72,9 @@ function rule(selector: string): Declarations {
   return found;
 }
 
+/** Outranks Carbon's (0,4,1) icon fill on a hovered, pressed or open header action. */
+const HEADER_ICON = '.cds--header .cds--btn.cds--header__action svg';
+
 const v = (name: string) => `var(--canopy-${name})`;
 const ALPHA_ACCENT = `color-mix(in srgb, ${v('accent')} 25%, transparent)`;
 
@@ -103,7 +106,15 @@ describe('the hand-written section of host-contract.css', () => {
 
   it('names no other colour: no rgb(), hsl() or colour keyword besides transparent', () => {
     expect(HAND_CSS).not.toMatch(/\b(rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(/);
-    expect(HAND_CSS).not.toMatch(/:\s*(white|black|red|currentcolor)\b/i);
+    expect(HAND_CSS).not.toMatch(/:\s*(white|black|red)\b/i);
+  });
+
+  it('reads currentColor once, as the fill of a header-action icon', () => {
+    expect(HAND_CSS.match(/currentcolor/gi)).toHaveLength(1);
+    const readers = [...RULES].filter(([, d]) =>
+      Object.values(d).some((x) => /currentcolor/i.test(x))
+    );
+    expect(readers).toEqual([[hosted(HEADER_ICON), { fill: 'currentColor' }]]);
   });
 
   it('reads contract variables only, and only names of the contract', () => {
@@ -323,6 +334,7 @@ describe('the component rules under the host gate', () => {
     expect(rule(hosted('.cds--header__name'))).toEqual({
       'padding-inline': '0 8px',
       'font-size': v('text-lg'),
+      color: v('text-primary'),
     });
     expect(rule(hosted('.cds--header__action svg'))).toEqual({
       'inline-size': '16px',
@@ -336,7 +348,20 @@ describe('the component rules under the host gate', () => {
       'block-size': v('control-h-sm'),
       'inline-size': v('control-h-sm'),
       'min-inline-size': v('control-h-sm'),
+      color: v('text-secondary'),
     });
+  });
+
+  it('colour a header action from the contract in every state (B1)', () => {
+    expect(rule(hosted('.cds--header__action:hover'))).toEqual({
+      color: v('text-primary'),
+      'background-color': v('hover-tint'),
+    });
+    expect(rule(hosted('.cds--header__action:focus'))).toEqual({
+      'border-color': v('focus'),
+      'box-shadow': `inset 0 0 0 1px ${v('focus')}`,
+    });
+    expect(rule(hosted(HEADER_ICON))).toEqual({ fill: 'currentColor' });
   });
 
   // Carbon pins the input at (0,2,1) with attribute selectors, in both sizes.
@@ -358,7 +383,8 @@ describe('the component rules under the host gate', () => {
     });
   });
 
-  // The :not(.cds--skeleton) selector is what outranks Carbon's (0,3,0) footer padding.
+  // The :not(.cds--skeleton) selector is what outranks Carbon's (0,3,0) footer padding. Carbon's
+  // `.cds--btn-set .cds--btn { inline-size: 100% }` would otherwise push Cancel off-screen (A2).
   it.each(['.cds--modal-footer .cds--btn', '.cds--modal-footer .cds--btn:not(.cds--skeleton)'])(
     'fit %s inside a contract-height box',
     (selector) => {
@@ -369,6 +395,7 @@ describe('the component rules under the host gate', () => {
         'min-block-size': v('control-h-sm'),
         'padding-block': '0',
         'padding-inline': '12px',
+        'inline-size': 'auto',
         'max-inline-size': 'none',
       });
     }
