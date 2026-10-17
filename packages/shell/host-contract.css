@@ -728,7 +728,8 @@ html[data-canopy-host] .cds--modal-footer {
 }
 
 /* The :not() selector outranks Carbon's own footer padding, which would push the label of a
-   compact button outside its box. */
+   compact button outside its box. `inline-size: auto` undoes Carbon's
+   `.cds--btn-set .cds--btn { inline-size: 100% }`, which otherwise pushes Cancel off-screen. */
 html[data-canopy-host] .cds--modal-footer .cds--btn,
 html[data-canopy-host] .cds--modal-footer .cds--btn:not(.cds--skeleton) {
   flex: 0 0 auto;
@@ -737,6 +738,7 @@ html[data-canopy-host] .cds--modal-footer .cds--btn:not(.cds--skeleton) {
   min-block-size: var(--canopy-control-h-sm);
   padding-block: 0;
   padding-inline: 12px;
+  inline-size: auto;
   max-inline-size: none;
 }
 

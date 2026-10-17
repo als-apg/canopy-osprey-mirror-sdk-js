@@ -358,7 +358,8 @@ describe('the component rules under the host gate', () => {
     });
   });
 
-  // The :not(.cds--skeleton) selector is what outranks Carbon's (0,3,0) footer padding.
+  // The :not(.cds--skeleton) selector is what outranks Carbon's (0,3,0) footer padding. Carbon's
+  // `.cds--btn-set .cds--btn { inline-size: 100% }` would otherwise push Cancel off-screen (A2).
   it.each(['.cds--modal-footer .cds--btn', '.cds--modal-footer .cds--btn:not(.cds--skeleton)'])(
     'fit %s inside a contract-height box',
     (selector) => {
@@ -369,6 +370,7 @@ describe('the component rules under the host gate', () => {
         'min-block-size': v('control-h-sm'),
         'padding-block': '0',
         'padding-inline': '12px',
+        'inline-size': 'auto',
         'max-inline-size': 'none',
       });
     }
