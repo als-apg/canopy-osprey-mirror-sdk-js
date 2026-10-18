@@ -606,11 +606,20 @@ describe('FoxFormulaService', () => {
       instances[0]!.close(1008, 'invalid_api_key');
 
       expect(service.status).toBe('disconnected');
-      expect(onError).toHaveBeenCalledExactlyOnceWith({
-        code: 'ws_terminal_close',
-        message:
-          'FoxFormulaService: server closed the connection with code 1008 (invalid_api_key); not reconnecting',
-      });
+      // The held subscription (no onError of its own) is told its evaluation
+      // is gone first, then the service reports the terminal close; neither is
+      // retryable because the service no longer reconnects on its own.
+      expect(onError.mock.calls).toEqual([
+        [{ code: 'ws_disconnected', message: 'Formula connection lost.', retryable: false }],
+        [
+          {
+            code: 'ws_terminal_close',
+            message:
+              'FoxFormulaService: server closed the connection with code 1008 (invalid_api_key); not reconnecting',
+            retryable: false,
+          },
+        ],
+      ]);
       vi.advanceTimersByTime(60_000);
       expect(instances).toHaveLength(1);
 
