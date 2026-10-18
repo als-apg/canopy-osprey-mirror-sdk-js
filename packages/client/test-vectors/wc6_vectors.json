@@ -1,7 +1,75 @@
 {
   "contract": "WC6",
-  "about": "CANOPY write outcomes, one entry per WC6 row id. `detail` is the envelope detail and equals the toast for every server row; `<...>` marks the dynamic part (rows 6-9: OSPREY's message, row 11: the observed value, the whole detail cut at 256 characters). `default` is the detail used when a dynamic row has no message. `status`/`code` null: no response or no envelope. 16-coalesced: `outcome` is the winner's, no toast for the superseded value; `toast` is the viewer's text for a run stopped by it.",
-  "detail_max_chars": 256,
+  "about": "CANOPY write outcomes, one entry per WC6 row id. `detail` is the envelope detail and equals the toast for every server row; `<...>` marks the dynamic part (rows 6-9: OSPREY's message, row 11: the observed value, row 16a: the frame's `label`; a detail longer than `detail_max_chars` is cut at the last whitespace before that limit with … appended, so it never ends inside a word). `detail_cut_cases` are the cases that define that cut: `text` cut to `limit` characters is `expected`, a character being one Unicode code point. `default` is the detail used when a dynamic row has no message (16a: a null label). Rows 1-off-disabled, 1-off-origin, 3a and 6-readonly-run carry the 403 text of their cause in the writes cause table (`heartbeat_vectors.json` `writes_cases`) verbatim; 6-readonly-run is row 6 when the whole deployment runs read-only. `status`/`code` null: no response or no envelope. 16-coalesced: `outcome` is the winner's, no toast for the superseded value; `toast` is the viewer's text for a run stopped by it.",
+  "detail_max_chars": 512,
+  "detail_cut_cases": [
+    {
+      "case": "fits-exactly",
+      "text": "aaa bbb ccc",
+      "limit": 11,
+      "expected": "aaa bbb ccc"
+    },
+    {
+      "case": "cut-lands-on-a-space",
+      "text": "aaa bbb ccc",
+      "limit": 8,
+      "expected": "aaa bbb…"
+    },
+    {
+      "case": "cut-lands-inside-a-word",
+      "text": "aaa bbb ccc",
+      "limit": 7,
+      "expected": "aaa…"
+    },
+    {
+      "case": "tab-is-a-boundary",
+      "text": "aaa\tbbb ccc",
+      "limit": 7,
+      "expected": "aaa…"
+    },
+    {
+      "case": "newline-is-a-boundary",
+      "text": "aaa\nbbb ccc",
+      "limit": 7,
+      "expected": "aaa…"
+    },
+    {
+      "case": "whitespace-run-leaves-no-trailing-space",
+      "text": "aaa  bbb",
+      "limit": 6,
+      "expected": "aaa…"
+    },
+    {
+      "case": "first-token-longer-than-the-limit",
+      "text": "aaa bbb ccc",
+      "limit": 3,
+      "expected": "aa…"
+    },
+    {
+      "case": "long-token-after-a-sentence",
+      "text": "written; the channel holds xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "limit": 40,
+      "expected": "written; the channel holds…"
+    },
+    {
+      "case": "astral-character-counts-as-one-fits",
+      "text": "😀😀😀😀",
+      "limit": 4,
+      "expected": "😀😀😀😀"
+    },
+    {
+      "case": "astral-character-counts-as-one-cut",
+      "text": "😀😀 😀😀 😀😀",
+      "limit": 6,
+      "expected": "😀😀 😀😀…"
+    },
+    {
+      "case": "at-the-cap",
+      "text": "word0 word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12 word13 word14 word15 word16 word17 word18 word19 word20 word21 word22 word23 word24 word25 word26 word27 word28 word29 word30 word31 word32 word33 word34 word35 word36 word37 word38 word39 word40 word41 word42 word43 word44 word45 word46 word47 word48 word49 word50 word51 word52 word53 word54 word55 word56 word57 word58 word59 word60 word61 word62 word63 word64 word65 word66 word67 word68 word69 word70 word71 word72 word73 word74 word75 word76 word77 word78 word79 word80 word81 word82 word83 word84 word85 word86 word87 word88 word89 word90 word91 word92 word93 word94 word95 word96 word97 word98 word99 word100 word101 word102 word103 word104 word105 word106 word107 word108 word109 word110 word111 word112 word113 word114 word115 word116 word117 word118 word119",
+      "limit": 512,
+      "expected": "word0 word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12 word13 word14 word15 word16 word17 word18 word19 word20 word21 word22 word23 word24 word25 word26 word27 word28 word29 word30 word31 word32 word33 word34 word35 word36 word37 word38 word39 word40 word41 word42 word43 word44 word45 word46 word47 word48 word49 word50 word51 word52 word53 word54 word55 word56 word57 word58 word59 word60 word61 word62 word63 word64 word65 word66 word67 word68 word69 word70 word71 word72 word73…"
+    }
+  ],
   "rows": {
     "1-off-disabled": {
       "source": "adapter",
@@ -12,10 +80,10 @@
         "decision": "refused",
         "reason": "writes_disabled"
       },
-      "detail": "writes are off here",
-      "toast": "writes are off here",
+      "detail": "writes from screens are not enabled in this deployment; nothing written",
+      "toast": "writes from screens are not enabled in this deployment; nothing written",
       "dynamic": false,
-      "default": "writes are off here"
+      "default": "writes from screens are not enabled in this deployment; nothing written"
     },
     "1-off-origin": {
       "source": "adapter",
@@ -26,10 +94,10 @@
         "decision": "refused",
         "reason": "own_origin_missing"
       },
-      "detail": "writes are off here until agent pages have their own origin",
-      "toast": "writes are off here until agent pages have their own origin",
+      "detail": "screens stay read-only until agent pages have their own origin; nothing written",
+      "toast": "screens stay read-only until agent pages have their own origin; nothing written",
       "dynamic": false,
-      "default": "writes are off here until agent pages have their own origin"
+      "default": "screens stay read-only until agent pages have their own origin; nothing written"
     },
     "2": {
       "source": "adapter",
@@ -68,10 +136,10 @@
         "decision": "refused",
         "reason": "posture_changed"
       },
-      "detail": "the write state of this target changed; the panel is reconnecting - retry",
-      "toast": "the write state of this target changed; the panel is reconnecting - retry",
+      "detail": "the write state of this target changed; nothing written",
+      "toast": "the write state of this target changed; nothing written",
       "dynamic": false,
-      "default": "the write state of this target changed; the panel is reconnecting - retry"
+      "default": "the write state of this target changed; nothing written"
     },
     "4": {
       "source": "session",
@@ -170,6 +238,20 @@
       "toast": "<error_message>",
       "dynamic": true,
       "default": "the write was refused; nothing written"
+    },
+    "6-readonly-run": {
+      "source": "connector",
+      "outcome": "refused",
+      "status": 403,
+      "code": "pv_write_refused",
+      "audit": {
+        "decision": "refused",
+        "reason": "channel_write_blocked"
+      },
+      "detail": "the whole deployment is running read-only; nothing written",
+      "toast": "the whole deployment is running read-only; nothing written",
+      "dynamic": false,
+      "default": "the whole deployment is running read-only; nothing written"
     },
     "7": {
       "source": "connector",
@@ -376,10 +458,24 @@
         "decision": null,
         "reason": null
       },
-      "detail": "the control target changed; nothing written",
-      "toast": "the control target changed; nothing written",
+      "detail": "the control target or its write state changed; nothing written",
+      "toast": "the control target or its write state changed; nothing written",
       "dynamic": false,
-      "default": "the control target changed; nothing written"
+      "default": "the control target or its write state changed; nothing written"
+    },
+    "16a": {
+      "source": "client",
+      "outcome": "target_changed",
+      "status": null,
+      "code": null,
+      "audit": {
+        "decision": null,
+        "reason": null
+      },
+      "detail": "the write state of <label> changed; nothing written",
+      "toast": "the write state of <label> changed; nothing written",
+      "dynamic": true,
+      "default": "the write state of this target changed; nothing written"
     },
     "16-coalesced": {
       "source": "client",
