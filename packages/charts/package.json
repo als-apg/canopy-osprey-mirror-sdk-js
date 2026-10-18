@@ -1,0 +1,57 @@
+{
+  "name": "@slaclab/canopy-charts",
+  "version": "0.2.0",
+  "private": false,
+  "description": "ECharts helpers for Canopy apps — Carbon g10/g100 chart themes, the CanopyChart wrapper, PNG capture and number formatters",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/slaclab/canopy-sdk-js.git",
+    "directory": "packages/charts"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "peerDependencies": {
+    "@slaclab/canopy-shell": "workspace:^",
+    "echarts": "^6.0.0",
+    "echarts-for-react": "^3.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@carbon/icons-react": "^11.81.0",
+    "@carbon/react": "^1.108.0",
+    "@slaclab/canopy-shell": "workspace:^",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "echarts": "^6.1.0",
+    "echarts-for-react": "^3.0.6",
+    "jsdom": "^26.0.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "typescript": "~6.0.2",
+    "vitest": "^4.1.6"
+  }
+}

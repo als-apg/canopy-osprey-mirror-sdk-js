@@ -1,11 +1,12 @@
 {
   "name": "canopy-sdk-js",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "private": true,
   "description": "TypeScript SDK for building apps on Canopy — live-PV client, typed API contracts, and the shared Carbon app shell",
   "type": "module",
   "scripts": {
     "build": "pnpm -r run build",
+    "build:watch": "pnpm -r --parallel exec tsc -p tsconfig.build.json --watch --preserveWatchOutput",
     "test": "pnpm run build && pnpm -r run test",
     "test:watch": "pnpm -r --parallel run test:watch",
     "test:coverage": "pnpm run build && pnpm -r run test:coverage",

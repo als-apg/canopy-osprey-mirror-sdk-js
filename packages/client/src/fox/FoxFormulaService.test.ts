@@ -62,6 +62,28 @@ describe('FoxFormulaService', () => {
       }).connect();
       expect(instances[1]!.url).toBe('wss://elsewhere/fox/v1/ws/formulas');
     });
+
+    it('resolves a relative baseUrl (a dev-proxy prefix) against the page location', () => {
+      vi.stubGlobal('location', { protocol: 'http:', host: 'localhost:5173', pathname: '/' });
+      try {
+        const { factory, instances } = createFakeWebSocketFactory();
+        new FoxFormulaService({ baseUrl: '/api/canopy', webSocketFactory: factory }).connect();
+        expect(instances[0]!.url).toBe('ws://localhost:5173/api/canopy/fox/v1/ws/formulas');
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it('does not resolve baseUrl when wsUrl overrides it', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      // A relative base with no location would throw if it were resolved.
+      new FoxFormulaService({
+        baseUrl: '/api/canopy',
+        wsUrl: 'ws://host/fox/v1/ws/formulas',
+        webSocketFactory: factory,
+      }).connect();
+      expect(instances[0]!.url).toBe('ws://host/fox/v1/ws/formulas');
+    });
   });
 
   // ── Subscribe / result routing ────────────────────────────────────────────
@@ -564,6 +586,59 @@ describe('FoxFormulaService', () => {
       instances[0]!.close();
 
       expect(onStatusChange.mock.calls).toEqual([['connecting'], ['connected'], ['disconnected']]);
+    });
+  });
+
+  describe('terminal close codes', () => {
+    it('stops reconnecting after a 1008 close and keeps subscriptions for a later connect()', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const onError = vi.fn<(error: FoxError) => void>();
+      const service = new FoxFormulaService({
+        baseUrl: BASE_URL,
+        webSocketFactory: factory,
+        onError,
+      });
+      service.connect();
+      service.subscribe(makeSpec(), { onResult: vi.fn() });
+      instances[0]!.open();
+      instances[0]!.message({ type: 'subscribed', id: 'srv-1' });
+
+      instances[0]!.close(1008, 'invalid_api_key');
+
+      expect(service.status).toBe('disconnected');
+      // The held subscription (no onError of its own) is told its evaluation
+      // is gone first, then the service reports the terminal close; neither is
+      // retryable because the service no longer reconnects on its own.
+      expect(onError.mock.calls).toEqual([
+        [{ code: 'ws_disconnected', message: 'Formula connection lost.', retryable: false }],
+        [
+          {
+            code: 'ws_terminal_close',
+            message:
+              'FoxFormulaService: server closed the connection with code 1008 (invalid_api_key); not reconnecting',
+            retryable: false,
+          },
+        ],
+      ]);
+      vi.advanceTimersByTime(60_000);
+      expect(instances).toHaveLength(1);
+
+      service.connect();
+      instances[1]!.open();
+      expect(instances[1]!.parsedSent()).toEqual([{ type: 'subscribe', spec: makeSpec() }]);
+    });
+
+    it('keeps reconnecting on 1008 when terminalCloseCodes is empty', () => {
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new FoxFormulaService({
+        baseUrl: BASE_URL,
+        webSocketFactory: factory,
+        terminalCloseCodes: [],
+      });
+      service.connect();
+      instances[0]!.close(1008);
+      vi.advanceTimersByTime(1000);
+      expect(instances).toHaveLength(2);
     });
   });
 });
