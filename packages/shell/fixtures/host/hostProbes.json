@@ -145,7 +145,7 @@
     },
     {
       "app": "viewer",
-      "selector": ".screen-header__button",
+      "selector": ".screen-header__button:not(:disabled)",
       "setup": ["focus"],
       "expect": {
         "outline-color": { "contract": "focus" },
