@@ -19,6 +19,8 @@ export const WC6_DETAIL_MAX_CHARS = 256;
 
 const REFUSED_GENERIC = 'the write was refused; nothing written';
 const TARGET_CHANGED = 'the control target changed; nothing written';
+const TARGET_OR_WRITES_CHANGED = 'the control target or its write state changed; nothing written';
+const WRITES_CHANGED = 'the write state of this target changed; nothing written';
 const UNKNOWN = 'outcome unknown — check the readback';
 const FRONT_REFUSED = 'the panel server refused this write; nothing written';
 
@@ -28,13 +30,13 @@ export const WC6_ROWS: Readonly<Record<string, Wc6Row>> = {
     outcome: 'refused',
     status: 403,
     code: 'pv_write_refused',
-    detail: 'writes are off here',
+    detail: 'writes from screens are not enabled in this deployment; nothing written',
   },
   '1-off-origin': {
     outcome: 'refused',
     status: 403,
     code: 'pv_write_refused',
-    detail: 'writes are off here until agent pages have their own origin',
+    detail: 'screens stay read-only until agent pages have their own origin; nothing written',
   },
   '2': {
     outcome: 'target_changed',
@@ -52,7 +54,7 @@ export const WC6_ROWS: Readonly<Record<string, Wc6Row>> = {
     outcome: 'refused',
     status: 403,
     code: 'pv_write_refused',
-    detail: 'the write state of this target changed; the panel is reconnecting - retry',
+    detail: WRITES_CHANGED,
   },
   '4': {
     outcome: 'refused',
@@ -91,6 +93,12 @@ export const WC6_ROWS: Readonly<Record<string, Wc6Row>> = {
     detail: 'the switch state could not be checked; nothing written',
   },
   '6': { outcome: 'refused', status: 403, code: 'pv_write_refused', detail: REFUSED_GENERIC },
+  '6-readonly-run': {
+    outcome: 'refused',
+    status: 403,
+    code: 'pv_write_refused',
+    detail: 'the whole deployment is running read-only; nothing written',
+  },
   '7': { outcome: 'refused', status: 403, code: 'pv_write_refused', detail: REFUSED_GENERIC },
   '8': { outcome: 'refused', status: 403, code: 'pv_write_refused', detail: REFUSED_GENERIC },
   '9': { outcome: 'refused', status: 403, code: 'pv_write_refused', detail: REFUSED_GENERIC },
@@ -125,7 +133,8 @@ export const WC6_ROWS: Readonly<Record<string, Wc6Row>> = {
   '14b-404': { outcome: 'refused', status: 404, code: 'pv_write_refused', detail: FRONT_REFUSED },
   '14b-413': { outcome: 'refused', status: 413, code: 'pv_write_refused', detail: FRONT_REFUSED },
   '15': { outcome: 'unknown', status: null, code: null, detail: UNKNOWN },
-  '16': { outcome: 'target_changed', status: null, code: null, detail: TARGET_CHANGED },
+  '16': { outcome: 'target_changed', status: null, code: null, detail: TARGET_OR_WRITES_CHANGED },
+  '16a': { outcome: 'target_changed', status: null, code: null, detail: WRITES_CHANGED },
   '16-coalesced': { outcome: null, status: null, code: null, detail: null },
 };
 
@@ -173,8 +182,24 @@ function rowOutcome(
   };
 }
 
-/** A client-side row that sent no request or got no reply: '15' (unknown) or '16' (target changed). */
-export function clientOutcome(rowId: '15' | '16'): WriteOutcome {
+/** Row 16a's text with its one token, `<label>`; a null label takes the row's default. */
+const WRITES_CHANGED_TEMPLATE = 'the write state of <label> changed; nothing written';
+
+/**
+ * A client-side row that sent no request or got no reply: '15' (unknown),
+ * '16' (the target or its write state changed) or '16a' (the write state of
+ * the target named by `label` changed). Only '16a' reads `label`; a null or
+ * absent label gives the row's default text.
+ */
+export function clientOutcome(rowId: '15' | '16' | '16a', label?: string | null): WriteOutcome {
+  if (rowId === '16a' && label != null) {
+    return rowOutcome(
+      rowId,
+      null,
+      null,
+      WRITES_CHANGED_TEMPLATE.replace('<label>', () => label)
+    );
+  }
   return rowOutcome(rowId, null, null);
 }
 

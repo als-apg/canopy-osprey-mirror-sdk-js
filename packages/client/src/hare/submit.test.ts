@@ -15,6 +15,7 @@ import {
   WC6_CODE_ROWS,
   WC6_DETAIL_MAX_CHARS,
   WC6_ROWS,
+  clientOutcome,
   outcomeFromResponse,
 } from './writeOutcome.js';
 
@@ -24,8 +25,10 @@ type VectorRow = {
   outcome: string | null;
   status: number | null;
   code: string | null;
+  detail: string | null;
   default: string | null;
   toast: string | null;
+  dynamic: boolean;
 };
 const vectors = vectorFile as unknown as {
   detail_max_chars: number;
@@ -35,7 +38,7 @@ const vectors = vectorFile as unknown as {
 const BASE_URL = 'ws://host/hare/v1/ws/pvs';
 const BINDING = 'va@3';
 const UNKNOWN_TEXT = 'outcome unknown — check the readback';
-const TARGET_CHANGED_TEXT = 'the control target changed; nothing written';
+const TARGET_CHANGED_TEXT = vectors.rows['16']!.default!;
 
 function heartbeatFrame(binding: string | null, backend = 'va'): HareHeartbeatFrame {
   return { type: 'heartbeat', timestamp: 0, backend, label: null, notice: null, binding };
@@ -140,6 +143,44 @@ describe('WC6 outcome table', () => {
     }
     expect(WC6_DETAIL_MAX_CHARS).toBe(vectors.detail_max_chars);
     expect(WC6_COALESCED_TOAST).toBe(vectors.rows['16-coalesced']!.toast);
+  });
+
+  it('gives row 16 its own text, apart from the server rows 2 and 3', () => {
+    expect(WC6_ROWS['16']!.detail).not.toBe(WC6_ROWS['2']!.detail);
+    expect(WC6_ROWS['16']!.detail).not.toBe(WC6_ROWS['3']!.detail);
+    expect(clientOutcome('16')).toEqual({
+      outcome: 'target_changed',
+      code: null,
+      status: null,
+      detail: vectors.rows['16']!.default,
+      coalesced: false,
+    });
+  });
+
+  it('fills row 16a with the label, and with the default for a null label', () => {
+    const row = vectors.rows['16a']!;
+    expect(row.dynamic).toBe(true);
+    expect(clientOutcome('16a', 'Simulator')).toEqual({
+      outcome: 'target_changed',
+      code: null,
+      status: null,
+      detail: row.detail!.replace('<label>', 'Simulator'),
+      coalesced: false,
+    });
+    expect(clientOutcome('16a', 'Simulator').detail).toBe(
+      'the write state of Simulator changed; nothing written'
+    );
+    expect(clientOutcome('16a', null).detail).toBe(row.default);
+    expect(clientOutcome('16a').detail).toBe(row.default);
+  });
+
+  it('fills only the label token: a label that looks like a token stays as given', () => {
+    expect(clientOutcome('16a', '<label>').detail).toBe(
+      'the write state of <label> changed; nothing written'
+    );
+    expect(clientOutcome('16a', '$&').detail).toBe(
+      'the write state of $& changed; nothing written'
+    );
   });
 
   it('maps every recognised code to a row carrying that code', () => {
