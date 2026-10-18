@@ -14,8 +14,32 @@ export interface Wc6Row {
   detail: string | null;
 }
 
-/** Longest envelope detail a server row carries; longer text is cut here too. */
-export const WC6_DETAIL_MAX_CHARS = 256;
+/**
+ * Longest envelope detail a server row carries, in Unicode code points with the
+ * cut's ellipsis included; longer text is cut here too, on a word boundary.
+ */
+export const WC6_DETAIL_MAX_CHARS = 512;
+
+const DETAIL_ELLIPSIS = '\u2026';
+
+/**
+ * `text` when it fits in `limit` code points; otherwise the longest whole-word
+ * prefix (trailing whitespace dropped) followed by an ellipsis, at most `limit`
+ * code points long. A first word longer than the limit is cut inside the word.
+ */
+export function cutWc6Detail(text: string, limit: number = WC6_DETAIL_MAX_CHARS): string {
+  const chars = Array.from(text);
+  if (chars.length <= limit) return text;
+  const headChars = chars.slice(0, limit - 1);
+  let head = headChars.join('');
+  if (!/\s/.test(chars[headChars.length]!)) {
+    // Python's head.rsplit(None, 1)[0]: all before the last whitespace run that
+    // separates two words, trailing whitespace ignored.
+    const words = /^([\s\S]*\S)\s+\S+\s*$/.exec(head);
+    if (words) head = words[1]!;
+  }
+  return head.trimEnd() + DETAIL_ELLIPSIS;
+}
 
 const REFUSED_GENERIC = 'the write was refused; nothing written';
 const TARGET_CHANGED = 'the control target changed; nothing written';
@@ -203,12 +227,12 @@ export function clientOutcome(rowId: '15' | '16' | '16a', label?: string | null)
   return rowOutcome(rowId, null, null);
 }
 
-/** Trimmed, length-capped server detail, or undefined when it is not usable text. */
+/** Trimmed server detail cut to the cap, or undefined when it is not usable text. */
 function toastText(detail: unknown): string | undefined {
   if (typeof detail !== 'string') return undefined;
   const text = detail.trim();
   if (text === '') return undefined;
-  return text.length > WC6_DETAIL_MAX_CHARS ? text.slice(0, WC6_DETAIL_MAX_CHARS) : text;
+  return cutWc6Detail(text);
 }
 
 /** The parsed body when it is a JSON object (not an array, not null), else null. */

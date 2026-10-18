@@ -16,6 +16,7 @@ import {
   WC6_DETAIL_MAX_CHARS,
   WC6_ROWS,
   clientOutcome,
+  cutWc6Detail,
   outcomeFromResponse,
 } from './writeOutcome.js';
 
@@ -32,6 +33,7 @@ type VectorRow = {
 };
 const vectors = vectorFile as unknown as {
   detail_max_chars: number;
+  detail_cut_cases: Array<{ case: string; text: string; limit: number; expected: string }>;
   rows: Record<string, VectorRow>;
 };
 
@@ -141,8 +143,31 @@ describe('WC6 outcome table', () => {
         detail: row.default,
       });
     }
-    expect(WC6_DETAIL_MAX_CHARS).toBe(vectors.detail_max_chars);
     expect(WC6_COALESCED_TOAST).toBe(vectors.rows['16-coalesced']!.toast);
+  });
+
+  it('caps an envelope detail at the vector file length', () => {
+    expect(WC6_DETAIL_MAX_CHARS).toBe(vectors.detail_max_chars);
+  });
+
+  it('carries cut cases in the vector file', () => {
+    expect(vectors.detail_cut_cases.length).toBeGreaterThan(0);
+  });
+
+  for (const c of vectors.detail_cut_cases) {
+    it(`cuts a detail like canopy: ${c.case}`, () => {
+      expect(cutWc6Detail(c.text, c.limit)).toBe(c.expected);
+      expect(cutWc6Detail(c.expected, c.limit)).toBe(c.expected);
+      expect(Array.from(cutWc6Detail(c.text, c.limit)).length).toBeLessThanOrEqual(c.limit);
+    });
+  }
+
+  it('cuts at the cap by default, on a word boundary', () => {
+    const sentence = Array.from({ length: 120 }, (_, i) => `word${i}`).join(' ');
+    const got = cutWc6Detail(sentence);
+    expect(Array.from(got).length).toBeLessThanOrEqual(WC6_DETAIL_MAX_CHARS);
+    expect(got.endsWith('\u2026')).toBe(true);
+    expect(sentence.startsWith(got.slice(0, -1) + ' ')).toBe(true);
   });
 
   it('gives row 16 its own text, apart from the server rows 2 and 3', () => {
@@ -230,9 +255,25 @@ describe('WC6 outcome table', () => {
     ).toMatchObject({ outcome: 'mismatch', detail: 'written; the channel holds 4' });
   });
 
-  it('cuts an over-long server detail at 256 characters', () => {
-    const got = outcomeFromResponse(false, 403, envelope('pv_write_refused', 'x'.repeat(400)));
-    expect(got.detail).toHaveLength(256);
+  it('keeps a server detail that fits the cap whole', () => {
+    const text = `refused: ${'limit '.repeat(60).trim()}`;
+    expect(text.length).toBeGreaterThan(256);
+    expect(text.length).toBeLessThanOrEqual(WC6_DETAIL_MAX_CHARS);
+    const got = outcomeFromResponse(false, 403, envelope('pv_write_refused', text));
+    expect(got.detail).toBe(text);
+  });
+
+  it('cuts an over-long server detail at the cap on a word boundary, after trimming', () => {
+    const text = Array(200).fill('abcdefg').join(' ');
+    const got = outcomeFromResponse(false, 403, envelope('pv_write_refused', `  ${text}\n`));
+    expect(got.detail!.endsWith('abcdefg\u2026')).toBe(true);
+    expect(Array.from(got.detail!).length).toBeLessThanOrEqual(WC6_DETAIL_MAX_CHARS);
+    expect(text.startsWith(got.detail!.slice(0, -1) + ' ')).toBe(true);
+  });
+
+  it('cuts a single over-long server token inside the token', () => {
+    const got = outcomeFromResponse(false, 403, envelope('pv_write_refused', 'x'.repeat(600)));
+    expect(got.detail).toBe('x'.repeat(WC6_DETAIL_MAX_CHARS - 1) + '\u2026');
   });
 
   it('never toasts a raw body: 405, FRONT 401, unrecognised codes and non-envelopes take the table text', () => {
