@@ -332,8 +332,8 @@ describe('HarePVService.heartbeat / submit', () => {
         { seen: false, binding: null },
         { seen: true, binding: BINDING },
       ]);
-      // The same identity again is not a backend change: onHeartbeat is the signal.
-      expect(backendChanges).toHaveBeenCalledTimes(1);
+      // Every socket's first heartbeat is a backend change, even with the same identity.
+      expect(backendChanges).toHaveBeenCalledTimes(2);
     });
 
     it('follows a binding change, also through onBackendChange', () => {

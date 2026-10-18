@@ -8,9 +8,30 @@ import type {
   HareInitialFrame,
   HareDiffFrame,
   HareHeartbeatFrame,
+  HareReachable,
+  HareWrites,
+  HareWritesState,
   PVMetaDTO,
   PVValueDTO,
 } from './types.js';
+import heartbeatVectorFile from '../../test-vectors/heartbeat_vectors.json' with { type: 'json' };
+
+interface HeartbeatFrameCase {
+  case: string;
+  frame: HareHeartbeatFrame;
+  expected: { reachable: HareReachable | null; writes: HareWrites | null };
+}
+
+/** The vendored copy of canopy's heartbeat vectors, narrowed to what the SDK reads. */
+const heartbeatVectors = heartbeatVectorFile as unknown as {
+  legacy_frame: HeartbeatFrameCase;
+  reachable_frames: HeartbeatFrameCase[];
+  writes_frames: HeartbeatFrameCase[];
+  sequences: {
+    id: string;
+    steps: { event: 'frame' | 'close'; frame?: HareHeartbeatFrame }[];
+  }[];
+};
 
 const BASE_URL = 'ws://host/hare/v1/ws/pvs';
 
@@ -521,6 +542,8 @@ describe('HarePVService', () => {
         label: 'Simulator',
         notice: null,
         binding: 'va@1',
+        reachable: null,
+        writes: null,
       };
       expect(service.getBackend()).toEqual(expected);
 
@@ -530,6 +553,8 @@ describe('HarePVService', () => {
         label: 'Rehearsal',
         notice: 'fallback',
         binding: 'standin@2',
+        reachable: null,
+        writes: null,
       });
     });
 
@@ -541,6 +566,8 @@ describe('HarePVService', () => {
         label: 'Machine',
         notice: 'unservable',
         binding: 'unservable',
+        reachable: null,
+        writes: null,
       });
     });
 
@@ -552,6 +579,8 @@ describe('HarePVService', () => {
         label: null,
         notice: null,
         binding: null,
+        reachable: null,
+        writes: null,
       });
     });
 
@@ -563,7 +592,16 @@ describe('HarePVService', () => {
       socket.message(heartbeat({ timestamp: 5 })); // timestamp alone is not a change
       socket.message(heartbeat());
       expect(onBackendChange.mock.calls).toEqual([
-        [{ name: 'osprey', label: 'Simulator', notice: null, binding: 'va@1' }],
+        [
+          {
+            name: 'osprey',
+            label: 'Simulator',
+            notice: null,
+            binding: 'va@1',
+            reachable: null,
+            writes: null,
+          },
+        ],
       ]);
 
       socket.message(heartbeat({ binding: 'va@2' }));
@@ -574,11 +612,46 @@ describe('HarePVService', () => {
         heartbeat({ binding: 'va@2', notice: 'fallback', label: 'Rehearsal', backend: null })
       );
       expect(onBackendChange.mock.calls.map((c: unknown[]) => c[0])).toEqual([
-        { name: 'osprey', label: 'Simulator', notice: null, binding: 'va@1' },
-        { name: 'osprey', label: 'Simulator', notice: null, binding: 'va@2' },
-        { name: 'osprey', label: 'Simulator', notice: 'fallback', binding: 'va@2' },
-        { name: 'osprey', label: 'Rehearsal', notice: 'fallback', binding: 'va@2' },
-        { name: null, label: 'Rehearsal', notice: 'fallback', binding: 'va@2' },
+        {
+          name: 'osprey',
+          label: 'Simulator',
+          notice: null,
+          binding: 'va@1',
+          reachable: null,
+          writes: null,
+        },
+        {
+          name: 'osprey',
+          label: 'Simulator',
+          notice: null,
+          binding: 'va@2',
+          reachable: null,
+          writes: null,
+        },
+        {
+          name: 'osprey',
+          label: 'Simulator',
+          notice: 'fallback',
+          binding: 'va@2',
+          reachable: null,
+          writes: null,
+        },
+        {
+          name: 'osprey',
+          label: 'Rehearsal',
+          notice: 'fallback',
+          binding: 'va@2',
+          reachable: null,
+          writes: null,
+        },
+        {
+          name: null,
+          label: 'Rehearsal',
+          notice: 'fallback',
+          binding: 'va@2',
+          reachable: null,
+          writes: null,
+        },
       ]);
     });
 
@@ -593,10 +666,12 @@ describe('HarePVService', () => {
         label: null,
         notice: null,
         binding: null,
+        reachable: null,
+        writes: null,
       });
     });
 
-    it('keeps the last backend across a reconnect and does not re-fire for an identical heartbeat', () => {
+    it('keeps the last backend across a reconnect and fires again on the new socket’s first heartbeat', () => {
       const onBackendChange = vi.fn();
       const { service, socket, instances } = connected(onBackendChange);
       socket.message(heartbeat());
@@ -606,24 +681,207 @@ describe('HarePVService', () => {
         label: 'Simulator',
         notice: null,
         binding: 'va@1',
+        reachable: null,
+        writes: null,
       });
 
       vi.advanceTimersByTime(1000);
       instances[1]!.open();
       instances[1]!.message(heartbeat());
-      expect(onBackendChange).toHaveBeenCalledTimes(1);
+      expect(onBackendChange).toHaveBeenCalledTimes(2);
+      expect(onBackendChange.mock.calls[1]![0]).toEqual(onBackendChange.mock.calls[0]![0]);
+
+      instances[1]!.message(heartbeat());
+      expect(onBackendChange).toHaveBeenCalledTimes(2);
 
       instances[1]!.message(heartbeat({ binding: 'va@3' }));
+      expect(onBackendChange).toHaveBeenCalledTimes(3);
+    });
+
+    it('fires again after disconnect() and connect() with an identical heartbeat', () => {
+      const onBackendChange = vi.fn();
+      const { service, instances } = connected(onBackendChange);
+      instances[0]!.message(heartbeat());
+      service.disconnect();
+      service.connect();
+      instances[1]!.open();
+      instances[1]!.message(heartbeat());
       expect(onBackendChange).toHaveBeenCalledTimes(2);
+    });
+
+    it('fires onBackendChange before onHeartbeat for the same heartbeat', () => {
+      const order: string[] = [];
+      const { factory, instances } = createFakeWebSocketFactory();
+      const service = new HarePVService({
+        url: BASE_URL,
+        webSocketFactory: factory,
+        onBackendChange: (b) => order.push(`backend:${b.binding}`),
+        onHeartbeat: (h) => order.push(`heartbeat:${h.seen}:${h.binding}`),
+      });
+      service.connect();
+      instances[0]!.open();
+      instances[0]!.message(heartbeat());
+      instances[0]!.message(heartbeat({ binding: 'va@2' }));
+      expect(order).toEqual([
+        'backend:va@1',
+        'heartbeat:true:va@1',
+        'backend:va@2',
+        'heartbeat:true:va@2',
+      ]);
     });
 
     it('a returned backend is a copy the caller cannot use to mutate service state', () => {
       const { service, socket } = connected();
-      socket.message(heartbeat());
+      socket.message(
+        heartbeat({
+          reachable: { state: 'yes', since: null, reason: null },
+          writes: { state: 'on', reason: null, cause: null },
+        })
+      );
       const first = service.getBackend()!;
       first.label = 'tampered';
-      expect(service.getBackend()!.label).toBe('Simulator');
+      first.reachable!.state = 'no';
+      first.writes!.state = 'off';
+      const again = service.getBackend()!;
+      expect(again.label).toBe('Simulator');
+      expect(again.reachable!.state).toBe('yes');
+      expect(again.writes!.state).toBe('on');
     });
+
+    // ── Machine statement (reachable / writes), driven by the vector copy ────
+
+    it('a legacy frame yields reachable and writes null', () => {
+      const { service, socket } = connected();
+      socket.message(heartbeatVectors.legacy_frame.frame);
+      const backend = service.getBackend()!;
+      expect(backend.reachable).toBe(heartbeatVectors.legacy_frame.expected.reachable);
+      expect(backend.writes).toBe(heartbeatVectors.legacy_frame.expected.writes);
+      expect(backend.reachable).toBeNull();
+      expect(backend.writes).toBeNull();
+    });
+
+    it('a frame with explicit null statements yields reachable and writes null', () => {
+      const { service, socket } = connected();
+      socket.message(heartbeat({ reachable: null, writes: null }));
+      expect(service.getBackend()).toMatchObject({ reachable: null, writes: null });
+    });
+
+    it.each([...heartbeatVectors.reachable_frames, ...heartbeatVectors.writes_frames])(
+      'vector frame $case reads as its expected statement',
+      (frameCase) => {
+        const { service, socket } = connected();
+        socket.message(frameCase.frame);
+        const backend = service.getBackend()!;
+        expect(backend.reachable).toEqual(frameCase.expected.reachable);
+        expect(backend.writes).toEqual(frameCase.expected.writes);
+      }
+    );
+
+    it('statement fields missing inside an object read as null', () => {
+      const { service, socket } = connected();
+      socket.message({
+        type: 'heartbeat',
+        timestamp: 0,
+        backend: 'osprey',
+        reachable: { state: 'no' },
+        writes: { state: 'locked' },
+      });
+      expect(service.getBackend()).toMatchObject({
+        reachable: { state: 'no', since: null, reason: null },
+        writes: { state: 'locked', reason: null, cause: null },
+      });
+    });
+
+    it('carries an unknown writes word through, and it does not read as on', () => {
+      const { service, socket } = connected();
+      socket.message(heartbeat({ writes: { state: 'paused', reason: null, cause: null } }));
+      const writes = service.getBackend()!.writes!;
+      expect(writes.state).toBe('paused');
+      expect(writes.state === 'on').toBe(false);
+    });
+
+    it('the writes state union includes applying', () => {
+      const state: HareWritesState = 'applying';
+      const { service, socket } = connected();
+      socket.message(heartbeat({ writes: { state, reason: null, cause: 'applying' } }));
+      expect(service.getBackend()!.writes!.state).toBe('applying');
+    });
+
+    it('fires onBackendChange when any reachable or writes field changes', () => {
+      const onBackendChange = vi.fn();
+      const { socket } = connected(onBackendChange);
+      const yes = { state: 'yes', since: null, reason: null };
+      const on = { state: 'on', reason: null, cause: null };
+      socket.message(heartbeat({ reachable: yes, writes: on }));
+      socket.message(heartbeat({ reachable: { ...yes }, writes: { ...on }, timestamp: 9 }));
+      expect(onBackendChange).toHaveBeenCalledTimes(1);
+
+      const steps = [
+        { reachable: { ...yes, state: 'no' }, writes: on },
+        { reachable: { ...yes, state: 'no', since: 5 }, writes: on },
+        { reachable: { ...yes, state: 'no', since: 5, reason: 'r' }, writes: on },
+        {
+          reachable: { ...yes, state: 'no', since: 5, reason: 'r' },
+          writes: { ...on, state: 'off' },
+        },
+        {
+          reachable: { ...yes, state: 'no', since: 5, reason: 'r' },
+          writes: { ...on, state: 'off', reason: 'x' },
+        },
+        {
+          reachable: { ...yes, state: 'no', since: 5, reason: 'r' },
+          writes: { ...on, state: 'off', reason: 'x', cause: 'narrowing' },
+        },
+        { reachable: null, writes: { ...on, state: 'off', reason: 'x', cause: 'narrowing' } },
+        { reachable: null, writes: null },
+      ];
+      for (const [i, step] of steps.entries()) {
+        socket.message(heartbeat(step));
+        expect(onBackendChange).toHaveBeenCalledTimes(i + 2);
+        expect(onBackendChange.mock.lastCall![0]).toMatchObject({
+          reachable: step.reachable,
+          writes: step.writes,
+        });
+      }
+    });
+
+    it.each(heartbeatVectors.sequences)(
+      'vector sequence $id: onBackendChange fires on every change and every socket’s first frame',
+      (sequence) => {
+        const onBackendChange = vi.fn();
+        const { instances } = connected(onBackendChange);
+        let socketIndex = 0;
+        let previous: unknown = null;
+        let expectedCalls = 0;
+        for (const step of sequence.steps) {
+          if (step.event === 'close') {
+            instances[socketIndex]!.close();
+            vi.advanceTimersByTime(1000);
+            socketIndex += 1;
+            instances[socketIndex]!.open();
+            previous = null;
+            continue;
+          }
+          const frame = step.frame!;
+          const statement = JSON.stringify([
+            frame.backend,
+            frame.label,
+            frame.notice,
+            frame.binding,
+            frame.reachable ?? null,
+            frame.writes ?? null,
+          ]);
+          if (statement !== previous) expectedCalls += 1;
+          previous = statement;
+          instances[socketIndex]!.message(frame);
+          expect(onBackendChange).toHaveBeenCalledTimes(expectedCalls);
+          expect(onBackendChange.mock.lastCall![0]).toMatchObject({
+            reachable: frame.reachable ?? null,
+            writes: frame.writes ?? null,
+          });
+        }
+      }
+    );
 
     it('a heartbeat carrying identity still counts as liveness', () => {
       const { factory, instances } = createFakeWebSocketFactory();

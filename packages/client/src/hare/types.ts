@@ -99,17 +99,56 @@ export interface HareHeartbeatFrame {
   notice: HareBackendNotice;
   /** Binding id (`<target>@<generation>`, or the binding state name); null when unbound. */
   binding: string | null;
+  /** Whether the machine answers; absent or null when the server makes no claim. */
+  reachable?: HareReachable | null;
+  /** Whether writes are accepted; absent or null when the server makes no claim. */
+  writes?: HareWrites | null;
 }
 
 /**
- * Backend identity reported by the last heartbeat, as returned by
- * `HarePVService.getBackend()` and passed to `onBackendChange`.
+ * A state word this SDK does not know. It is carried through unchanged; a
+ * reader treats it as `unknown` for `reachable` and as not `on` for `writes`.
+ */
+export type HareUnknownStateWord = string & {};
+
+/** Reachability words: `yes` answers, `no` stopped answering, `unknown` not established. */
+export type HareReachableState = 'yes' | 'no' | 'unknown';
+
+export interface HareReachable {
+  state: HareReachableState | HareUnknownStateWord;
+  /** Epoch seconds the current state began; null when not known. */
+  since: number | null;
+  /** Server sentence explaining the state; null when none. */
+  reason: string | null;
+}
+
+/**
+ * Writes words. Only `on` accepts writes; `off`, `locked` and `applying`
+ * (the new write state is coming up) are inert, as is any unknown word.
+ */
+export type HareWritesState = 'on' | 'off' | 'locked' | 'applying';
+
+export interface HareWrites {
+  state: HareWritesState | HareUnknownStateWord;
+  /** Server sentence explaining the state; null when none. */
+  reason: string | null;
+  /** Id of the server's writes-cause row; null when none. */
+  cause: string | null;
+}
+
+/**
+ * Backend identity and machine statement reported by the last heartbeat, as
+ * returned by `HarePVService.getBackend()` and passed to `onBackendChange`.
  */
 export interface HareBackend {
   name: string | null;
   label: string | null;
   notice: HareBackendNotice;
   binding: string | null;
+  /** Null when the heartbeat carried no reachability claim. */
+  reachable: HareReachable | null;
+  /** Null when the heartbeat carried no writes claim. */
+  writes: HareWrites | null;
 }
 
 export interface HarePongFrame {

@@ -15,7 +15,9 @@ import type {
   HareBackend,
   HareHeartbeatFrame,
   HareHeartbeatState,
+  HareReachable,
   HareServerFrame,
+  HareWrites,
   PVMetaDTO,
   PVValueDTO,
   PVWriteOrigin,
@@ -64,7 +66,12 @@ export interface HarePVServiceOptions {
   fetchFn?: FetchLike;
   onError?: (error: HareError) => void;
   onStatusChange?: (status: HareConnectionStatus) => void;
-  /** Fired when a heartbeat reports a backend identity different from the last one (the first heartbeat counts). */
+  /**
+   * Fired when a heartbeat's backend identity or machine statement differs
+   * from the last one this socket reported. Every socket's first heartbeat
+   * counts, even when it repeats the previous socket's. Fires before the
+   * same heartbeat's `onHeartbeat`.
+   */
   onBackendChange?: (backend: HareBackend) => void;
   /**
    * Fired whenever `heartbeat()` changes: the current socket's first
@@ -195,6 +202,9 @@ export class HarePVService implements PVService {
   // Identity from the last heartbeat; kept across disconnects (the link
   // state is reported separately through status).
   private backend: HareBackend | null = null;
+  // True once the current socket has reported `backend`; a new socket's first
+  // heartbeat therefore always counts as a change.
+  private backendReported = false;
   // The socket itself lives in ResilientSocket; each open gets a new number,
   // null while no socket is open. Heartbeat state and queued writes compare it
   // to tell the current socket from an earlier one.
@@ -317,7 +327,7 @@ export class HarePVService implements PVService {
 
   /** Backend identity of the last heartbeat received, or null before the first one. */
   getBackend(): HareBackend | null {
-    return this.backend ? { ...this.backend } : null;
+    return this.backend ? copyBackend(this.backend) : null;
   }
 
   /**
@@ -572,26 +582,34 @@ export class HarePVService implements PVService {
   }
 
   private applyHeartbeat(frame: HareHeartbeatFrame): void {
-    // Older servers send only `backend`; their missing fields read as null.
+    // Older servers omit fields; whatever is missing reads as null.
     const next: HareBackend = {
       name: frame.backend ?? null,
       label: frame.label ?? null,
       notice: frame.notice ?? null,
       binding: frame.binding ?? null,
+      reachable: frame.reachable
+        ? {
+            state: frame.reachable.state,
+            since: frame.reachable.since ?? null,
+            reason: frame.reachable.reason ?? null,
+          }
+        : null,
+      writes: frame.writes
+        ? {
+            state: frame.writes.state,
+            reason: frame.writes.reason ?? null,
+            cause: frame.writes.cause ?? null,
+          }
+        : null,
     };
-    this.noteHeartbeat(next.binding);
     const prev = this.backend;
-    if (
-      prev &&
-      prev.name === next.name &&
-      prev.label === next.label &&
-      prev.notice === next.notice &&
-      prev.binding === next.binding
-    ) {
-      return;
+    if (!this.backendReported || !prev || !sameBackend(prev, next)) {
+      this.backend = next;
+      this.backendReported = true;
+      this.onBackendChangeCallback?.(copyBackend(next));
     }
-    this.backend = next;
-    this.onBackendChangeCallback?.({ ...next });
+    this.noteHeartbeat(next.binding);
   }
 
   /** Record the current socket's heartbeat; drop waiting writes whose binding it changed. */
@@ -612,6 +630,7 @@ export class HarePVService implements PVService {
   /** The current socket is gone: heartbeat unseen, every waiting write dropped. */
   private forgetHeartbeat(): void {
     const wasSeen = this.heartbeatConnection !== null;
+    this.backendReported = false;
     this.heartbeatConnection = null;
     this.heartbeatBinding = null;
     this.dropPendingWrites(() => false);
@@ -838,4 +857,34 @@ function formatDisplayValue(dto: PVValueDTO, meta: PVMetaDTO | undefined): strin
   }
 
   return String(value);
+}
+
+/** A copy whose statement objects the caller cannot use to mutate service state. */
+function copyBackend(backend: HareBackend): HareBackend {
+  return {
+    ...backend,
+    reachable: backend.reachable ? { ...backend.reachable } : null,
+    writes: backend.writes ? { ...backend.writes } : null,
+  };
+}
+
+function sameBackend(a: HareBackend, b: HareBackend): boolean {
+  return (
+    a.name === b.name &&
+    a.label === b.label &&
+    a.notice === b.notice &&
+    a.binding === b.binding &&
+    sameReachable(a.reachable, b.reachable) &&
+    sameWrites(a.writes, b.writes)
+  );
+}
+
+function sameReachable(a: HareReachable | null, b: HareReachable | null): boolean {
+  if (a === null || b === null) return a === b;
+  return a.state === b.state && a.since === b.since && a.reason === b.reason;
+}
+
+function sameWrites(a: HareWrites | null, b: HareWrites | null): boolean {
+  if (a === null || b === null) return a === b;
+  return a.state === b.state && a.reason === b.reason && a.cause === b.cause;
 }
