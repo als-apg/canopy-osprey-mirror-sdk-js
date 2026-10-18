@@ -1,6 +1,6 @@
 {
   "name": "@slaclab/canopy-react",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "private": false,
   "description": "React bindings for @slaclab/canopy-client — usePV, the PV service context, and useJob",
   "repository": {

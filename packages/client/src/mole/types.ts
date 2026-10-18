@@ -3,7 +3,7 @@
 // These mirror Canopy's Python contracts (`canopy.mole.schemas`), whose
 // pydantic base (`CanopyModel`) serializes snake_case field names to
 // camelCase on the wire (`from_ns`/`to_ns` are explicitly aliased to
-// `from`/`to`). Lifted from react-trace's `src/api/types.ts`.
+// `from`/`to`).
 
 import type { WireAlarmSeverity } from '../wire.js';
 

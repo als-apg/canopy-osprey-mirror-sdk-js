@@ -1,6 +1,6 @@
 {
   "name": "@slaclab/canopy-screen-ir",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "private": false,
   "description": "The Canopy Screen IR contract — the *.screen.json JSON Schema, its schemaVersion, TypeScript model types, and a validate() helper. The single source shared by the screen builder, the runtime viewer, the content repo's CI, and the PyDM converter.",
   "repository": {

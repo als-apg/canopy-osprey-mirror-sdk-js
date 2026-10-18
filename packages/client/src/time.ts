@@ -2,9 +2,6 @@
 // domain — Mole `from`/`to`, Fox `t0Ns`/`t1Ns`, and Hare/Mole `tsNs` are all
 // integer epoch nanoseconds — while JS works in epoch milliseconds.
 //
-// Ported from react-trace's `src/api/time.ts` (the UI range-string helpers
-// stayed behind; they are app concerns, not protocol ones).
-//
 // The ms→ns direction goes through BigInt so the arithmetic itself cannot
 // lose precision; the result is returned as a plain number to match the wire
 // DTOs. Note that present-day epoch nanoseconds (~1.8e18) exceed

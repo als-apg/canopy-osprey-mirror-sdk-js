@@ -1,4 +1,11 @@
-import type { WebSocketFactory, WebSocketLike } from '../hare/HarePVService.js';
+import type { WebSocketFactory } from '../transport.js';
+import {
+  ResilientSocket,
+  describeSocketError,
+  toServiceStatus,
+  toWsUrl,
+} from '../ws/ResilientSocket.js';
+import type { SocketFrame } from '../ws/ResilientSocket.js';
 import type { FormulaResultDTO, FormulaSpec, FoxServerFrame, TableInputDTO } from './types.js';
 
 export type FoxConnectionStatus = 'idle' | 'connecting' | 'connected' | 'disconnected';
@@ -18,14 +25,17 @@ export interface FoxFormulaServiceOptions {
   /**
    * Base URL of the Canopy API, e.g. `https://canopy.example.org` — the
    * service connects to `{baseUrl}/fox/v1/ws/formulas` (http(s) is switched
-   * to ws(s); a ws(s) base is used as-is).
+   * to ws(s); a ws(s) base is used as-is). A relative base such as a
+   * same-origin dev-proxy prefix (`/api/canopy`) is resolved against
+   * `globalThis.location` (see {@link toWsUrl}); without one (Node) the
+   * constructor throws, so pass an absolute base or `wsUrl` there.
    */
   baseUrl: string;
   /** Appended as `?api_key=` on the WS URL. */
   apiKey?: string;
   /** Override the full WS endpoint URL (skips derivation from `baseUrl`). */
   wsUrl?: string;
-  /** Capped backoff schedule; attempt counter resets on successful open. Default [1000, 2000, 4000, 8000, 15000]. */
+  /** Capped backoff schedule; the attempt counter resets once the server sends a frame on a new connection. Default [1000, 2000, 4000, 8000, 15000]. */
   reconnectDelaysMs?: number[];
   /** Client ping period while connected. Default 15000. */
   pingIntervalMs?: number;
@@ -33,6 +43,14 @@ export interface FoxFormulaServiceOptions {
   pongTimeoutMs?: number;
   /** Injectable for tests / Node consumers. Default: globalThis.WebSocket. */
   webSocketFactory?: WebSocketFactory;
+  /**
+   * Close codes after which the service stops reconnecting (status
+   * `disconnected`, `onError` with `ws_terminal_close`) until `connect()` is
+   * called again. Default `[1008]` (Canopy's "invalid API key", or a key not
+   * scoped to this module). Browsers report a rejected handshake as 1006,
+   * which never stops the service; pass `[]` to always reconnect.
+   */
+  terminalCloseCodes?: number[];
   /** Connection-level errors and error frames that match no subscription. */
   onError?: (error: FoxError) => void;
   onStatusChange?: (status: FoxConnectionStatus) => void;
@@ -69,24 +87,6 @@ interface LocalSubscription {
   unsubscribed: boolean;
 }
 
-const WS_OPEN = 1;
-
-const DEFAULT_RECONNECT_DELAYS_MS = [1000, 2000, 4000, 8000, 15000];
-const DEFAULT_PING_INTERVAL_MS = 15000;
-const DEFAULT_PONG_TIMEOUT_MS = 10000;
-
-/** Derive the formulas WS endpoint from the API base URL (http(s) -> ws(s)). */
-function deriveFormulasWsUrl(baseUrl: string): string {
-  let base = baseUrl.replace(/\/+$/, '');
-  base = base.replace(/^http:/i, 'ws:').replace(/^https:/i, 'wss:');
-  return `${base}/fox/v1/ws/formulas`;
-}
-
-function defaultWebSocketFactory(): WebSocketFactory | undefined {
-  const ctor = (globalThis as { WebSocket?: new (url: string) => WebSocketLike }).WebSocket;
-  return ctor ? (url: string) => new ctor(url) : undefined;
-}
-
 /**
  * Live formula evaluation over Canopy Fox's WebSocket
  * (`WS /fox/v1/ws/formulas`). Knows `FormulaSpec` only — naming conventions
@@ -100,18 +100,13 @@ function defaultWebSocketFactory(): WebSocketFactory | undefined {
  * the existing callbacks.
  *
  * Framework- and environment-agnostic: takes an injectable
- * `WebSocketFactory`, reconnects with the same capped backoff and ping/pong
- * liveness scheme as `HarePVService`.
+ * `WebSocketFactory`; the connection (capped-backoff reconnect, ping/pong
+ * liveness) is a {@link ResilientSocket}, as for `HarePVService`.
  */
 export class FoxFormulaService {
-  private readonly url: string;
-  private readonly apiKey: string | undefined;
-  private readonly reconnectDelaysMs: number[];
-  private readonly pingIntervalMs: number;
-  private readonly pongTimeoutMs: number;
-  private readonly webSocketFactory: WebSocketFactory | undefined;
   private readonly onErrorCallback: ((error: FoxError) => void) | undefined;
   private readonly onStatusChangeCallback: ((status: FoxConnectionStatus) => void) | undefined;
+  private readonly socket: ResilientSocket;
 
   /** Every live local subscription, in subscribe order. */
   private subscriptions = new Set<LocalSubscription>();
@@ -119,24 +114,32 @@ export class FoxFormulaService {
   private pending: LocalSubscription[] = [];
   private byServerId = new Map<string, LocalSubscription>();
 
-  private socket: WebSocketLike | null = null;
-  private desiredConnected = false;
   private _status: FoxConnectionStatus = 'idle';
-  private reconnectAttempt = 0;
-
-  private reconnectTimer: number | undefined;
-  private pingTimer: number | undefined;
-  private pongTimer: number | undefined;
 
   constructor(options: FoxFormulaServiceOptions) {
-    this.url = options.wsUrl ?? deriveFormulasWsUrl(options.baseUrl);
-    this.apiKey = options.apiKey;
-    this.reconnectDelaysMs = options.reconnectDelaysMs ?? DEFAULT_RECONNECT_DELAYS_MS;
-    this.pingIntervalMs = options.pingIntervalMs ?? DEFAULT_PING_INTERVAL_MS;
-    this.pongTimeoutMs = options.pongTimeoutMs ?? DEFAULT_PONG_TIMEOUT_MS;
-    this.webSocketFactory = options.webSocketFactory ?? defaultWebSocketFactory();
     this.onErrorCallback = options.onError;
     this.onStatusChangeCallback = options.onStatusChange;
+    this.socket = new ResilientSocket({
+      url: options.wsUrl ?? toWsUrl(options.baseUrl, '/fox/v1/ws/formulas'),
+      apiKey: options.apiKey,
+      reconnectDelaysMs: options.reconnectDelaysMs,
+      pingIntervalMs: options.pingIntervalMs,
+      pongTimeoutMs: options.pongTimeoutMs,
+      webSocketFactory: options.webSocketFactory,
+      terminalCloseCodes: options.terminalCloseCodes,
+      label: 'FoxFormulaService',
+      onOpen: () => this.resubscribeAll(),
+      onFrame: (frame) => this.handleFrame(frame),
+      onClose: () => this.handleSocketClose(),
+      onStatusChange: (status) => this.setStatus(toServiceStatus(status)),
+      onError: (error) =>
+        this.reportError({
+          code: error.code,
+          message: describeSocketError(error, 'formula'),
+          // A failed open schedules a reconnect; a terminal close stops the service.
+          retryable: error.code === 'ws_connect_failed',
+        }),
+    });
   }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -150,15 +153,7 @@ export class FoxFormulaService {
   }
 
   connect(): void {
-    this.desiredConnected = true;
-    // An explicit connect supersedes any pending backoff timer; otherwise the
-    // timer could fire later and open a second, orphaned socket.
-    this.clearReconnectTimer();
-    if (this.socket && (this.socket.readyState === WS_OPEN || this.socket.readyState === 0)) {
-      // Already open or connecting.
-      return;
-    }
-    this.openSocket();
+    this.socket.connect();
   }
 
   /**
@@ -167,20 +162,8 @@ export class FoxFormulaService {
    * remapped, exactly as on an automatic reconnect).
    */
   dispose(): void {
-    this.desiredConnected = false;
-    this.clearReconnectTimer();
-    this.stopHeartbeat();
     this.resetServerCorrelation();
-    const socket = this.socket;
-    this.socket = null;
-    if (socket) {
-      socket.onopen = null;
-      socket.onmessage = null;
-      socket.onclose = null;
-      socket.onerror = null;
-      socket.close();
-    }
-    this.setStatus('disconnected');
+    this.socket.close();
   }
 
   // ── Subscriptions ─────────────────────────────────────────────────────────
@@ -203,9 +186,9 @@ export class FoxFormulaService {
     };
     this.subscriptions.add(sub);
 
-    if (this.socket && this.socket.readyState === WS_OPEN) {
-      this.sendSubscribe(sub);
-    }
+    // Sent only while the socket is open; otherwise the next open re-sends
+    // every held subscription.
+    this.sendSubscribe(sub);
 
     return () => {
       this.unsubscribe(sub);
@@ -219,9 +202,7 @@ export class FoxFormulaService {
 
     if (sub.serverId !== null) {
       this.byServerId.delete(sub.serverId);
-      if (this.socket && this.socket.readyState === WS_OPEN) {
-        this.socket.send(JSON.stringify({ type: 'unsubscribe', id: sub.serverId }));
-      }
+      this.socket.send({ type: 'unsubscribe', id: sub.serverId });
       sub.serverId = null;
       return;
     }
@@ -235,89 +216,25 @@ export class FoxFormulaService {
     }
   }
 
-  // ── Socket lifecycle ──────────────────────────────────────────────────────
+  // ── Connection callbacks ──────────────────────────────────────────────────
 
-  private openSocket(): void {
-    const factory = this.webSocketFactory;
-    if (!factory) {
-      throw new Error(
-        'FoxFormulaService.connect: no WebSocket implementation available (inject `webSocketFactory` or run in an environment with global WebSocket).'
-      );
-    }
-
-    this.setStatus('connecting');
-
-    const wsUrl = this.apiKey
-      ? `${this.url}${this.url.includes('?') ? '&' : '?'}api_key=${encodeURIComponent(this.apiKey)}`
-      : this.url;
-
-    let socket: WebSocketLike;
-    try {
-      socket = factory(wsUrl);
-    } catch (err) {
-      this.setStatus('disconnected');
-      this.reportError({
-        code: 'ws_connect_failed',
-        message: `Could not open formula connection: ${errorMessage(err)}`,
-        // The service schedules a reconnect while connection is desired.
-        retryable: true,
-      });
-      if (this.desiredConnected) {
-        this.scheduleReconnect();
-      }
-      return;
-    }
-    this.socket = socket;
-
-    // Every handler ignores events from a socket we have since replaced or
-    // dropped, so a late close/open from an orphaned socket cannot clobber
-    // the current connection's bookkeeping.
-    socket.onopen = () => {
-      if (this.socket !== socket) return;
-      this.reconnectAttempt = 0;
-      this.setStatus('connected');
-      this.resubscribeAll();
-      this.startHeartbeat();
-    };
-
-    socket.onmessage = (ev: { data: unknown }) => {
-      if (this.socket !== socket) return;
-      this.handleMessage(ev.data);
-    };
-
-    socket.onclose = () => {
-      if (this.socket !== socket) return;
-      this.handleSocketClose();
-    };
-
-    socket.onerror = () => {
-      // The subsequent onclose (fired by every WebSocket implementation
-      // after an error) drives the actual reconnect/dispose bookkeeping.
-    };
-  }
-
+  /** The socket dropped on its own (an explicit `dispose()` never gets here). */
   private handleSocketClose(): void {
-    this.socket = null;
-    this.stopHeartbeat();
     this.resetServerCorrelation();
-    this.setStatus('disconnected');
 
     // Every held subscription loses its live evaluation with the socket. Tell
     // each one, so a consumer stops presenting its last result as current;
-    // retryable because the subscription is kept and re-sent on reconnect.
-    // dispose() detaches onclose first, so a deliberate close stays silent.
+    // retryable while the service reconnects (the subscription is kept and
+    // re-sent on reconnect), not after a terminal close stopped it.
     // Iterate a copy: a callback may unsubscribe.
+    const retryable = this.socket.status !== 'closed';
     for (const sub of [...this.subscriptions]) {
       if (!this.subscriptions.has(sub)) continue;
       this.dispatchSubscriptionError(sub, {
         code: 'ws_disconnected',
         message: 'Formula connection lost.',
-        retryable: true,
+        retryable,
       });
-    }
-
-    if (this.desiredConnected) {
-      this.scheduleReconnect();
     }
   }
 
@@ -327,28 +244,6 @@ export class FoxFormulaService {
     this.byServerId.clear();
     for (const sub of this.subscriptions) {
       sub.serverId = null;
-    }
-  }
-
-  private scheduleReconnect(): void {
-    this.clearReconnectTimer();
-    const delays = this.reconnectDelaysMs;
-    const delay = delays[Math.min(this.reconnectAttempt, delays.length - 1)] ?? 0;
-    this.reconnectAttempt += 1;
-    this.reconnectTimer = setTimeout(() => {
-      this.reconnectTimer = undefined;
-      // The !socket guard covers a connect() that already opened one while
-      // this timer was pending.
-      if (this.desiredConnected && !this.socket) {
-        this.openSocket();
-      }
-    }, delay);
-  }
-
-  private clearReconnectTimer(): void {
-    if (this.reconnectTimer !== undefined) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = undefined;
     }
   }
 
@@ -363,64 +258,10 @@ export class FoxFormulaService {
     }
   }
 
-  // ── Heartbeat (client ping / pong liveness) ───────────────────────────────
-
-  private startHeartbeat(): void {
-    this.stopHeartbeat();
-    this.pingTimer = setInterval(() => {
-      this.sendPing();
-    }, this.pingIntervalMs);
-  }
-
-  private stopHeartbeat(): void {
-    if (this.pingTimer !== undefined) {
-      clearInterval(this.pingTimer);
-      this.pingTimer = undefined;
-    }
-    this.disarmPongDeadline();
-  }
-
-  private sendPing(): void {
-    const socket = this.socket;
-    if (!socket || socket.readyState !== WS_OPEN) return;
-    socket.send(JSON.stringify({ type: 'ping' }));
-    this.armPongDeadline();
-  }
-
-  private armPongDeadline(): void {
-    if (this.pongTimer !== undefined) return; // one deadline in flight at a time
-    this.pongTimer = setTimeout(() => {
-      this.pongTimer = undefined;
-      // No server frame arrived in time: treat the connection as dead.
-      // Closing triggers the normal onclose -> reconnect path.
-      const socket = this.socket;
-      if (socket) {
-        socket.close();
-      }
-    }, this.pongTimeoutMs);
-  }
-
-  private disarmPongDeadline(): void {
-    if (this.pongTimer !== undefined) {
-      clearTimeout(this.pongTimer);
-      this.pongTimer = undefined;
-    }
-  }
-
   // ── Frame handling ────────────────────────────────────────────────────────
 
-  private handleMessage(raw: unknown): void {
-    // Any inbound frame is proof of life, regardless of whether it parses.
-    this.disarmPongDeadline();
-
-    if (typeof raw !== 'string') return;
-    let frame: FoxServerFrame;
-    try {
-      frame = JSON.parse(raw) as FoxServerFrame;
-    } catch {
-      return; // Malformed frame: ignore.
-    }
-
+  private handleFrame(raw: SocketFrame): void {
+    const frame = raw as unknown as FoxServerFrame;
     switch (frame.type) {
       case 'subscribed':
         this.handleSubscribed(frame.id);
@@ -443,7 +284,7 @@ export class FoxFormulaService {
         });
         break;
       case 'pong':
-        // Liveness only; already handled above.
+        // Liveness only (the socket already counted it).
         break;
     }
   }
@@ -457,7 +298,7 @@ export class FoxFormulaService {
     if (sub.unsubscribed) {
       // Unsubscribed while the subscribe was in flight: now that the server
       // id exists, immediately release it.
-      this.socket?.send(JSON.stringify({ type: 'unsubscribe', id: serverId }));
+      this.socket.send({ type: 'unsubscribe', id: serverId });
       return;
     }
 
@@ -502,19 +343,18 @@ export class FoxFormulaService {
   // ── Outbound messages ─────────────────────────────────────────────────────
 
   private sendSubscribe(sub: LocalSubscription): void {
-    if (!this.socket) return;
-    this.pending.push(sub);
     // JSON.stringify drops undefined members, so omitted options fall back
     // to the server-side defaults.
-    this.socket.send(
-      JSON.stringify({
-        type: 'subscribe',
-        spec: sub.spec,
-        t0Ns: sub.t0Ns,
-        t1Ns: sub.t1Ns,
-        intervalMs: sub.intervalMs,
-      })
-    );
+    const sent = this.socket.send({
+      type: 'subscribe',
+      spec: sub.spec,
+      t0Ns: sub.t0Ns,
+      t1Ns: sub.t1Ns,
+      intervalMs: sub.intervalMs,
+    });
+    if (sent) {
+      this.pending.push(sub);
+    }
   }
 
   // ── Status / error reporting ──────────────────────────────────────────────
@@ -532,10 +372,6 @@ export class FoxFormulaService {
       console.warn(`[FoxFormulaService] ${error.code}: ${error.message}`);
     }
   }
-}
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }
 
 /**
