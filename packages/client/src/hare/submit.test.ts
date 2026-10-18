@@ -62,7 +62,7 @@ function deferredFetch() {
   const fetchFn = vi.fn<FetchLike>(
     (url, init) =>
       new Promise((resolve, reject) => {
-        calls.push({ url, body: JSON.parse(init.body), headers: init.headers });
+        calls.push({ url, body: JSON.parse(init.body as string), headers: init.headers });
         releases.push((reply) => {
           if (reply instanceof Error) {
             reject(reply);
@@ -423,7 +423,7 @@ describe('HarePVService.heartbeat / submit', () => {
       expect(init.method).toBe('PUT');
       expect(init.headers['X-API-Key']).toBe('k');
       expect(init.headers['Content-Type']).toBe('application/json');
-      expect(JSON.parse(init.body)).toEqual({
+      expect(JSON.parse(init.body as string)).toEqual({
         value: 2.5,
         binding: 'va@7',
         origin: { screen: 'sr/overview', rev: 'r1' },
@@ -434,7 +434,7 @@ describe('HarePVService.heartbeat / submit', () => {
       const fetchFn = replyFetch({ ok: true, status: 200 });
       const { service } = connected(fetchFn);
       await service.submit('X', 1, { binding: 'va@2', timeoutS: 3 });
-      expect(JSON.parse(fetchFn.mock.calls[0]![1].body)).toEqual({
+      expect(JSON.parse(fetchFn.mock.calls[0]![1].body as string)).toEqual({
         value: 1,
         binding: 'va@2',
         timeout: 3,
@@ -446,8 +446,8 @@ describe('HarePVService.heartbeat / submit', () => {
       const { service } = connected(fetchFn, { binding: null });
       await service.submit('X', 1);
       await service.submit('Y', 1, { binding: null });
-      expect(JSON.parse(fetchFn.mock.calls[0]![1].body)).toEqual({ value: 1 });
-      expect(JSON.parse(fetchFn.mock.calls[1]![1].body)).toEqual({ value: 1 });
+      expect(JSON.parse(fetchFn.mock.calls[0]![1].body as string)).toEqual({ value: 1 });
+      expect(JSON.parse(fetchFn.mock.calls[1]![1].body as string)).toEqual({ value: 1 });
     });
 
     it('maps the response by code with toast-ready detail', async () => {
