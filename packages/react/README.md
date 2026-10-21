@@ -2,8 +2,9 @@
 
 React bindings over [`@slaclab/canopy-client`](../client): an app-wide
 `CanopyProvider` for the `CanopyConnection`, a context provider for the
-`PVService`, the `usePV` hook, and the
-`useJob` / `useCanopyJob` polling hooks for background jobs.
+`PVService`, the `usePV` hook, the
+`useJob` / `useCanopyJob` polling hooks for background jobs, and the
+`useElogConfig` / `useCanopyElogConfig` e-log config hooks.
 
 Peer dependencies: `react`, `react-dom` (^19).
 
@@ -126,6 +127,31 @@ Polling and errors:
   such as a missing `fetch` implementation: retrying cannot fix it.
 - Changing the id or unmounting stops polling and aborts the request in
   flight. Results are keyed by id, so a stale job never leaks through.
+
+## E-log config: useCanopyElogConfig / useElogConfig
+
+`useCanopyElogConfig(app | null)` fetches Canopy's e-log config for a
+client app (`GET /elog/v1/apps/{app}/config`, which needs no API key) with
+the provider's connection; `useElogConfig(conn, app | null)` takes an
+explicit one. Both return `{ config, error, loading }`:
+
+```tsx
+import { useCanopyElogConfig } from '@slaclab/canopy-react';
+
+function PostToElogButton() {
+  const { config } = useCanopyElogConfig('trace');
+  if (!config?.enabled) return null; // disabled, loading, or failed
+  return <Button onClick={() => openDialog(config.defaultLogbookIds)}>Post to e-log</Button>;
+}
+```
+
+- An app without an e-log token, or an instance without e-log, is
+  `config.enabled: false` with a `config.reason`, not an `error`.
+- A failed request (network, a malformed app name, ...) is surfaced on
+  `error` with `config: null`, and not retried; remount or change the app
+  to try again.
+- One request per app; it is aborted on unmount and when the app changes,
+  and results are keyed by app, so a previous app's config never shows.
 
 ## Migrating from 0.1
 

@@ -7,6 +7,7 @@ dependencies: `react` and `react-dom` ^19.
 | -------------------------------------------- | -------------------------------------------------------------------- |
 | `CanopyProvider`, `useCanopyConnection`      | One app-wide `CanopyConnection` in context                           |
 | `useCanopyJob`, `useJob`                     | Poll a background job: a status model, backoff on transient failures |
+| `useCanopyElogConfig`, `useElogConfig`       | Whether an app can post to the e-log (Canopy's e-log module)         |
 | `PVServiceProvider`, `usePV`, `usePVService` | Live PV data from a `PVService` (Hare, mock, local)                  |
 
 The full reference is the
@@ -56,6 +57,20 @@ const { job, status, error, loading } = useCanopyJob(jobId);
 - The request in flight is aborted on unmount and when the id changes.
 
 `useJob(conn, id, options)` is the same hook with an explicit connection.
+
+## E-log config
+
+```tsx
+import { useCanopyElogConfig } from '@slaclab/canopy-react';
+
+const { config, error, loading } = useCanopyElogConfig('trace');
+const showPostButton = config?.enabled === true;
+```
+
+One `GET /elog/v1/apps/{app}/config` per app (no API key needed), aborted
+on unmount and app change. A disabled app is `config.enabled: false` with a
+`reason`; a failed request is on `error` (not retried).
+`useElogConfig(conn, app)` takes an explicit connection.
 
 ## Live PVs
 
