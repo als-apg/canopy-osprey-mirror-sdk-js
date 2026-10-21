@@ -58,11 +58,16 @@ const wsUrl = toWsUrl(connection.baseUrl, '/optimization/v1/ws/runs'); // from @
   Canopy's module-scoped keys it must be scoped `@*` or to each module the
   app uses (in `CANOPY_API_KEYS`, `<token>:<scopes>@<module>+<module>`);
   otherwise those modules answer 403 `insufficient_module_access`.
-- **elog** (opt-in): `elog: { target, accessToken, path, accessTokenHeader }`
-  forwards `/elog` to elog-plus with the prefix stripped and the token
-  injected in `accessTokenHeader` (default `x-vouch-idp-accesstoken`, or
-  `ELOG_TOKEN_HEADER`); without a target (`ELOG_BASE_URL`) the route is left
-  out.
+- **E-log key** (optional): Canopy's e-log module (`/elog`) is proxied like
+  any other module (list `'/elog'` in `modules`; under `basePath` it already
+  is). `elogApiKey` (else `CANOPY_ELOG_API_KEY`) sends it a key of its own,
+  such as a `read+write@elog` key, so that `apiKey` can stay read-only
+  (Canopy's `read`/`write` scopes are per key). Unset or empty, e-log gets
+  `apiKey`.
+- **elog** (deprecated, removed in 0.3): the direct elog-plus proxy
+  (`elog: { target, accessToken, path, accessTokenHeader }`). Canopy's e-log
+  module holds the e-log token server-side, so drop it; its path may no
+  longer overlap a Canopy route.
 
 ## Security
 

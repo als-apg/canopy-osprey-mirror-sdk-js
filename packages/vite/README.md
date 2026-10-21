@@ -4,8 +4,8 @@ Vite dev-server tooling for Canopy apps. `canopyDevProxy()` builds the
 `server.proxy` entries every Canopy frontend needs: it forwards the Canopy
 API (REST and WebSocket upgrades) to a backend and injects `X-API-Key`
 **server-side**, so the key lives in a git-ignored `.env` file and never
-reaches the browser bundle. It can also forward elog-plus with its access
-token. In production a reverse proxy (nginx) serves the same paths and adds
+reaches the browser bundle. Canopy's e-log module (`/elog`) can get a key of
+its own. In production a reverse proxy (nginx) serves the same paths and adds
 the same headers.
 
 Node-side only (import it from `vite.config.ts`). Peer dependency: `vite`
@@ -42,7 +42,8 @@ CANOPY_BASE_URL=http://localhost:8000
 CANOPY_API_KEY=dev
 ```
 
-The proxy sends this one key to every module it forwards. Canopy keys are
+The proxy sends this one key to every module it forwards (Canopy's e-log
+module can get its own, see [E-log](#e-log)). Canopy keys are
 scoped per module, so the key must be scoped `@*` or to each module the app
 uses (in the backend's `CANOPY_API_KEYS`, `<token>:<scopes>@<module>+<module>`).
 A module outside the key's scope answers 403 `insufficient_module_access`, and
@@ -65,7 +66,8 @@ const runsWs = toWsUrl(connection.baseUrl, '/optimization/v1/ws/runs'); // ws(s)
 | `apiKey`         | `CANOPY_API_KEY`                                | Sent as `X-API-Key` on proxied requests **and** WebSocket upgrades (`proxyReq` + `proxyReqWs`). Empty or unset: no header is added.  |
 | `basePath`       | `'/api/canopy'` (when `modules` is not given)   | Single-prefix mode: `${basePath}/*` is forwarded to `${target}/*` with the prefix stripped, with `ws: true`.                         |
 | `modules`        | —                                               | Per-module mode (the react-trace/react-squirrel layout): each prefix (`'/hare'`, `'/mole'`, ...) is forwarded unchanged, `ws: true`. |
-| `elog`           | off                                             | `{ path?, target?, accessToken?, accessTokenHeader? }`: forwards `path` (default `/elog`) to elog-plus with the prefix stripped.     |
+| `elogApiKey`     | `CANOPY_ELOG_API_KEY`, else `apiKey`            | `X-API-Key` for Canopy's e-log module only (see [E-log](#e-log)). Empty or unset: `apiKey` is used.                                  |
+| `elog`           | off                                             | **Deprecated** (removed in 0.3): a direct elog-plus proxy. See [Migrating from 0.2](#migrating-from-02).                             |
 | `allowedOrigins` | —                                               | Browser origins besides the dev server's own that may use the proxy, e.g. `['http://localhost:6006']` (see [Security](#security)).   |
 
 Every Canopy route uses `changeOrigin: true`. `basePath` and `modules` can
@@ -77,36 +79,52 @@ Each prefix matches only on a path-segment boundary: `/api/canopy` covers
 strings (`'^/api/canopy(?=[/?#]|$)'`), which Vite supports; pass the object
 to `server.proxy` as a whole rather than looking entries up by path.
 
-### elog
+### E-log
+
+Canopy's e-log module (`canopy.elog`, at `/elog`) holds one e-log token per
+client app, so neither the browser nor the dev proxy holds one. It is a
+Canopy module like any other: under `basePath` it is already proxied
+(`/api/canopy/elog/...` -> `${target}/elog/...`); in per-module mode, list
+`'/elog'` in `modules`. Call it with `@slaclab/canopy-client`'s e-log
+functions (`getElogConfig`, `createElogEntry`, ...).
+
+The key needs the `elog` module scope, and `write` to post. Canopy's
+`read`/`write` scopes are per key, not per module, so giving an app's main
+key `write` for e-log also lets it write PVs through Hare. To keep the main
+key read-only, give e-log its own key:
 
 ```ts
 canopyDevProxy({
-  basePath: '/api/canopy',
-  elog: {
-    target: env.ELOG_BASE_URL, // default process.env.ELOG_BASE_URL
-    accessToken: env.ELOG_API_KEY, // default process.env.ELOG_API_KEY
-  },
+  apiKey: env.CANOPY_API_KEY, // e.g. <token>:read@mole+hare+fox
+  elogApiKey: env.CANOPY_ELOG_API_KEY, // e.g. <token>:read+write@elog
+  modules: ['/mole', '/hare', '/fox', '/elog'],
 });
 ```
 
-The token is sent in `x-vouch-idp-accesstoken`, the header elog-plus reads
-behind Vouch Proxy. If your elog-plus sits behind a different auth proxy, set
-`accessTokenHeader` (or `ELOG_TOKEN_HEADER`) to the header it expects.
-
-When no elog target is set (neither `elog.target` nor `ELOG_BASE_URL`), the
-elog route is left out, so the app can hide its logbook features.
+`elogApiKey` (default `CANOPY_ELOG_API_KEY`) is sent on the `'/elog'`
+module entry and, in `basePath` mode, on an extra `${basePath}/elog` entry
+placed ahead of the `basePath` one. Unset or empty, the e-log module gets
+`apiKey` like every other module, which suits a local `@*` dev key. (This
+differs from `apiKey`, where an empty value sends no key at all.)
 
 ### Migrating react-trace / react-squirrel
 
 Their hand-written blocks map to:
 
 ```ts
-// react-trace: /mole, /hare, /fox (+ /elog), same-origin baseUrl ''
+// react-trace: /mole, /hare, /fox, /elog with a dedicated e-log key, same-origin baseUrl ''
 canopyDevProxy({
   target: env.CANOPY_BASE_URL,
   apiKey: env.CANOPY_API_KEY,
-  modules: ['/mole', '/hare', '/fox'],
-  elog: { target: env.ELOG_BASE_URL, accessToken: env.ELOG_API_KEY },
+  elogApiKey: env.CANOPY_ELOG_API_KEY,
+  modules: ['/mole', '/hare', '/fox', '/elog'],
+});
+
+// react-squirrel: one key for every module
+canopyDevProxy({
+  target: env.CANOPY_URL,
+  apiKey: env.API_KEY,
+  modules: ['/squirrel', '/jobs', '/hare', '/analytics', '/elog'],
 });
 ```
 
@@ -134,3 +152,19 @@ has no CORS), and have the key added for it.
   `server.allowedHosts` (Vite 6.0.9 and later); don't set it to `true`. With `server.host`
   (listening on the LAN) anyone who can reach the port can use the key, as
   with any dev proxy; prefer a key with limited rights.
+
+## Migrating from 0.2
+
+**The `elog` option is deprecated** and will be removed in 0.3. It proxied
+`/elog` straight to elog-plus with an access token from the developer's
+`.env` (`ELOG_BASE_URL`, `ELOG_API_KEY`, `ELOG_TOKEN_HEADER`); Canopy's e-log
+module now holds the token server-side. It still works, logs a deprecation
+warning when its route is built, and throws when its path overlaps a Canopy
+route (for example `elog: {...}` with its default `/elog` path next to
+`modules: ['/elog']`), where it used to replace that route silently.
+
+| 0.2                                                            | Now                                                                                                                                    |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `elog: { target: env.ELOG_BASE_URL, accessToken: ... }`        | Drop it. List `'/elog'` in `modules` (already covered under `basePath`) and set `elogApiKey` if e-log needs its own key                |
+| The app calls elog-plus routes (`/elog/v2/entries`, ...)       | The app calls Canopy's (`/elog/v1/apps/{app}/...`) through `@slaclab/canopy-client`: `createElogEntry`, `uploadElogAttachment`, ...    |
+| `ELOG_BASE_URL`, `ELOG_API_KEY`, `ELOG_TOKEN_HEADER` in `.env` | Gone from the app. Canopy is configured with the app's e-log token (`CANOPY_ELOG__APPS__<APP>__TOKEN`); the key needs the `elog` scope |
