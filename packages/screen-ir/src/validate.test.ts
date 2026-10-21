@@ -176,6 +176,7 @@ describe('@slaclab/canopy-screen-ir validate', () => {
 
     it('accepts a hover label, a CSS or role outline color and an outline width', () => {
       expect(validate(withProps({ hoverLabel: 'Open Booster →' }))).toEqual([]);
+      expect(validate(withProps({ hoverLabelPlacement: 'center' }))).toEqual([]);
       expect(validate(withProps({ outlineColor: '#24a148', outlineWidth: 3 }))).toEqual([]);
       expect(
         validate(withProps({ outlineColor: { $role: 'OK', fallback: '#24a148' }, outlineWidth: 0 }))
@@ -190,6 +191,7 @@ describe('@slaclab/canopy-screen-ir validate', () => {
         '/root/props/outlineWidth must be >= 0',
       ]);
       expect(validate(withProps({ outlineColor: 7 })).length).toBeGreaterThan(0);
+      expect(validate(withProps({ hoverLabelPlacement: 'middle' })).length).toBeGreaterThan(0);
     });
   });
 });

@@ -107,6 +107,10 @@
               "description": "Text shown centred over the widget while the pointer is on it. Only a widget whose props.actions run on click shows it.",
               "type": "string"
             },
+            "hoverLabelPlacement": {
+              "description": "Where the hoverLabel sits inside the widget's box (default bottom-left).",
+              "enum": ["bottom-left", "bottom-right", "top-left", "top-right", "center"]
+            },
             "outlineColor": {
               "description": "A resting outline drawn just inside the widget's box: a CSS color or a ColorRole. A rule targeting outlineColor binds it to live data.",
               "anyOf": [{ "type": "string" }, { "$ref": "#/$defs/ColorRole" }]
