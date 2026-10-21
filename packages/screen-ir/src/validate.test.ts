@@ -170,4 +170,28 @@ describe('@slaclab/canopy-screen-ir validate', () => {
       ).toEqual(['/root/props/curves/0/color must NOT have additional properties']);
     });
   });
+
+  describe('documented props: hoverLabel, outlineColor, outlineWidth', () => {
+    const withProps = (props: unknown) => ({ ...minimal, root: { ...minimal.root, props } });
+
+    it('accepts a hover label, a CSS or role outline color and an outline width', () => {
+      expect(validate(withProps({ hoverLabel: 'Open Booster →' }))).toEqual([]);
+      expect(validate(withProps({ hoverLabelPlacement: 'center' }))).toEqual([]);
+      expect(validate(withProps({ outlineColor: '#24a148', outlineWidth: 3 }))).toEqual([]);
+      expect(
+        validate(withProps({ outlineColor: { $role: 'OK', fallback: '#24a148' }, outlineWidth: 0 }))
+      ).toEqual([]);
+    });
+
+    it('rejects ill-typed values', () => {
+      expect(validate(withProps({ hoverLabel: 5 }))).toEqual([
+        '/root/props/hoverLabel must be string',
+      ]);
+      expect(validate(withProps({ outlineWidth: -1 }))).toEqual([
+        '/root/props/outlineWidth must be >= 0',
+      ]);
+      expect(validate(withProps({ outlineColor: 7 })).length).toBeGreaterThan(0);
+      expect(validate(withProps({ hoverLabelPlacement: 'middle' })).length).toBeGreaterThan(0);
+    });
+  });
 });

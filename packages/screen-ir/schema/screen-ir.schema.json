@@ -100,8 +100,27 @@
         "id": { "type": "string" },
         "type": { "type": "string" },
         "props": {
-          "description": "JSON literals, with a ColorRole legal wherever a color is held, at any depth (for example curves[].color). Open by design: per-widget prop sets are not enumerated here. fox:// references live in designated channel props; resolution is checked in validate().",
+          "description": "JSON literals, with a ColorRole legal wherever a color is held, at any depth (for example curves[].color). Open by design: per-widget prop sets are not enumerated here; only props every widget honours are. fox:// references live in designated channel props; resolution is checked in validate().",
           "type": "object",
+          "properties": {
+            "hoverLabel": {
+              "description": "Text shown centred over the widget while the pointer is on it. Only a widget whose props.actions run on click shows it.",
+              "type": "string"
+            },
+            "hoverLabelPlacement": {
+              "description": "Where the hoverLabel sits inside the widget's box (default bottom-left).",
+              "enum": ["bottom-left", "bottom-right", "top-left", "top-right", "center"]
+            },
+            "outlineColor": {
+              "description": "A resting outline drawn just inside the widget's box: a CSS color or a ColorRole. A rule targeting outlineColor binds it to live data.",
+              "anyOf": [{ "type": "string" }, { "$ref": "#/$defs/ColorRole" }]
+            },
+            "outlineWidth": {
+              "description": "Width of the resting outline in authored px (default 2; 0 draws none).",
+              "type": "number",
+              "minimum": 0
+            }
+          },
           "additionalProperties": { "$ref": "#/$defs/PropertyValue" }
         },
         "geometry": { "$ref": "#/$defs/Geometry" },
