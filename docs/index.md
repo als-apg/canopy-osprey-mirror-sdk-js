@@ -20,12 +20,13 @@ for registry setup.
 
 - [`@slaclab/canopy-client`](client.md): framework-free protocol client —
   REST core and error handling, the reconnecting `ResilientSocket`, Hare
-  live PVs, Fox formulas, Mole history, background jobs, and test doubles
+  live PVs, Fox formulas, Mole history, background jobs, e-log posting, and test doubles
   (`@slaclab/canopy-client/testing`).
 - [`@slaclab/canopy-react`](react.md): React bindings — `CanopyProvider`,
-  `useCanopyJob`/`useJob`, `usePV`.
+  `useCanopyJob`/`useJob`, `useCanopyElogConfig`/`useElogConfig`, `usePV`.
 - [`@slaclab/canopy-vite`](vite.md): Vite dev proxy that forwards the Canopy
-  API (and elog) and injects the API key server-side.
+  API and injects the API key server-side (optionally a separate one for
+  e-log).
 
 ## UI packages
 
