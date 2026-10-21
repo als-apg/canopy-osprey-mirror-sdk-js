@@ -31,6 +31,16 @@ describe('canopyFetch', () => {
     expect(init.body).toBeUndefined();
   });
 
+  it('repeats the key for array query values and skips empty arrays', async () => {
+    const fetchFn = makeFetchMock({ ok: true, status: 200, text: '[]' });
+
+    await canopyFetch({ baseUrl: BASE_URL, fetch: fetchFn }, '/x', {
+      query: { id: ['a b', 'c'], none: [], limit: 5 },
+    });
+
+    expect(fetchFn.mock.calls[0]![0]).toBe('http://host/x?id=a%20b&id=c&limit=5');
+  });
+
   it('tolerates a trailing slash on baseUrl and omits X-API-Key without an apiKey', async () => {
     const fetchFn = makeFetchMock({ ok: true, status: 200, text: 'null' });
     await canopyFetch({ baseUrl: 'http://host/', fetch: fetchFn }, '/jobs/v1/abc');

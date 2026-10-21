@@ -2,7 +2,7 @@
 
 Framework-free TypeScript client for Canopy's wire protocols: Hare live PVs
 (WebSocket), Fox formula subscriptions (WebSocket), Mole history (REST),
-background jobs (REST), the shared REST core, a reconnecting WebSocket for
+background jobs (REST), e-log posting (REST), the shared REST core, a reconnecting WebSocket for
 any Canopy stream (`ResilientSocket`), epoch-nanosecond time helpers, and the
 typed wire DTOs for all of them. Pure TypeScript — no React, no DOM lib
 dependency, no `@types/node`. Runs unmodified in browsers, Node, and tests
@@ -14,7 +14,7 @@ React bindings (hooks, context providers) live in `@slaclab/canopy-react`, not h
 
 ## Connections (REST core)
 
-REST-side helpers (Mole, jobs, Hare writes) all take a `CanopyConnection`
+REST-side helpers (Mole, jobs, e-log, Hare writes) all take a `CanopyConnection`
 saying how to reach one Canopy deployment:
 
 ```ts
@@ -37,6 +37,8 @@ proxy prefix and no key: `{ baseUrl: '/api/canopy' }`.
 every helper. `body` is sent as JSON (`Content-Type: application/json`),
 except a `FormData`, which is passed to `fetch` untouched so it sets the
 multipart boundary itself. An empty 2xx body resolves to `undefined`.
+`query` skips `undefined`/`null` values and repeats the key for an array
+(`{ id: ['a', 'b'] }` -> `?id=a&id=b`).
 
 ### Error handling
 
@@ -54,6 +56,10 @@ a string):
 
 A `validation_error` also carries the structured entries on `issues`
 (`{ loc, msg, type, input?, ctx? }[]`), so forms can map them onto fields.
+Every module's routes can also fail the shared API-key checks, typed as
+`CanopyAuthErrorCode`: 401 `invalid_api_key`, 403
+`insufficient_module_access` (the key is not scoped to the module) and 403
+`insufficient_{read,write,admin}_access`.
 Aborts are not wrapped: the `AbortError` passes through unchanged, so
 callers can tell cancellation from failure.
 
@@ -271,6 +277,79 @@ reports `pending`. By default `awaitJob` rejects on the 404; pass
 together with `timeoutMs` for "until the deadline"), e.g. against an older
 backend. `isJobNotFoundError(err)` identifies the 404.
 
+## E-log
+
+Canopy's e-log module (`/elog/v1/...`) posts to the e-log backend
+(elog-plus at SLAC) with one application token per client app, held
+server-side, so the browser never holds one. Every per-app call names the
+app (`{app}`, `^[a-z0-9_-]{1,64}$`, e.g. `'trace'`), which picks the token.
+The API key needs the `elog` module scope, `read` for lookups and `write`
+for uploads and posts.
+
+```ts
+import {
+  createElogEntry,
+  getElogConfig,
+  isElogError,
+  listElogLogbooks,
+  uploadElogAttachment,
+} from '@slaclab/canopy-client';
+
+const config = await getElogConfig(conn, 'trace'); // no API key needed
+if (!config.enabled) console.info('E-log is off:', config.reason);
+
+const logbooks = await listElogLogbooks(conn, 'trace');
+const { id: attachmentId } = await uploadElogAttachment(conn, 'trace', pngBlob, {
+  filename: 'plot.png', // default: a File's own name
+});
+try {
+  await createElogEntry(conn, 'trace', {
+    logbookIds: config.defaultLogbookIds,
+    title: 'Orbit drift',
+    bodyMarkdown: 'BPM readings drifted after the **injector** retune.',
+    attachmentIds: [attachmentId],
+    eventAt: new Date().toISOString(), // with an offset; Canopy converts to UTC
+  });
+} catch (err) {
+  if (isElogError(err, 'elog_upstream_error')) console.error(err.detail); // the backend's message
+}
+```
+
+| Call                                                            | Route                                               |
+| --------------------------------------------------------------- | --------------------------------------------------- |
+| `getElogConfig(conn, app)`                                      | `GET /elog/v1/apps/{app}/config` (no key)           |
+| `listElogLogbooks(conn, app)`                                   | `GET .../logbooks`                                  |
+| `listElogTags(conn, app, logbookId)`                            | `GET .../logbooks/{logbookId}/tags`                 |
+| `searchElogUsers(conn, app, search, { limit? })`                | `GET .../users?search=&limit=` (1-100 chars, 1-100) |
+| `listElogRecentEntries(conn, app, logbookIds, { limit? })`      | `GET .../recent-entries?logbookId=a&logbookId=b`    |
+| `uploadElogAttachment(conn, app, blob, { filename?, signal? })` | `POST .../attachments` (multipart, one part `file`) |
+| `createElogEntry(conn, app, entry)`                             | `POST .../entries` (JSON `ElogEntryCreateDTO`)      |
+| `getElogHealthSummary(conn)` / `getElogWatchdog(conn)`          | `GET /elog/v1/health/summary` / `.../watchdog`      |
+
+Notes:
+
+- `getElogConfig` answers for any well-formed app name: an app without a
+  token, or an instance without e-log, is `enabled: false` with a `reason`.
+  `useElogConfig` in `@slaclab/canopy-react` wraps it.
+- Ids in `logbookIds`, `tagIds` and `attachmentIds`, the
+  `additionalAuthors` emails and `followsUpEntryId` must be non-empty:
+  `""` is a 422 `validation_error` (leave `followsUpEntryId` out, or send
+  `null`, for a fresh entry). So are an empty `logbookIds`, a `title` over
+  255 characters and out-of-range `limit`s.
+- `recent-entries` `loggedAt` is ISO-8601 with a UTC offset, or `null`.
+- `uploadElogAttachment` needs a global `FormData` (browsers, Node 18+).
+  Over the instance's limit (20 MiB by default) Canopy answers 413
+  `elog_attachment_too_large`, though a reverse proxy in front of it may
+  refuse a large body first.
+- `isElogError(err, code?)` is true for a `CanopyError` with that
+  `ElogErrorCode`, or any of them without `code`: `invalid_app_name` (400),
+  `elog_app_not_found` (404), `elog_not_configured` (503),
+  `elog_upstream_error` (502: the backend rejected the call, e.g. an
+  unknown author email; `detail` carries its message),
+  `elog_upstream_timeout` (504), `elog_not_supported` (501),
+  `elog_attachment_too_large` (413). Auth failures are
+  `CanopyAuthErrorCode`s, not e-log codes.
+
 ## Time helpers
 
 Canopy's APIs share one time domain — integer epoch nanoseconds (Mole
@@ -332,7 +411,11 @@ serializes snake_case to camelCase on the wire):
   `SearchResultsDTO`, ... (`canopy.mole.schemas`)
 - `src/jobs/types.ts` — `JobStatusDTO`, `JobCreatedDTO`
   (`canopy.jobs.schemas.job`, `canopy.contracts.jobs`)
+- `src/elog/types.ts` — `ElogConfigDTO`, `ElogEntryCreateDTO`,
+  `ElogHealthSummaryDTO`, `ElogErrorCode`, ... (`canopy.elog.schemas`)
 - `src/wire.ts` — shared primitives (`WireAlarmSeverity`)
+- `src/health.ts` — `HeartbeatDTO`, every module's `/health/watchdog`
+  (`canopy.contracts.health`)
 - `src/pv/` — the `PVService` abstraction and its local implementations
   (`MockPVService`, `LocalPVService` for `loc://name?type=&init=` PVs,
   `RoutedPVService` for scheme-prefix routing)
