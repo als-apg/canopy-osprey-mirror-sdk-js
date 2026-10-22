@@ -53,9 +53,9 @@ export type SetupName =
   | 'open-properties'
   | 'select-first-outline-row'
   | 'open-outline'
-  | 'select-trigger-section'
-  | 'inspector-tab-appearance'
-  | 'inspector-tab-symbol'
+  | 'open-section-axes'
+  | 'open-section-display'
+  | 'open-more'
   | 'open-screen-tree-menu'
   | 'open-insight-overflow'
   | 'open-trace-tab'
@@ -87,9 +87,9 @@ declare const hoverAction: Setup;
 declare const openProperties: Setup;
 declare const selectFirstOutlineRow: Setup;
 declare const openOutline: Setup;
-declare const selectTriggerSection: Setup;
-declare const inspectorTabAppearance: Setup;
-declare const inspectorTabSymbol: Setup;
+declare const openSectionAxes: Setup;
+declare const openSectionDisplay: Setup;
+declare const openMore: Setup;
 declare const openScreenTreeMenu: Setup;
 declare const openInsightOverflow: Setup;
 declare const openTraceTab: Setup;
@@ -107,9 +107,9 @@ export {
   openProperties as 'open-properties',
   selectFirstOutlineRow as 'select-first-outline-row',
   openOutline as 'open-outline',
-  selectTriggerSection as 'select-trigger-section',
-  inspectorTabAppearance as 'inspector-tab-appearance',
-  inspectorTabSymbol as 'inspector-tab-symbol',
+  openSectionAxes as 'open-section-axes',
+  openSectionDisplay as 'open-section-display',
+  openMore as 'open-more',
   openScreenTreeMenu as 'open-screen-tree-menu',
   openInsightOverflow as 'open-insight-overflow',
   openTraceTab as 'open-trace-tab',

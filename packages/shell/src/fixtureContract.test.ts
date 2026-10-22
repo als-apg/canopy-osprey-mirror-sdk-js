@@ -54,9 +54,9 @@ const SETUP_NAMES = [
   'open-properties',
   'select-first-outline-row',
   'open-outline',
-  'select-trigger-section',
-  'inspector-tab-appearance',
-  'inspector-tab-symbol',
+  'open-section-axes',
+  'open-section-display',
+  'open-more',
   'open-screen-tree-menu',
   'open-insight-overflow',
   'open-trace-tab',
@@ -451,13 +451,16 @@ describe('hostProbes.json', () => {
     expect(correlation.map((row) => [row.selector, row.pseudo, row.setup])).toEqual([
       ['[data-testid=outline-add-input]', undefined, ['open-outline']],
       ['[data-testid=trigger-source]', undefined, ['open-outline']],
-      ['#density-y', undefined, ['open-properties']],
+      ['#density-y', undefined, ['open-properties', 'open-section-display']],
       ['[data-testid=trigger-source]', undefined, ['open-outline', 'hover']],
       ['[data-testid=actions-bar]', undefined, []],
       ['[data-testid=actions-bar] .cds--btn--icon-only', undefined, []],
       ['[data-testid=actions-bar] .cds--popover-content', undefined, ['hover-action']],
-      ['#y-layout .wb-segmented__option + .wb-segmented__option', undefined, ['open-properties']],
-      ['#trigger-source', undefined, ['select-trigger-section', 'open-properties']],
+      [
+        '#y-layout .wb-segmented__option + .wb-segmented__option',
+        undefined,
+        ['open-properties', 'open-section-axes'],
+      ],
       ['#role', undefined, ['select-first-outline-row', 'open-properties']],
     ]);
     const retired = [
@@ -476,8 +479,8 @@ describe('hostProbes.json', () => {
   });
 
   it('probes the Correlation fields with the field look of the controls they replace', () => {
-    // The add row's input took the PV picker's input, the Trigger header's inline Source and
-    // Properties' #trigger-source took its Source select, #density-y the toolbar's Density Y.
+    // The add row's input took the PV picker's input, the Trigger header's inline Source took
+    // its Source select (the one place the Source shows), #density-y the toolbar's Density Y.
     const look = rowsWhere('correlation', '[data-testid=outline-add-input]')[0].expect;
     expect(Object.keys(look)).toEqual([
       'height',
@@ -488,7 +491,7 @@ describe('hostProbes.json', () => {
       'font-family',
       'font-size',
     ]);
-    for (const selector of ['#density-y', '#trigger-source', '#role']) {
+    for (const selector of ['#density-y', '#role']) {
       expect(
         rowsWhere('correlation', selector).map((row) => row.expect),
         selector
@@ -554,8 +557,8 @@ describe('hostProbes.json', () => {
     expect(PROBES.rows.filter((row) => row.app === 'trace').length).toBe(21);
   });
 
-  it('opens the plot-level Trace rows on a page with no curve, so Properties shows the plot', () => {
-    // With a PV the opening selection is its curve, whose Properties hold no plot field.
+  it('opens the plot-level Trace rows on a page with no curve', () => {
+    // The plot's fields read the same with or without a curve; the page keeps the rows short.
     for (const selector of ['#plot-title', '#grid-style']) {
       const rows = PROBES.rows.filter((row) => row.app === 'trace' && row.selector === selector);
       expect(rows.length, selector).toBe(1);
@@ -563,30 +566,20 @@ describe('hostProbes.json', () => {
     }
   });
 
-  it('opens Properties, then the tab when not the first, for every Trace Properties row', () => {
-    // A field lives in Properties under its #id (the swatch under its testid); a curve field
-    // needs the curve selected first. The composed setups are idempotent (r2 CC-10).
+  it('opens the panel, then the card or section that holds it, for every Trace panel row', () => {
+    // A field lives in the panel under its #id (the swatch under its testid): a curve field in
+    // the curve's card, opened first; a plot field in its plot-wide section, opened after the
+    // panel, a "More" field after that. The composed setups are idempotent (r2 CC-10).
     const curve = ['select-first-outline-row', 'open-properties'];
+    const display = ['open-properties', 'open-section-display'];
     const expected: [string, string | undefined, string[]][] = [
-      ['#plot-title', undefined, ['open-properties']],
-      ['#grid-style', undefined, ['open-properties', 'inspector-tab-appearance']],
-      [
-        '.cds--toggle:has(#show-symbols) .cds--toggle__switch',
-        undefined,
-        [...curve, 'inspector-tab-symbol'],
-      ],
-      [
-        '.cds--toggle:has(#show-symbols) .cds--toggle__switch',
-        '::before',
-        [...curve, 'inspector-tab-symbol'],
-      ],
+      ['#plot-title', undefined, display],
+      ['#grid-style', undefined, [...display, 'open-more']],
+      ['.cds--toggle:has(#show-symbols) .cds--toggle__switch', undefined, curve],
+      ['.cds--toggle:has(#show-symbols) .cds--toggle__switch', '::before', curve],
       ['#display-name', undefined, curve],
-      [
-        '.cds--toggle:has(#show-symbols) .cds--toggle__text',
-        undefined,
-        [...curve, 'inspector-tab-symbol'],
-      ],
-      ['.wb-inspector .wb-field__label', undefined, ['open-properties']],
+      ['.cds--toggle:has(#show-symbols) .cds--toggle__text', undefined, curve],
+      ['.wb-panel .wb-field__label', undefined, display],
       ['[data-testid=trace-color-swatch]', undefined, curve],
     ];
     const properties = PROBES.rows.filter(
@@ -595,15 +588,15 @@ describe('hostProbes.json', () => {
     expect(properties.map((row) => [row.selector, row.pseudo, row.setup])).toEqual(expected);
     for (const row of PROBES.rows) {
       const at = row.setup.indexOf('open-properties');
-      const tabs = row.setup.filter((name) => name.startsWith('inspector-tab-'));
-      if (tabs.length === 0) continue;
-      expect(at, label(row)).toBeGreaterThanOrEqual(0);
-      expect(row.setup.slice(at + 1, at + 1 + tabs.length), label(row)).toEqual(tabs);
+      const after = row.setup.filter(
+        (name) => name.startsWith('open-section-') || name === 'open-more'
+      );
+      for (const name of after) expect(row.setup.indexOf(name), label(row)).toBeGreaterThan(at);
     }
   });
 
   it('probes the row and section-heading recipes on every adopted surface', () => {
-    // Rows read text-md at the tree height, headings, tabs and labels text-sm. The viewer
+    // Rows read text-md at the tree height, headings, titles and labels text-sm. The viewer
     // selectors hold in today's tree and in the Browse tree: a member row by the data-screen-key
     // its treeitem carries, a top-level branch by the recipe class.
     const rows = {
@@ -617,11 +610,11 @@ describe('hostProbes.json', () => {
         { height: rows.height, 'font-size': rows.text },
       ],
       ['viewer', '.screen-tree .canopy-section-heading', { 'font-size': 'text-sm' }],
-      ['trace', '.wb-sidebar__tab', { 'font-size': 'text-sm' }],
-      ['trace', '.wb-outline-section__title', { 'font-size': 'text-sm' }],
+      ['trace', '.wb-sidebar__title', { 'font-size': 'text-sm' }],
+      ['trace', '.wb-group__heading', { 'font-size': 'text-sm' }],
       ['trace', '.wb-outline-row', { height: rows.height, 'font-size': rows.text }],
       ['trace', '.wb-outline-row__name', { 'font-size': rows.text }],
-      ['trace', '.wb-inspector .wb-field__label', { 'font-size': 'text-sm' }],
+      ['trace', '.wb-panel .wb-field__label', { 'font-size': 'text-sm' }],
     ];
     for (const [app, selector, contracts] of expected) {
       const found = rowsWhere(app, selector);
@@ -678,8 +671,8 @@ describe('hostProbes.json', () => {
     ).toEqual([]);
   });
 
-  it('probes the Trace sidebar and Inspector density (B9)', () => {
-    expect(rowsWhere('trace', '.wb-sidebar__tabbar')[0].expect.height).toEqual({
+  it('probes the Trace sidebar and panel density (B9)', () => {
+    expect(rowsWhere('trace', '.wb-sidebar__header')[0].expect.height).toEqual({
       contract: 'control-h-xs',
     });
     expect(rowsWhere('trace', '#display-name').map((row) => row.expect)).toEqual([
@@ -693,7 +686,7 @@ describe('hostProbes.json', () => {
   });
 
   it('probes the workbench sidebar chrome with no setup', () => {
-    for (const selector of ['.wb-split__edge', '.wb-sidebar__tabbar']) {
+    for (const selector of ['.wb-split__edge', '.wb-sidebar__header']) {
       expect(
         rowsWhere('trace', selector).map((row) => row.setup),
         selector
@@ -824,101 +817,69 @@ describe('setups.mjs', () => {
         page,
         {}
       );
-    const INSPECTOR = '.wb-sidebar__pane--properties .wb-inspector';
+    const PANEL = '.wb-sidebar__pane--properties .wb-panel';
+    const RAIL = '.wb-sidebar__rail-target[data-pane=properties]';
 
-    it('open-properties clicks the Properties tab only when it is not selected', async () => {
-      const idle = fakePage(['[data-testid=sidebar-tab-properties][aria-selected=false]']);
-      await run('open-properties', idle.page);
-      expect(idle.log).toEqual([
-        'wait .wb-sidebar',
-        'click [data-testid=sidebar-tab-properties][aria-selected=false]',
-        'wait .wb-sidebar__pane--properties',
-        `wait ${INSPECTOR}`,
-      ]);
+    it('open-properties expands a collapsed sidebar through the rail target, then waits', async () => {
+      const railed = fakePage([RAIL]);
+      await run('open-properties', railed.page);
+      expect(railed.log).toEqual(['wait .wb-sidebar', `click ${RAIL}`, `wait ${PANEL}`]);
 
-      // Selected already: a click would collapse the sidebar, so none is made.
+      // Showing already: nothing is clicked.
       const shown = fakePage([]);
       await run('open-properties', shown.page);
-      expect(shown.log.filter((entry) => entry.startsWith('click'))).toEqual([]);
-      expect(shown.log.at(-1)).toBe(`wait ${INSPECTOR}`);
+      expect(shown.log).toEqual(['wait .wb-sidebar', `wait ${PANEL}`]);
     });
 
-    it('open-properties expands a collapsed sidebar through the rail target', async () => {
-      const { page, log } = fakePage([
-        '.wb-sidebar__rail-target[data-pane=properties]',
-        '[data-testid=sidebar-tab-properties][aria-selected=false]',
-      ]);
-      await run('open-properties', page);
-      expect(log.filter((entry) => entry.startsWith('click'))).toEqual([
-        'click .wb-sidebar__rail-target[data-pane=properties]',
-      ]);
+    it('open-outline is open-properties: the panel holds both', async () => {
+      const outline = fakePage([RAIL]);
+      const properties = fakePage([RAIL]);
+      await run('open-outline', outline.page);
+      await run('open-properties', properties.page);
+      expect(outline.log).toEqual(properties.log);
     });
 
-    it('open-properties expands a collapsed stacked pane by its header', async () => {
-      const { page, log } = fakePage([
-        '.wb-sidebar__header[data-pane=properties][aria-expanded=false]',
-      ]);
-      await run('open-properties', page);
-      expect(log.filter((entry) => entry.startsWith('click'))).toEqual([
-        'click .wb-sidebar__header[data-pane=properties][aria-expanded=false]',
-      ]);
-    });
-
-    it('inspector-tab-<id> clicks the tab only when it is not selected', async () => {
-      const tab = `${INSPECTOR} [data-testid=inspector-tab-appearance]`;
-      const idle = fakePage([`${tab}:not([aria-selected=true])`]);
-      await run('inspector-tab-appearance', idle.page);
-      expect(idle.log).toEqual([
-        `click ${tab}:not([aria-selected=true])`,
-        `wait ${tab}[aria-selected=true]`,
-      ]);
-      const selected = fakePage([]);
-      await run('inspector-tab-symbol', selected.page);
-      expect(selected.log).toEqual([
-        `wait ${INSPECTOR} [data-testid=inspector-tab-symbol][aria-selected=true]`,
-      ]);
-    });
-
-    it('select-first-outline-row shows the Outline, selects, and waits for the item', async () => {
-      const { page, log } = fakePage(['[data-testid=sidebar-tab-outline][aria-selected=false]']);
-      await run('select-first-outline-row', page);
-      expect(log).toEqual([
+    it('select-first-outline-row opens the first card unless one is open, then waits for its body', async () => {
+      const name = `${PANEL} .wb-card__head .wb-outline-row__name`;
+      const closed = fakePage([]);
+      await run('select-first-outline-row', closed.page);
+      expect(closed.log).toEqual([
         'wait .wb-sidebar',
-        'click [data-testid=sidebar-tab-outline][aria-selected=false]',
-        'wait .wb-sidebar__pane--outline',
-        'click .wb-outline-row .wb-outline-row__name',
-        `wait ${INSPECTOR}[data-level=item]`,
+        `wait ${PANEL}`,
+        `click ${name}`,
+        `wait ${PANEL} .wb-card--open .wb-card__body`,
       ]);
-      // The click reveals Properties, which hides the Outline in the tabbed sidebar, so no wait
-      // after it may target the Outline (it would never become visible).
-      const afterClick = log.slice(log.indexOf('click .wb-outline-row .wb-outline-row__name') + 1);
-      expect(afterClick.filter((l) => l.startsWith('wait') && l.includes('outline'))).toEqual([]);
+
+      // A card already open is left open: a second click would close it.
+      const open = fakePage([`${PANEL} .wb-card--open`]);
+      await run('select-first-outline-row', open.page);
+      expect(open.log.filter((entry) => entry.startsWith('click'))).toEqual([]);
     });
 
-    it('open-outline clicks the Outline tab only when it is not selected', async () => {
-      const idle = fakePage(['[data-testid=sidebar-tab-outline][aria-selected=false]']);
-      await run('open-outline', idle.page);
-      expect(idle.log).toEqual([
+    it('open-section-<id> opens the plot-wide section only when it is closed', async () => {
+      const section = `${PANEL} .wb-plot-section[data-section=display]`;
+      const head = `${section} > .wb-plot-section__head[aria-expanded=false]`;
+      const closed = fakePage([head]);
+      await run('open-section-display', closed.page);
+      expect(closed.log).toEqual([
         'wait .wb-sidebar',
-        'click [data-testid=sidebar-tab-outline][aria-selected=false]',
-        'wait .wb-sidebar__pane--outline',
+        `wait ${PANEL}`,
+        `click ${head}`,
+        `wait ${section} > .wb-plot-section__body`,
       ]);
-      const shown = fakePage([]);
-      await run('open-outline', shown.page);
-      expect(shown.log).toEqual(['wait .wb-sidebar', 'wait .wb-sidebar__pane--outline']);
+      const open = fakePage([]);
+      await run('open-section-axes', open.page);
+      expect(open.log.filter((entry) => entry.startsWith('click'))).toEqual([]);
+      expect(open.log.at(-1)).toBe(
+        `wait ${PANEL} .wb-plot-section[data-section=axes] > .wb-plot-section__body`
+      );
     });
 
-    it('select-trigger-section selects the Trigger section by its gear', async () => {
-      const gear = '.wb-sidebar__pane--outline [data-section-id=trig] .wb-outline-section__gear';
-      const { page, log } = fakePage(['[data-testid=sidebar-tab-outline][aria-selected=false]']);
-      await run('select-trigger-section', page);
-      expect(log).toEqual([
-        'wait .wb-sidebar',
-        'click [data-testid=sidebar-tab-outline][aria-selected=false]',
-        'wait .wb-sidebar__pane--outline',
-        `click ${gear}`,
-        `wait ${INSPECTOR}[data-level=section]`,
-      ]);
+    it('open-more opens the closed More disclosures it finds, then waits for one', async () => {
+      const toggle = `${PANEL} .wb-block__more-toggle[aria-expanded=false]`;
+      const { page, log } = fakePage([toggle]);
+      await run('open-more', page);
+      expect(log).toEqual([`click ${toggle}`, `wait ${PANEL} .wb-block__more-body`]);
     });
 
     it('open-save-view-dialog asks the stand-in Trace for a query only while Save is disabled', async () => {

@@ -51,16 +51,15 @@ const UNDOCKED_TAB = `${TAB_STRIP} [role=tab][data-docked=false]`;
 /** The dock root while it lists two or more docked keys (`data-docked` is a JSON array). */
 const TWO_TILES = `[data-testid=workspace-dock][data-docked*='","']`;
 
-/** The workbench sidebar of a tool (react-trace `src/workbench/`), and its two panes. */
+/** The workbench sidebar of a tool (react-trace `src/workbench/`) and its one pane. */
 const SIDEBAR = '.wb-sidebar';
-/** @param {'outline' | 'properties'} pane */
-const PANE = (pane) => `.wb-sidebar__pane--${pane}`;
-/** The Inspector of the Properties pane: what every Properties row reads inside. */
-const INSPECTOR = `${PANE('properties')} .wb-inspector`;
-const OUTLINE_ROW = '.wb-outline-row';
-/** The section gear of an Outline section (`data-section-id` is the section id), which selects it. */
-const SECTION_GEAR = (/** @type {string} */ id) =>
-  `.wb-sidebar__pane--outline [data-section-id=${id}] .wb-outline-section__gear`;
+const PANE = '.wb-sidebar__pane--properties';
+/** The properties panel inside the pane: what every panel row reads inside. */
+const PANEL = `${PANE} .wb-panel`;
+/** A card's head in the panel's top block (Trace curves, Correlation PVs, Waveform signals). */
+const CARD_HEAD = `${PANEL} .wb-card__head`;
+/** A plot-wide section of the panel (`data-section` is its id: acquisition, axes, display, statistics). */
+const PLOT_SECTION = (/** @type {string} */ id) => `${PANEL} .wb-plot-section[data-section=${id}]`;
 /** The tool's actions bar, and one of its actions (a Carbon IconButton). */
 const ACTIONS_BAR = '[data-testid=actions-bar]';
 const ACTION = `${ACTIONS_BAR} .cds--btn--icon-only`;
@@ -128,100 +127,73 @@ async function hoverAction(page) {
 }
 
 /**
- * Shows one pane of the workbench sidebar, whatever the stored arrangement left it as: the rail
- * (every pane collapsed) is expanded through its target for the pane; in tabbed mode the pane's
- * tab is clicked only when it is not the selected one, because clicking the selected tab
- * collapses the sidebar; in stacked mode a collapsed pane's header is clicked. A pane already
- * showing is left alone, so the step is idempotent and composes after a setup that revealed it.
- *
- * @param {PageLike} page
- * @param {'outline' | 'properties'} pane
- * @returns {Promise<void>}
- */
-async function showPane(page, pane) {
-  await page.locator(SIDEBAR).first().waitFor();
-  const rail = page.locator(`.wb-sidebar__rail-target[data-pane=${pane}]`);
-  const tab = page.locator(`[data-testid=sidebar-tab-${pane}][aria-selected=false]`);
-  const header = page.locator(`.wb-sidebar__header[data-pane=${pane}][aria-expanded=false]`);
-  if ((await rail.count()) > 0) await rail.first().click();
-  else if ((await tab.count()) > 0) await tab.first().click();
-  else if ((await header.count()) > 0) await header.first().click();
-  await page.locator(PANE(pane)).first().waitFor();
-}
-
-/**
- * Shows the Properties pane and waits for its Inspector. Idempotent (see `showPane`).
+ * Shows the tool's properties panel: a collapsed sidebar (the 32 px rail) is expanded through its
+ * target; a panel already showing is left alone, so the step is idempotent and composes after a
+ * setup that revealed it.
  *
  * @param {PageLike} page
  * @returns {Promise<void>}
  */
 async function openProperties(page) {
-  await showPane(page, 'properties');
-  await page.locator(INSPECTOR).first().waitFor();
+  await page.locator(SIDEBAR).first().waitFor();
+  const rail = page.locator('.wb-sidebar__rail-target[data-pane=properties]');
+  if ((await rail.count()) > 0) await rail.first().click();
+  await page.locator(PANEL).first().waitFor();
 }
 
 /**
- * Shows the Outline pane. Idempotent (see `showPane`).
- *
- * @param {PageLike} page
- * @returns {Promise<void>}
- */
-async function openOutline(page) {
-  await showPane(page, 'outline');
-}
-
-/**
- * Selects Correlation's Trigger section through its gear, a user selection, which reveals
- * Properties by itself; it waits until the Inspector shows a section, so an `open-properties`
- * after it finds the pane showing and does nothing. The section's own fields (`#trigger-source`)
- * live in Properties only while it is selected.
- *
- * @param {PageLike} page
- * @returns {Promise<void>}
- */
-async function selectTriggerSection(page) {
-  await showPane(page, 'outline');
-  await page.locator(SECTION_GEAR('trig')).first().click();
-  // As after a row click: the selection may hide the Outline, so the wait is on the Inspector.
-  await page.locator(`${INSPECTOR}[data-level=section]`).first().waitFor();
-}
-
-/**
- * Selects the first row of the Outline (in Trace, the first curve), a user selection, which
- * reveals Properties by itself; it waits until the Inspector shows that item, so an
- * `open-properties` after it finds the pane showing and does nothing.
+ * Opens the first card of the panel's top block (in Trace the first curve), a user selection; it
+ * waits until that card's body shows. A card already open is left open.
  *
  * @param {PageLike} page
  * @returns {Promise<void>}
  */
 async function selectFirstOutlineRow(page) {
-  await showPane(page, 'outline');
-  await page.locator(`${OUTLINE_ROW} .wb-outline-row__name`).first().click();
-  // No wait on the Outline after the click: the selection reveals Properties, and in the tabbed
-  // sidebar that hides the Outline pane, so a selected row is never visible. The Inspector at
-  // item level is the proof the selection landed.
-  await page.locator(`${INSPECTOR}[data-level=item]`).first().waitFor();
+  await openProperties(page);
+  const open = page.locator(`${PANEL} .wb-card--open`);
+  if ((await open.count()) === 0) {
+    await page.locator(`${CARD_HEAD} .wb-outline-row__name`).first().click();
+  }
+  await page.locator(`${PANEL} .wb-card--open .wb-card__body`).first().waitFor();
 }
 
 /**
- * The setup that selects the Inspector tab `id` (`inspector-tab-<id>`), clicking it only when it
- * is not selected yet. Runs after `open-properties`. The runner looks setups up by name, so each
- * tab a row needs is one export below.
+ * The setup that opens the plot-wide section `id` of the panel, clicking its header only when it
+ * is closed. The runner looks setups up by name, so each section a row needs is one export below.
  *
  * @param {string} id
  * @returns {(page: PageLike) => Promise<void>}
  */
-function inspectorTab(id) {
-  const tab = `${INSPECTOR} [data-testid=inspector-tab-${id}]`;
+function openSection(id) {
+  const head = `${PLOT_SECTION(id)} > .wb-plot-section__head`;
   return async (page) => {
-    const idle = page.locator(`${tab}:not([aria-selected=true])`);
-    if ((await idle.count()) > 0) await idle.first().click();
-    await page.locator(`${tab}[aria-selected=true]`).first().waitFor();
+    await openProperties(page);
+    const closed = page.locator(`${head}[aria-expanded=false]`);
+    if ((await closed.count()) > 0) await closed.first().click();
+    await page
+      .locator(`${PLOT_SECTION(id)} > .wb-plot-section__body`)
+      .first()
+      .waitFor();
   };
 }
 
-const inspectorTabAppearance = inspectorTab('appearance');
-const inspectorTabSymbol = inspectorTab('symbol');
+const openSectionAxes = openSection('axes');
+const openSectionDisplay = openSection('display');
+
+/**
+ * Opens every closed "More" disclosure the panel shows, so a row can read a field kept there.
+ * Runs after the setup that opened the card or section holding it.
+ *
+ * @param {PageLike} page
+ * @returns {Promise<void>}
+ */
+async function openMore(page) {
+  const closed = page.locator(`${PANEL} .wb-block__more-toggle[aria-expanded=false]`);
+  // Each click opens the first one still closed; the count bounds the loop.
+  const count = await closed.count();
+  for (let i = 0; i < count; i += 1) await closed.first().click();
+  await page.locator(`${PANEL} .wb-block__more-body`).first().waitFor();
+}
 
 /**
  * @param {PageLike} page
@@ -503,11 +475,11 @@ export {
   focus as 'focus',
   hoverAction as 'hover-action',
   openProperties as 'open-properties',
+  openProperties as 'open-outline',
   selectFirstOutlineRow as 'select-first-outline-row',
-  openOutline as 'open-outline',
-  selectTriggerSection as 'select-trigger-section',
-  inspectorTabAppearance as 'inspector-tab-appearance',
-  inspectorTabSymbol as 'inspector-tab-symbol',
+  openSectionAxes as 'open-section-axes',
+  openSectionDisplay as 'open-section-display',
+  openMore as 'open-more',
   openScreenTreeMenu as 'open-screen-tree-menu',
   openInsightOverflow as 'open-insight-overflow',
   openTraceTab as 'open-trace-tab',
