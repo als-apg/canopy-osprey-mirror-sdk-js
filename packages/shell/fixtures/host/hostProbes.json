@@ -193,7 +193,7 @@
       "app": "trace",
       "selector": "#plot-title",
       "page": "/?embedded=true&theme={theme}&range=-10m",
-      "setup": ["open-properties"],
+      "setup": ["open-properties", "open-section-display"],
       "expect": {
         "height": { "contract": "control-h-sm" },
         "border-top-left-radius": { "contract": "radius-sm" },
@@ -222,7 +222,7 @@
       "app": "correlation",
       "selector": "#density-y",
       "page": "/correlation.html?embedded=true&theme={theme}&x=PROBE:X&y=PROBE:Y1&y=PROBE:Y2&dt=1&n=1000&lookback=1h&view=density&axes=shared",
-      "setup": ["open-properties"],
+      "setup": ["open-properties", "open-section-display"],
       "expect": {
         "height": { "contract": "control-h-sm" },
         "border-top-left-radius": { "contract": "radius-sm" },
@@ -237,7 +237,7 @@
       "app": "trace",
       "selector": "#grid-style",
       "page": "/?embedded=true&theme={theme}&range=-10m",
-      "setup": ["open-properties", "inspector-tab-appearance"],
+      "setup": ["open-properties", "open-section-display", "open-more"],
       "expect": {
         "height": { "contract": "control-h-sm" },
         "border-top-left-radius": { "contract": "radius-sm" },
@@ -400,23 +400,9 @@
     {
       "app": "correlation",
       "selector": "#y-layout .wb-segmented__option + .wb-segmented__option",
-      "setup": ["open-properties"],
+      "setup": ["open-properties", "open-section-axes"],
       "expect": {
         "border-left-color": { "contract": "border", "standalone": { "carbon": "border-subtle" } }
-      }
-    },
-    {
-      "app": "correlation",
-      "selector": "#trigger-source",
-      "setup": ["select-trigger-section", "open-properties"],
-      "expect": {
-        "height": { "contract": "control-h-sm" },
-        "border-top-left-radius": { "contract": "radius-sm" },
-        "background-color": { "contract": "bg-field" },
-        "border-bottom-color": { "contract": "border-strong" },
-        "border-bottom-width": { "literal": "1px" },
-        "font-family": { "contract": "font-ui" },
-        "font-size": { "contract": "text-md" }
       }
     },
     {
@@ -436,7 +422,7 @@
     {
       "app": "trace",
       "selector": ".cds--toggle:has(#show-symbols) .cds--toggle__switch",
-      "setup": ["select-first-outline-row", "open-properties", "inspector-tab-symbol"],
+      "setup": ["select-first-outline-row", "open-properties"],
       "expect": {
         "background-color": { "contract": "text-muted", "standalone": { "carbon": "toggle-off" } }
       }
@@ -445,7 +431,7 @@
       "app": "trace",
       "selector": ".cds--toggle:has(#show-symbols) .cds--toggle__switch",
       "pseudo": "::before",
-      "setup": ["select-first-outline-row", "open-properties", "inspector-tab-symbol"],
+      "setup": ["select-first-outline-row", "open-properties"],
       "expect": {
         "background-color": { "contract": "on-accent", "standalone": { "carbon": "icon-on-color" } }
       }
@@ -461,7 +447,7 @@
     {
       "app": "trace",
       "selector": ".cds--toggle:has(#show-symbols) .cds--toggle__text",
-      "setup": ["select-first-outline-row", "open-properties", "inspector-tab-symbol"],
+      "setup": ["select-first-outline-row", "open-properties"],
       "expect": {
         "font-size": { "contract": "text-sm" }
       }
@@ -531,7 +517,7 @@
     },
     {
       "app": "trace",
-      "selector": ".wb-sidebar__tabbar",
+      "selector": ".wb-sidebar__header",
       "setup": [],
       "expect": {
         "height": { "contract": "control-h-xs" },
@@ -540,7 +526,7 @@
     },
     {
       "app": "trace",
-      "selector": ".wb-sidebar__tab",
+      "selector": ".wb-sidebar__title",
       "setup": [],
       "expect": {
         "font-size": { "contract": "text-sm" }
@@ -548,7 +534,7 @@
     },
     {
       "app": "trace",
-      "selector": ".wb-outline-section__title",
+      "selector": ".wb-group__heading",
       "setup": ["open-outline"],
       "expect": {
         "font-size": { "contract": "text-sm" }
@@ -573,8 +559,8 @@
     },
     {
       "app": "trace",
-      "selector": ".wb-inspector .wb-field__label",
-      "setup": ["open-properties"],
+      "selector": ".wb-panel .wb-field__label",
+      "setup": ["open-properties", "open-section-display"],
       "expect": {
         "font-size": { "contract": "text-sm" }
       }
