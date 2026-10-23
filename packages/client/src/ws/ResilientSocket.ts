@@ -1,8 +1,8 @@
 // A reconnecting JSON WebSocket for Canopy's streaming endpoints: connect /
 // capped-backoff reconnect / resubscribe on open / ping + pong-deadline
-// liveness / orphaned-socket guards. Protocol services (Hare, Fox, the
-// optimization run stream) sit on top and only deal with frames and
-// (re)subscription.
+// liveness / orphaned-socket guards. Protocol services (Hare, the Formula
+// Engine, the optimization run stream) sit on top and only deal with frames
+// and (re)subscription.
 
 import type { WebSocketCloseEventLike, WebSocketFactory, WebSocketLike } from '../transport.js';
 
@@ -116,7 +116,7 @@ function defaultWebSocketFactory(): WebSocketFactory | undefined {
 }
 
 // ── Helpers shared with the protocol services in this package ──────────────
-// (Exported for HarePVService / FoxFormulaService; not re-exported from the
+// (Exported for HarePVService / FormulaEngineService; not re-exported from the
 // package root.)
 
 /** `err.message` for an Error, else `String(err)`. */
@@ -126,8 +126,8 @@ export function errorMessage(err: unknown): string {
 
 /**
  * The status a protocol service reports for a socket status: a stopped
- * socket ('closed') reads as 'disconnected', as Hare and Fox report both
- * drops and an explicit disconnect.
+ * socket ('closed') reads as 'disconnected', as Hare and the Formula Engine
+ * report both drops and an explicit disconnect.
  */
 export function toServiceStatus(status: SocketStatus): Exclude<SocketStatus, 'closed'> {
   return status === 'closed' ? 'disconnected' : status;

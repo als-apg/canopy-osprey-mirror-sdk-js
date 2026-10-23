@@ -1,7 +1,7 @@
 # @slaclab/canopy-client
 
 Framework-free TypeScript client for Canopy's wire protocols: Hare live PVs
-(WebSocket), Fox formula subscriptions (WebSocket), Mole history (REST),
+(WebSocket), Formula Engine subscriptions (WebSocket), Mole history (REST),
 background jobs (REST), the shared REST core, a reconnecting WebSocket for
 any Canopy stream (`ResilientSocket`), epoch-nanosecond time helpers, and the
 typed wire DTOs for all of them. Pure TypeScript — no React, no DOM lib
@@ -118,25 +118,25 @@ pass `terminalCloseCodes: []` to always reconnect.
 realistic-looking simulated values locally (with alarm transitions) based on
 naming conventions in the PV name (e.g. `TEMP`, `CURRENT`, `PRESSURE`).
 
-## Formulas (Fox)
+## Formulas (Formula Engine)
 
-`FoxFormulaService` streams live formula evaluations over
-`WS {baseUrl}/fox/v1/ws/formulas`. It knows `FormulaSpec` only — expression,
-token→PV bindings, and evaluation options — with no naming conventions or
+`FormulaEngineService` streams live formula evaluations over
+`WS {baseUrl}/formula-engine/v1/ws/formulas`. It knows `FormulaSpec` only —
+expression, token→PV bindings, and evaluation options — with no naming conventions or
 screen-level rule types. `baseUrl` may also be relative, such as the dev
 proxy's `/api/canopy`; it is resolved against the page like `toWsUrl` does
 (outside a browser, pass an absolute base or `wsUrl`):
 
 ```ts
-import { FoxFormulaService } from '@slaclab/canopy-client';
+import { FormulaEngineService } from '@slaclab/canopy-client';
 
-const fox = new FoxFormulaService({
+const formulaEngine = new FormulaEngineService({
   baseUrl: 'https://canopy.example.org', // http(s) is switched to ws(s)
   apiKey: 'my-api-key', // sent as ?api_key= on the WS URL
 });
-fox.connect();
+formulaEngine.connect();
 
-const unsubscribe = fox.subscribe(
+const unsubscribe = formulaEngine.subscribe(
   { kind: 'scalar', expression: 'A - B', bindings: { A: 'PV:ONE', B: 'PV:TWO' } },
   {
     // t0Ns / t1Ns / intervalMs are optional (live push mode by default)
@@ -146,7 +146,7 @@ const unsubscribe = fox.subscribe(
 );
 
 unsubscribe();
-fox.dispose();
+formulaEngine.dispose();
 ```
 
 Subscription ids are server-assigned; the service correlates replies through
@@ -157,7 +157,7 @@ assigned ids are remapped onto the existing callbacks transparently.
 
 ## Streams (`ResilientSocket`)
 
-`HarePVService` and `FoxFormulaService` are built on `ResilientSocket`, a
+`HarePVService` and `FormulaEngineService` are built on `ResilientSocket`, a
 JSON WebSocket that keeps itself connected. Use it for any other Canopy
 stream (e.g. the optimization run stream): the protocol code only
 (re)subscribes in `onOpen` and handles frames.
@@ -274,7 +274,7 @@ backend. `isJobNotFoundError(err)` identifies the 404.
 ## Time helpers
 
 Canopy's APIs share one time domain — integer epoch nanoseconds (Mole
-`from`/`to`, Fox `t0Ns`/`t1Ns`, sample `tsNs`). `src/time.ts` exports
+`from`/`to`, Formula Engine `t0Ns`/`t1Ns`, sample `tsNs`). `src/time.ts` exports
 `nowNs`, `msToNs`, `nsToMs`, `dateToNs`, and `nsToDate` to convert between
 that and JS epoch milliseconds / `Date`.
 
@@ -326,8 +326,9 @@ serializes snake_case to camelCase on the wire):
 - `src/hare/types.ts` — `PVValueDTO`, `PVMetaDTO`, `HareServerFrame`,
   `HareClientMessage`, `PVWriteRequestDTO`, ... (`canopy.contracts.pv`,
   `canopy.hare.schemas.pv`)
-- `src/fox/types.ts` — `FormulaSpec`, `FormulaResultDTO`, `FoxServerFrame`,
-  ... (`canopy.contracts.formula`, `canopy.fox.api.v1.ws`)
+- `src/formula-engine/types.ts` — `FormulaSpec`, `FormulaResultDTO`,
+  `FormulaEngineServerFrame`, ... (`canopy.contracts.formula`,
+  `canopy.formula_engine.api.v1.ws`)
 - `src/mole/types.ts` — `ArchiverDataDTO`, `PVMetadataDTO`,
   `SearchResultsDTO`, ... (`canopy.mole.schemas`)
 - `src/jobs/types.ts` — `JobStatusDTO`, `JobCreatedDTO`

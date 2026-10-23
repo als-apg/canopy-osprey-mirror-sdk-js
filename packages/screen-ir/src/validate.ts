@@ -1,14 +1,14 @@
 // Runtime validation of a screen document against the canonical Screen IR.
 // Layered: (1) structural conformance to the JSON Schema
 // (../schema/screen-ir.schema.json), then (2) the cross-field/cross-reference
-// rules the schema can't express (macro defaults, fox:// resolution). So
+// rules the schema can't express (macro defaults, formula:// resolution). So
 // validate() is the FULL contract, not just the structural subset.
 
 // Named import (not CJS default) so the class type survives NodeNext resolution.
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import type { ValidateFunction } from 'ajv/dist/2020.js';
 
-import { foxName, isFoxRef } from './formula.js';
+import { formulaName, isFormulaRef } from './formula.js';
 import schema from '../schema/screen-ir.schema.json' with { type: 'json' };
 
 // Lazily compiled on first validate() call so type-only consumers of the
@@ -42,7 +42,7 @@ export function validate(screen: unknown): string[] {
   const doc = screen as ScreenLike;
 
   checkMacroDefaults(doc, errors);
-  checkFoxRefs(doc, errors);
+  checkFormulaRefs(doc, errors);
 
   return errors;
 }
@@ -64,10 +64,10 @@ function checkMacroDefaults(doc: ScreenLike, errors: string[]): void {
 }
 
 /**
- * Every `fox://` reference (in calc-PV channel props, rule `pvs[].name`, and
+ * Every `formula://` reference (in calc-PV channel props, rule `pvs[].name`, and
  * `Rule.formula`) resolves to a declared `formulas[]` entry.
  */
-function checkFoxRefs(doc: ScreenLike, errors: string[]): void {
+function checkFormulaRefs(doc: ScreenLike, errors: string[]): void {
   const formulaNames = new Set((doc.formulas ?? []).map((f) => f.name));
 
   const requireFormula = (name: string, where: string): void => {
@@ -80,18 +80,19 @@ function checkFoxRefs(doc: ScreenLike, errors: string[]): void {
     if (!node) return;
 
     for (const [key, value] of Object.entries(node.props ?? {})) {
-      if (isFoxRef(value)) requireFormula(foxName(value), `widget '${node.id}' prop '${key}'`);
+      if (isFormulaRef(value))
+        requireFormula(formulaName(value), `widget '${node.id}' prop '${key}'`);
     }
 
     for (const rule of node.rules ?? []) {
       // `formula`/`pvs[].name` are schema-typed as strings; the guards here are
       // defensive and would fail-open if a future schema edit loosened them.
       if (typeof rule.formula === 'string') {
-        requireFormula(foxName(rule.formula), `rule '${rule.id}' on widget '${node.id}'`);
+        requireFormula(formulaName(rule.formula), `rule '${rule.id}' on widget '${node.id}'`);
       }
       for (const pv of rule.pvs ?? []) {
-        if (isFoxRef(pv.name))
-          requireFormula(foxName(pv.name), `rule '${rule.id}' on widget '${node.id}' pv`);
+        if (isFormulaRef(pv.name))
+          requireFormula(formulaName(pv.name), `rule '${rule.id}' on widget '${node.id}' pv`);
       }
     }
 

@@ -5,7 +5,7 @@
  *
  * Conditions reference these by 0-based index (`{0}`, `{1}`, …), so renames stay
  * stable. `name` may contain `${MACRO}` substitutions — resolved client-side
- * before subscribing to Fox.
+ * before subscribing to the Formula Engine.
  */
 export interface RulePvBinding {
   readonly name: string;
@@ -43,13 +43,13 @@ interface RuleBase {
  * A widget property rule (author form) — a discriminated union of two arms:
  *
  * - **Conditional** (`conditions`): an ordered condition→value table over `pvs`;
- *   what the `.edl`/`.ui` converter emits. A `pvs[].name` may be a `fox://<name>`
+ *   what the `.edl`/`.ui` converter emits. A `pvs[].name` may be a `formula://<name>`
  *   reference, so conditions can test a screen-level formula's output alongside raw PVs.
  * - **Formula-driven** (`formula`): the target property is set directly to the named
  *   screen-level `FormulaDeclaration`'s output — no condition table. `formula` is the
- *   bare formula name, not the `fox://` form.
+ *   bare formula name, not the `formula://` form.
  *
- * Both arms compile client-side to a Fox `FormulaSpec`; compiled form is never stored.
+ * Both arms compile client-side to a Formula Engine `FormulaSpec`; compiled form is never stored.
  */
 export type Rule =
   | (RuleBase & {

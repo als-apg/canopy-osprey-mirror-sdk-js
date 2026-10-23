@@ -2,7 +2,7 @@
   "name": "@slaclab/canopy-client",
   "version": "0.2.0",
   "private": false,
-  "description": "Framework-free TypeScript client for Canopy's protocols — Hare live PVs, Fox formulas, Mole history, background jobs, the shared REST core, and typed wire DTOs",
+  "description": "Framework-free TypeScript client for Canopy's protocols — Hare live PVs, Formula Engine formulas, Mole history, background jobs, the shared REST core, and typed wire DTOs",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/slaclab/canopy-sdk-js.git",

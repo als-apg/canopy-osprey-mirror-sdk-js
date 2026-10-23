@@ -498,8 +498,8 @@ describe('toWsUrl', () => {
     expect(toWsUrl('http://localhost:8000/', '/hare/v1/ws/pvs')).toBe(
       'ws://localhost:8000/hare/v1/ws/pvs'
     );
-    expect(toWsUrl('HTTPS://host/prefix//', 'fox/v1/ws/formulas')).toBe(
-      'wss://host/prefix/fox/v1/ws/formulas'
+    expect(toWsUrl('HTTPS://host/prefix//', 'formula-engine/v1/ws/formulas')).toBe(
+      'wss://host/prefix/formula-engine/v1/ws/formulas'
     );
     expect(toWsUrl('wss://host/api', '/x')).toBe('wss://host/api/x');
   });

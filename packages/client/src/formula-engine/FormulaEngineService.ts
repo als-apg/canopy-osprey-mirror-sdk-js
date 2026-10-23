@@ -6,19 +6,19 @@ import {
   toWsUrl,
 } from '../ws/ResilientSocket.js';
 import type { SocketFrame } from '../ws/ResilientSocket.js';
-import type { FormulaResultDTO, FormulaSpec, FoxServerFrame } from './types.js';
+import type { FormulaResultDTO, FormulaSpec, FormulaEngineServerFrame } from './types.js';
 
-export type FoxConnectionStatus = 'idle' | 'connecting' | 'connected' | 'disconnected';
+export type FormulaEngineConnectionStatus = 'idle' | 'connecting' | 'connected' | 'disconnected';
 
-export interface FoxError {
+export interface FormulaEngineError {
   code: string;
   message: string;
 }
 
-export interface FoxFormulaServiceOptions {
+export interface FormulaEngineServiceOptions {
   /**
    * Base URL of the Canopy API, e.g. `https://canopy.example.org` — the
-   * service connects to `{baseUrl}/fox/v1/ws/formulas` (http(s) is switched
+   * service connects to `{baseUrl}/formula-engine/v1/ws/formulas` (http(s) is switched
    * to ws(s); a ws(s) base is used as-is). A relative base such as a
    * same-origin dev-proxy prefix (`/api/canopy`) is resolved against
    * `globalThis.location` (see {@link toWsUrl}); without one (Node) the
@@ -46,12 +46,12 @@ export interface FoxFormulaServiceOptions {
    */
   terminalCloseCodes?: number[];
   /** Connection-level errors and error frames that match no subscription. */
-  onError?: (error: FoxError) => void;
-  onStatusChange?: (status: FoxConnectionStatus) => void;
+  onError?: (error: FormulaEngineError) => void;
+  onStatusChange?: (status: FormulaEngineConnectionStatus) => void;
 }
 
-/** Options accepted by {@link FoxFormulaService.subscribe}. */
-export interface FoxSubscribeOptions {
+/** Options accepted by {@link FormulaEngineService.subscribe}. */
+export interface FormulaEngineSubscribeOptions {
   /** Window start (epoch ns). Omitted = server default 0. */
   t0Ns?: number;
   /**
@@ -65,7 +65,7 @@ export interface FoxSubscribeOptions {
   intervalMs?: number;
   onResult: (data: FormulaResultDTO) => void;
   /** Errors scoped to this subscription. Falls back to the service-level onError. */
-  onError?: (error: FoxError) => void;
+  onError?: (error: FormulaEngineError) => void;
 }
 
 interface LocalSubscription {
@@ -74,7 +74,7 @@ interface LocalSubscription {
   t1Ns: number | undefined;
   intervalMs: number | undefined;
   onResult: (data: FormulaResultDTO) => void;
-  onError: ((error: FoxError) => void) | undefined;
+  onError: ((error: FormulaEngineError) => void) | undefined;
   /** Server-assigned id on the *current* socket; null while (re)subscribing. */
   serverId: string | null;
   /** Set when the caller unsubscribed while the subscribe was still in flight. */
@@ -82,8 +82,8 @@ interface LocalSubscription {
 }
 
 /**
- * Live formula evaluation over Canopy Fox's WebSocket
- * (`WS /fox/v1/ws/formulas`). Knows `FormulaSpec` only — naming conventions
+ * Live formula evaluation over the Canopy Formula Engine's WebSocket
+ * (`WS /formula-engine/v1/ws/formulas`). Knows `FormulaSpec` only — naming conventions
  * and screen-level rule types live in the consuming apps.
  *
  * Subscription ids are **server-assigned**: each `subscribe` frame is
@@ -97,9 +97,11 @@ interface LocalSubscription {
  * `WebSocketFactory`; the connection (capped-backoff reconnect, ping/pong
  * liveness) is a {@link ResilientSocket}, as for `HarePVService`.
  */
-export class FoxFormulaService {
-  private readonly onErrorCallback: ((error: FoxError) => void) | undefined;
-  private readonly onStatusChangeCallback: ((status: FoxConnectionStatus) => void) | undefined;
+export class FormulaEngineService {
+  private readonly onErrorCallback: ((error: FormulaEngineError) => void) | undefined;
+  private readonly onStatusChangeCallback:
+    | ((status: FormulaEngineConnectionStatus) => void)
+    | undefined;
   private readonly socket: ResilientSocket;
 
   /** Every live local subscription, in subscribe order. */
@@ -108,20 +110,20 @@ export class FoxFormulaService {
   private pending: LocalSubscription[] = [];
   private byServerId = new Map<string, LocalSubscription>();
 
-  private _status: FoxConnectionStatus = 'idle';
+  private _status: FormulaEngineConnectionStatus = 'idle';
 
-  constructor(options: FoxFormulaServiceOptions) {
+  constructor(options: FormulaEngineServiceOptions) {
     this.onErrorCallback = options.onError;
     this.onStatusChangeCallback = options.onStatusChange;
     this.socket = new ResilientSocket({
-      url: options.wsUrl ?? toWsUrl(options.baseUrl, '/fox/v1/ws/formulas'),
+      url: options.wsUrl ?? toWsUrl(options.baseUrl, '/formula-engine/v1/ws/formulas'),
       apiKey: options.apiKey,
       reconnectDelaysMs: options.reconnectDelaysMs,
       pingIntervalMs: options.pingIntervalMs,
       pongTimeoutMs: options.pongTimeoutMs,
       webSocketFactory: options.webSocketFactory,
       terminalCloseCodes: options.terminalCloseCodes,
-      label: 'FoxFormulaService',
+      label: 'FormulaEngineService',
       onOpen: () => this.resubscribeAll(),
       onFrame: (frame) => this.handleFrame(frame),
       onClose: () => this.resetServerCorrelation(),
@@ -137,7 +139,7 @@ export class FoxFormulaService {
     return this._status === 'connected';
   }
 
-  get status(): FoxConnectionStatus {
+  get status(): FormulaEngineConnectionStatus {
     return this._status;
   }
 
@@ -162,7 +164,7 @@ export class FoxFormulaService {
    * unsubscribe function. May be called before `connect()` or while
    * disconnected — the subscription is (re)sent whenever a socket opens.
    */
-  subscribe(spec: FormulaSpec, opts: FoxSubscribeOptions): () => void {
+  subscribe(spec: FormulaSpec, opts: FormulaEngineSubscribeOptions): () => void {
     const sub: LocalSubscription = {
       spec,
       t0Ns: opts.t0Ns,
@@ -230,7 +232,7 @@ export class FoxFormulaService {
   // ── Frame handling ────────────────────────────────────────────────────────
 
   private handleFrame(raw: SocketFrame): void {
-    const frame = raw as unknown as FoxServerFrame;
+    const frame = raw as unknown as FormulaEngineServerFrame;
     switch (frame.type) {
       case 'subscribed':
         this.handleSubscribed(frame.id);
@@ -271,7 +273,7 @@ export class FoxFormulaService {
     this.byServerId.set(serverId, sub);
   }
 
-  private handleErrorFrame(id: string | undefined, error: FoxError): void {
+  private handleErrorFrame(id: string | undefined, error: FormulaEngineError): void {
     if (id !== undefined) {
       const sub = this.byServerId.get(id);
       if (sub) {
@@ -297,7 +299,7 @@ export class FoxFormulaService {
     this.reportError(error);
   }
 
-  private dispatchSubscriptionError(sub: LocalSubscription, error: FoxError): void {
+  private dispatchSubscriptionError(sub: LocalSubscription, error: FormulaEngineError): void {
     if (sub.onError) {
       sub.onError(error);
     } else {
@@ -324,17 +326,17 @@ export class FoxFormulaService {
 
   // ── Status / error reporting ──────────────────────────────────────────────
 
-  private setStatus(status: FoxConnectionStatus): void {
+  private setStatus(status: FormulaEngineConnectionStatus): void {
     if (this._status === status) return;
     this._status = status;
     this.onStatusChangeCallback?.(status);
   }
 
-  private reportError(error: FoxError): void {
+  private reportError(error: FormulaEngineError): void {
     if (this.onErrorCallback) {
       this.onErrorCallback(error);
     } else {
-      console.warn(`[FoxFormulaService] ${error.code}: ${error.message}`);
+      console.warn(`[FormulaEngineService] ${error.code}: ${error.message}`);
     }
   }
 }

@@ -1,6 +1,7 @@
 // Epoch-nanosecond time helpers. Canopy's wire protocols share one time
-// domain — Mole `from`/`to`, Fox `t0Ns`/`t1Ns`, and Hare/Mole `tsNs` are all
-// integer epoch nanoseconds — while JS works in epoch milliseconds.
+// domain — Mole `from`/`to`, Formula Engine `t0Ns`/`t1Ns`, and Hare/Mole
+// `tsNs` are all integer epoch nanoseconds — while JS works in epoch
+// milliseconds.
 //
 // The ms→ns direction goes through BigInt so the arithmetic itself cannot
 // lose precision; the result is returned as a plain number to match the wire
