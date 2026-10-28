@@ -434,7 +434,7 @@ either way.
 
 ### The names
 
-Contract v1 has 27 names, each set by the host as `--canopy-host-<name>` and
+Contract v1 has 35 names, each set by the host as `--canopy-host-<name>` and
 read by the app as `--canopy-<name>`:
 
 | Group    | Names                                                              |
@@ -449,6 +449,9 @@ read by the app as `--canopy-<name>`:
 | Accent   | `accent`, `on-accent`, `accent-hover`, `accent-tint`, `hover-tint` |
 | Focus    | `focus`                                                            |
 | Status   | `status-success`, `status-warning`, `status-error`                 |
+| Tile bar | `bar-h`, `bar-icon`, `tab-min-w`, `tab-max-w`, `tab-underline`     |
+| Weights  | `weight-medium`                                                    |
+| Layers   | `shadow-dropdown`, `z-dropdown`                                    |
 
 ### What the server that delivers the page does
 
@@ -488,7 +491,7 @@ import wiring from '@slaclab/canopy-shell/wiring.json' with { type: 'json' };
   defines every `--canopy-*` variable per Carbon zone, points Carbon's own
   tokens at them, and holds the few component rules that read them.
 - **`tokens.json`.** The contract as data: the version, the four Carbon zones
-  and, for each of the 27 names, its Carbon value per zone and the Carbon
+  and, for each of the 35 names, its Carbon value per zone and the Carbon
   tokens it drives.
 - **`wiring.json`.** The map from every Carbon zone, type and layout token to
   the contract name that drives it, or to the reason it stays Carbon's.
