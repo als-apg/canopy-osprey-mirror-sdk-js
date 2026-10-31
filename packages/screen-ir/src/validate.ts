@@ -31,6 +31,9 @@ export function validate(screen: unknown): string[] {
 
   if (!validateSchema(screen)) {
     for (const err of validateSchema.errors ?? []) {
+      // An `if` error only restates that a branch failed; the branch's own
+      // errors name the property and the reason.
+      if (err.keyword === 'if') continue;
       const path = err.instancePath || '(root)';
       errors.push(`${path} ${err.message ?? 'is invalid'}`);
     }

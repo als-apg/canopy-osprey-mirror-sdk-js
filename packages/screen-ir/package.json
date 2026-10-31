@@ -19,11 +19,13 @@
       "types": "./dist/src/index.d.ts",
       "import": "./dist/src/index.js"
     },
-    "./schema.json": "./schema/screen-ir.schema.json"
+    "./schema.json": "./schema/screen-ir.schema.json",
+    "./color-scheme.schema.json": "./schema/canopy-color-scheme-1.schema.json"
   },
   "files": [
     "dist",
-    "schema"
+    "schema",
+    "data"
   ],
   "sideEffects": false,
   "scripts": {
