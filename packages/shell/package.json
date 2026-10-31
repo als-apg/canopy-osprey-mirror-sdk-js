@@ -26,14 +26,16 @@
     "./styles.css": "./styles.css",
     "./host-contract.css": "./host-contract.css",
     "./tokens.json": "./tokens.json",
-    "./wiring.json": "./wiring.json"
+    "./wiring.json": "./wiring.json",
+    "./fixtures/*": "./fixtures/*"
   },
   "files": [
     "dist",
     "styles.css",
     "host-contract.css",
     "tokens.json",
-    "wiring.json"
+    "wiring.json",
+    "fixtures"
   ],
   "sideEffects": [
     "*.css"
