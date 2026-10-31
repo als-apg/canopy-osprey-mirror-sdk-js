@@ -20,3 +20,6 @@ packages/client/src/fox/__fixtures__
 
 # Byte copies of canopy's heartbeat and write-outcome vectors (sha256 gated across canopy and the sdk); never reformat
 packages/client/test-vectors
+
+# Byte copy of the runtime-generated expand() vectors (identity gated); never reformat
+packages/screen-ir/test-vectors
