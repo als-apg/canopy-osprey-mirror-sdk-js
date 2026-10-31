@@ -14,3 +14,6 @@ build
 
 # Generated files
 src/routeTree.gen.ts
+
+# Byte copies of canopy's heartbeat and WC6 write-outcome vectors (sha256 gated across canopy and the sdk); never reformat
+packages/client/test-vectors
