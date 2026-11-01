@@ -64,7 +64,7 @@ export interface ScreenJSON {
   readonly id: string;
   readonly metadata: ScreenMetadata;
   readonly macros: readonly MacroDeclaration[];
-  /** Screen-level Fox formulas, referenced by `fox://<name>` from channel props and rules. */
+  /** Screen-level formulas, referenced by `formula://<name>` from channel props and rules. */
   readonly formulas?: readonly FormulaDeclaration[];
   readonly root: WidgetNode;
 }

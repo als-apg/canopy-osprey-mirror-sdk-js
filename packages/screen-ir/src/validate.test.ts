@@ -41,6 +41,18 @@ describe('@slaclab/canopy-screen-ir validate', () => {
     expect(validate(screen).length).toBeGreaterThan(0);
   });
 
+  it('resolves formula:// references against formulas[]', () => {
+    const withRef = (pv: string) => ({
+      ...minimal,
+      formulas: [{ name: 'f', expression: '1' }],
+      root: { ...minimal.root, props: { ...minimal.root.props, pv } },
+    });
+    expect(validate(withRef('formula://f'))).toEqual([]);
+    expect(validate(withRef('formula://missing'))).toEqual([
+      "widget 'w-001' prop 'pv' references formula 'missing' but no formulas[] entry declares it",
+    ]);
+  });
+
   describe('rule positions', () => {
     const role = { $role: 'alarm.major', fallback: '#ff0000', fallbackDark: '#ff4040' };
 
