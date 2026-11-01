@@ -2862,12 +2862,12 @@
       "name": "viewer mode: one file reached through two spellings expands twice before the cycle guard sees it",
       "screenPath": null,
       "docs": {
-        "gtb/A": {
+        "linac/A": {
           "schemaVersion": "1.0",
           "kind": "screen",
-          "id": "gtb-a",
+          "id": "linac-a",
           "metadata": {
-            "title": "gtb-a",
+            "title": "linac-a",
             "source": {
               "type": "hand-authored"
             },
@@ -2878,7 +2878,7 @@
           },
           "macros": [],
           "root": {
-            "id": "gtb-a-root",
+            "id": "linac-a-root",
             "type": "absolute-canvas",
             "props": {},
             "geometry": {
@@ -2904,12 +2904,12 @@
             ]
           }
         },
-        "gtb/B": {
+        "linac/B": {
           "schemaVersion": "1.0",
           "kind": "screen",
-          "id": "gtb-b",
+          "id": "linac-b",
           "metadata": {
-            "title": "gtb-b",
+            "title": "linac-b",
             "source": {
               "type": "hand-authored"
             },
@@ -2920,7 +2920,7 @@
           },
           "macros": [],
           "root": {
-            "id": "gtb-b-root",
+            "id": "linac-b-root",
             "type": "absolute-canvas",
             "props": {},
             "geometry": {
@@ -2947,7 +2947,7 @@
                 "id": "t3",
                 "type": "embedded-display",
                 "props": {
-                  "file": "../gtb/B.screen.json"
+                  "file": "../linac/B.screen.json"
                 },
                 "geometry": {
                   "x": 0,
@@ -2962,21 +2962,21 @@
       },
       "docsRaw": {},
       "invalidDocs": [],
-      "top": "gtb/A",
+      "top": "linac/A",
       "macros": {},
       "expect": {
         "nodes": [
           {
-            "screen": "gtb/A",
+            "screen": "linac/A",
             "instance": "",
-            "nodeId": "gtb-a-root",
+            "nodeId": "linac-a-root",
             "type": "absolute-canvas",
             "props": {},
             "ruleChannels": [],
             "machineBound": false
           },
           {
-            "screen": "gtb/A",
+            "screen": "linac/A",
             "instance": "",
             "nodeId": "t1",
             "type": "embedded-display",
@@ -2987,16 +2987,16 @@
             "machineBound": false
           },
           {
-            "screen": "gtb/B",
+            "screen": "linac/B",
             "instance": "/0:t1",
-            "nodeId": "gtb-b-root",
+            "nodeId": "linac-b-root",
             "type": "absolute-canvas",
             "props": {},
             "ruleChannels": [],
             "machineBound": false
           },
           {
-            "screen": "gtb/B",
+            "screen": "linac/B",
             "instance": "/0:t1",
             "nodeId": "t2",
             "type": "pv-label",
@@ -3007,27 +3007,27 @@
             "machineBound": true
           },
           {
-            "screen": "gtb/B",
+            "screen": "linac/B",
             "instance": "/0:t1",
             "nodeId": "t3",
             "type": "embedded-display",
             "props": {
-              "file": "../gtb/B.screen.json"
+              "file": "../linac/B.screen.json"
             },
             "ruleChannels": [],
             "machineBound": false
           },
           {
-            "screen": "gtb/B",
+            "screen": "linac/B",
             "instance": "/0:t1/0:t3",
-            "nodeId": "gtb-b-root",
+            "nodeId": "linac-b-root",
             "type": "absolute-canvas",
             "props": {},
             "ruleChannels": [],
             "machineBound": false
           },
           {
-            "screen": "gtb/B",
+            "screen": "linac/B",
             "instance": "/0:t1/0:t3",
             "nodeId": "t2",
             "type": "pv-label",
@@ -3038,12 +3038,12 @@
             "machineBound": true
           },
           {
-            "screen": "gtb/B",
+            "screen": "linac/B",
             "instance": "/0:t1/0:t3",
             "nodeId": "t3",
             "type": "embedded-display",
             "props": {
-              "file": "../gtb/B.screen.json"
+              "file": "../linac/B.screen.json"
             },
             "ruleChannels": [],
             "machineBound": false
@@ -3055,7 +3055,7 @@
       }
     },
     {
-      "name": "channels: loc://, fox://, y_channels, actions and rules props, rule-only, loc-only rules, formula rules",
+      "name": "channels: loc://, formula://, y_channels, actions and rules props, rule-only, loc-only rules, formula rules",
       "screenPath": "ch/top",
       "docs": {
         "ch/top": {
@@ -3084,7 +3084,7 @@
               "expression": "{a}+{b}",
               "bindings": {
                 "a": "${S}:A",
-                "b": "fox://half"
+                "b": "formula://half"
               }
             },
             {
@@ -3130,7 +3130,7 @@
                 "id": "c2",
                 "type": "pv-label",
                 "props": {
-                  "pv": "fox://sum"
+                  "pv": "formula://sum"
                 },
                 "geometry": {
                   "x": 0,
@@ -3335,7 +3335,7 @@
                     "default": null,
                     "pvs": [
                       {
-                        "name": "fox://half",
+                        "name": "formula://half",
                         "trigger": true
                       }
                     ],
@@ -3384,7 +3384,7 @@
             "nodeId": "c2",
             "type": "pv-label",
             "props": {
-              "pv": "fox://sum"
+              "pv": "formula://sum"
             },
             "ruleChannels": [],
             "machineBound": true
@@ -3487,7 +3487,7 @@
             "props": {},
             "ruleChannels": [
               "CH:A",
-              "fox://half"
+              "formula://half"
             ],
             "machineBound": true
           },
@@ -3511,7 +3511,7 @@
               "text": "fox rule pv"
             },
             "ruleChannels": [
-              "fox://half"
+              "formula://half"
             ],
             "machineBound": true
           }
