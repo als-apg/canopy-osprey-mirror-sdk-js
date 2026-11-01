@@ -541,13 +541,6 @@ function AppRoot({ hostThemeId }: { hostThemeId: string | null }) {
 }
 ```
 
-### Messages
-
-- **`theme` on `canopy:trace-theme`.** The message an embedding viewer posts to
-  an embedded Trace frame is `{ mode, theme }`: `mode` is `light` or `dark`,
-  and `theme` is the validated host theme id, which the receiver passes to
-  `useHostTheme`.
-
 ## Testing apps that use the shell
 
 jsdom lacks `window.matchMedia` and `ResizeObserver`, and Carbon uses both.
