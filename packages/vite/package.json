@@ -1,6 +1,6 @@
 {
   "name": "@slaclab/canopy-vite",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": false,
   "description": "Vite dev-server proxy for Canopy apps — forwards the API (REST + WebSocket) and elog, injecting the keys server-side so they never reach the browser bundle",
   "repository": {
