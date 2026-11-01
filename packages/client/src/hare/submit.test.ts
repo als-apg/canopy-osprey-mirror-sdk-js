@@ -11,12 +11,12 @@ import { HarePVService } from './HarePVService.js';
 import type { FetchLike } from './HarePVService.js';
 import type { HareHeartbeatFrame, HareHeartbeatState, WriteOutcome } from './types.js';
 import {
-  WC6_COALESCED_TOAST,
-  WC6_CODE_ROWS,
-  WC6_DETAIL_MAX_CHARS,
-  WC6_ROWS,
+  WRITE_OUTCOME_COALESCED_TOAST,
+  WRITE_OUTCOME_CODE_ROWS,
+  WRITE_OUTCOME_DETAIL_MAX_CHARS,
+  WRITE_OUTCOME_ROWS,
   clientOutcome,
-  cutWc6Detail,
+  cutWriteOutcomeDetail,
   outcomeFromResponse,
 } from './writeOutcome.js';
 
@@ -134,20 +134,20 @@ function envelope(code: string, detail: string): string {
 
 describe('WC6 outcome table', () => {
   it('equals the vector file row for row (outcome, status, code, default detail)', () => {
-    expect(Object.keys(WC6_ROWS).sort()).toEqual(Object.keys(vectors.rows).sort());
+    expect(Object.keys(WRITE_OUTCOME_ROWS).sort()).toEqual(Object.keys(vectors.rows).sort());
     for (const [id, row] of Object.entries(vectors.rows)) {
-      expect(WC6_ROWS[id], id).toEqual({
+      expect(WRITE_OUTCOME_ROWS[id], id).toEqual({
         outcome: row.outcome,
         status: row.status,
         code: row.code,
         detail: row.default,
       });
     }
-    expect(WC6_COALESCED_TOAST).toBe(vectors.rows['16-coalesced']!.toast);
+    expect(WRITE_OUTCOME_COALESCED_TOAST).toBe(vectors.rows['16-coalesced']!.toast);
   });
 
   it('caps an envelope detail at the vector file length', () => {
-    expect(WC6_DETAIL_MAX_CHARS).toBe(vectors.detail_max_chars);
+    expect(WRITE_OUTCOME_DETAIL_MAX_CHARS).toBe(vectors.detail_max_chars);
   });
 
   it('carries cut cases in the vector file', () => {
@@ -156,23 +156,25 @@ describe('WC6 outcome table', () => {
 
   for (const c of vectors.detail_cut_cases) {
     it(`cuts a detail like canopy: ${c.case}`, () => {
-      expect(cutWc6Detail(c.text, c.limit)).toBe(c.expected);
-      expect(cutWc6Detail(c.expected, c.limit)).toBe(c.expected);
-      expect(Array.from(cutWc6Detail(c.text, c.limit)).length).toBeLessThanOrEqual(c.limit);
+      expect(cutWriteOutcomeDetail(c.text, c.limit)).toBe(c.expected);
+      expect(cutWriteOutcomeDetail(c.expected, c.limit)).toBe(c.expected);
+      expect(Array.from(cutWriteOutcomeDetail(c.text, c.limit)).length).toBeLessThanOrEqual(
+        c.limit
+      );
     });
   }
 
   it('cuts at the cap by default, on a word boundary', () => {
     const sentence = Array.from({ length: 120 }, (_, i) => `word${i}`).join(' ');
-    const got = cutWc6Detail(sentence);
-    expect(Array.from(got).length).toBeLessThanOrEqual(WC6_DETAIL_MAX_CHARS);
+    const got = cutWriteOutcomeDetail(sentence);
+    expect(Array.from(got).length).toBeLessThanOrEqual(WRITE_OUTCOME_DETAIL_MAX_CHARS);
     expect(got.endsWith('\u2026')).toBe(true);
     expect(sentence.startsWith(got.slice(0, -1) + ' ')).toBe(true);
   });
 
   it('gives row 16 its own text, apart from the server rows 2 and 3', () => {
-    expect(WC6_ROWS['16']!.detail).not.toBe(WC6_ROWS['2']!.detail);
-    expect(WC6_ROWS['16']!.detail).not.toBe(WC6_ROWS['3']!.detail);
+    expect(WRITE_OUTCOME_ROWS['16']!.detail).not.toBe(WRITE_OUTCOME_ROWS['2']!.detail);
+    expect(WRITE_OUTCOME_ROWS['16']!.detail).not.toBe(WRITE_OUTCOME_ROWS['3']!.detail);
     expect(clientOutcome('16')).toEqual({
       outcome: 'target_changed',
       code: null,
@@ -214,8 +216,8 @@ describe('WC6 outcome table', () => {
         .map((r) => r.code)
         .filter((c): c is string => c !== null)
     );
-    expect(new Set(Object.keys(WC6_CODE_ROWS))).toEqual(serverCodes);
-    for (const [code, rowId] of Object.entries(WC6_CODE_ROWS)) {
+    expect(new Set(Object.keys(WRITE_OUTCOME_CODE_ROWS))).toEqual(serverCodes);
+    for (const [code, rowId] of Object.entries(WRITE_OUTCOME_CODE_ROWS)) {
       expect(vectors.rows[rowId]!.code).toBe(code);
     }
   });
@@ -258,7 +260,7 @@ describe('WC6 outcome table', () => {
   it('keeps a server detail that fits the cap whole', () => {
     const text = `refused: ${'limit '.repeat(60).trim()}`;
     expect(text.length).toBeGreaterThan(256);
-    expect(text.length).toBeLessThanOrEqual(WC6_DETAIL_MAX_CHARS);
+    expect(text.length).toBeLessThanOrEqual(WRITE_OUTCOME_DETAIL_MAX_CHARS);
     const got = outcomeFromResponse(false, 403, envelope('pv_write_refused', text));
     expect(got.detail).toBe(text);
   });
@@ -267,13 +269,13 @@ describe('WC6 outcome table', () => {
     const text = Array(200).fill('abcdefg').join(' ');
     const got = outcomeFromResponse(false, 403, envelope('pv_write_refused', `  ${text}\n`));
     expect(got.detail!.endsWith('abcdefg\u2026')).toBe(true);
-    expect(Array.from(got.detail!).length).toBeLessThanOrEqual(WC6_DETAIL_MAX_CHARS);
+    expect(Array.from(got.detail!).length).toBeLessThanOrEqual(WRITE_OUTCOME_DETAIL_MAX_CHARS);
     expect(text.startsWith(got.detail!.slice(0, -1) + ' ')).toBe(true);
   });
 
   it('cuts a single over-long server token inside the token', () => {
     const got = outcomeFromResponse(false, 403, envelope('pv_write_refused', 'x'.repeat(600)));
-    expect(got.detail).toBe('x'.repeat(WC6_DETAIL_MAX_CHARS - 1) + '\u2026');
+    expect(got.detail).toBe('x'.repeat(WRITE_OUTCOME_DETAIL_MAX_CHARS - 1) + '\u2026');
   });
 
   it('never toasts a raw body: 405, FRONT 401, unrecognised codes and non-envelopes take the table text', () => {

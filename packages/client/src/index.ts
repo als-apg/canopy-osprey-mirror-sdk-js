@@ -66,11 +66,11 @@ export type {
   HareWriteOptions,
 } from './hare/HarePVService.js';
 export { HarePVService } from './hare/HarePVService.js';
-export type { Wc6Row } from './hare/writeOutcome.js';
+export type { WriteOutcomeRow } from './hare/writeOutcome.js';
 export {
-  WC6_COALESCED_TOAST,
-  WC6_DETAIL_MAX_CHARS,
-  WC6_ROWS,
+  WRITE_OUTCOME_COALESCED_TOAST,
+  WRITE_OUTCOME_DETAIL_MAX_CHARS,
+  WRITE_OUTCOME_ROWS,
   clientOutcome,
   outcomeFromResponse,
 } from './hare/writeOutcome.js';

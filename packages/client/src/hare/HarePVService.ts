@@ -366,7 +366,7 @@ export class HarePVService implements PVService {
    * Legacy, unchecked path, kept for scripts and existing callers. It sends no
    * heartbeat binding (so the server cannot refuse a write aimed at a control
    * target that changed meanwhile), follows redirects, does not serialise
-   * writes per PV and does not map the reply to a WC6 outcome. Writes a person
+   * writes per PV and does not map the reply to a write outcome. Writes a person
    * makes from a screen must go through `submit()`.
    */
   async write(pvName: string, value: PVWriteValue, options?: HareWriteOptions): Promise<void> {
@@ -396,7 +396,7 @@ export class HarePVService implements PVService {
   }
 
   /**
-   * Write one value with WC6's client discipline; never rejects.
+   * Write one value with the write-outcome client discipline; never rejects.
    *
    * - Answers row 16 (`target_changed`) with no request unless the current
    *   socket is open and has delivered a heartbeat.
@@ -511,7 +511,7 @@ export class HarePVService implements PVService {
     };
   }
 
-  /** One PUT; resolves its WC6 outcome and never rejects. */
+  /** One PUT; resolves its write outcome and never rejects. */
   private async sendWriteRequest(pvName: string, entry: QueuedWrite): Promise<WriteOutcome> {
     try {
       const fetchFn = this.fetchFn;

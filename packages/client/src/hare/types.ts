@@ -217,9 +217,9 @@ export interface PVWriteResultDTO {
   pv: string;
 }
 
-// ── Write outcomes (WC6) ────────────────────────────────────────────────────
+// ── Write outcomes ──────────────────────────────────────────────────────────
 
-/** How a write ended, as WC6 names it. */
+/** How a write ended, as the write-outcome contract names it. */
 export type WriteOutcomeKind =
   | 'confirmed'
   | 'mismatch'
@@ -230,7 +230,7 @@ export type WriteOutcomeKind =
   | 'switch_in_progress';
 
 /**
- * What `HarePVService.submit()` resolves to: one WC6 row. `detail` is always
+ * What `HarePVService.submit()` resolves to: one write-outcome row. `detail` is always
  * toast-ready text (never a raw response body). `status`/`code` are the HTTP
  * status and envelope code when a response arrived, else null. `coalesced` is
  * true when a newer value for the same PV superseded this one before it was

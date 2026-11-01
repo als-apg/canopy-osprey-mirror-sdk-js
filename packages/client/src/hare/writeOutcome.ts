@@ -22,8 +22,8 @@
 
 import type { WriteOutcome, WriteOutcomeKind } from './types.js';
 
-/** One WC6 row as the client needs it: `detail` is the row's default (toast-ready) text. */
-export interface Wc6Row {
+/** One write-outcome row as the client needs it: `detail` is the row's default (toast-ready) text. */
+export interface WriteOutcomeRow {
   outcome: WriteOutcomeKind | null;
   status: number | null;
   code: string | null;
@@ -34,7 +34,7 @@ export interface Wc6Row {
  * Longest envelope detail a server row carries, in Unicode code points with the
  * cut's ellipsis included; longer text is cut here too, on a word boundary.
  */
-export const WC6_DETAIL_MAX_CHARS = 512;
+export const WRITE_OUTCOME_DETAIL_MAX_CHARS = 512;
 
 const DETAIL_ELLIPSIS = '\u2026';
 
@@ -43,7 +43,10 @@ const DETAIL_ELLIPSIS = '\u2026';
  * prefix (trailing whitespace dropped) followed by an ellipsis, at most `limit`
  * code points long. A first word longer than the limit is cut inside the word.
  */
-export function cutWc6Detail(text: string, limit: number = WC6_DETAIL_MAX_CHARS): string {
+export function cutWriteOutcomeDetail(
+  text: string,
+  limit: number = WRITE_OUTCOME_DETAIL_MAX_CHARS
+): string {
   const chars = Array.from(text);
   if (chars.length <= limit) return text;
   const headChars = chars.slice(0, limit - 1);
@@ -64,8 +67,8 @@ const WRITES_CHANGED = 'the write state of this target changed; nothing written'
 const UNKNOWN = 'outcome unknown — check the readback';
 const FRONT_REFUSED = 'the panel server refused this write; nothing written';
 
-/** Every WC6 row by id, mirroring the vector file. */
-export const WC6_ROWS: Readonly<Record<string, Wc6Row>> = {
+/** Every write-outcome row by id, mirroring the vector file. */
+export const WRITE_OUTCOME_ROWS: Readonly<Record<string, WriteOutcomeRow>> = {
   '1-off-disabled': {
     outcome: 'refused',
     status: 403,
@@ -182,7 +185,7 @@ export const WC6_ROWS: Readonly<Record<string, Wc6Row>> = {
  * The viewer's toast for a run stopped by a coalesced write (row
  * 16-coalesced). A coalesced outcome itself is never toasted.
  */
-export const WC6_COALESCED_TOAST = 'a newer value replaced this one; nothing more sent';
+export const WRITE_OUTCOME_COALESCED_TOAST = 'a newer value replaced this one; nothing more sent';
 
 /**
  * How each recognised envelope code maps: the row whose outcome it takes and
@@ -206,7 +209,7 @@ const CODE_ROWS: Readonly<Record<string, { row: string; serverDetail: boolean }>
  * exported from this module only so the outcome-table test can check it
  * against the vector file.
  */
-export const WC6_CODE_ROWS: Readonly<Record<string, string>> = Object.fromEntries(
+export const WRITE_OUTCOME_CODE_ROWS: Readonly<Record<string, string>> = Object.fromEntries(
   Object.entries(CODE_ROWS).map(([code, { row }]) => [code, row])
 );
 
@@ -216,7 +219,7 @@ function rowOutcome(
   code: string | null,
   detail?: string
 ): WriteOutcome {
-  const row = WC6_ROWS[rowId]!;
+  const row = WRITE_OUTCOME_ROWS[rowId]!;
   return {
     outcome: row.outcome!,
     code,
@@ -252,7 +255,7 @@ function toastText(detail: unknown): string | undefined {
   if (typeof detail !== 'string') return undefined;
   const text = detail.trim();
   if (text === '') return undefined;
-  return cutWc6Detail(text);
+  return cutWriteOutcomeDetail(text);
 }
 
 /** The parsed body when it is a JSON object (not an array, not null), else null. */
@@ -269,7 +272,7 @@ function jsonObject(bodyText: string): Record<string, unknown> | null {
 }
 
 /**
- * Map a PUT response to its WC6 outcome. A redirect (`type` is
+ * Map a PUT response to its write outcome. A redirect (`type` is
  * `'opaqueredirect'` under `redirect: 'manual'`, or any 3xx status) is row 15:
  * the write did not reach the relay, or nobody can say whether it did. A 2xx
  * is row 10 only when its body is the server's write result, a JSON object
