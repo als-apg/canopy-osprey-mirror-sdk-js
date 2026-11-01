@@ -6,9 +6,9 @@ tests against them.
 | File | canopy source | git blob |
 |------|---------------|----------|
 | `heartbeat_vectors.json` | `src/canopy/contracts/heartbeat_vectors.json` | `d88ddf45a271f3a4eae8df2fc277b4cf50314d5c` |
-| `write_outcome_vectors.json` | `src/canopy/contracts/write_outcome_vectors.json` | `419549572649916b48fe46c329c472049f8d74a5` |
+| `write_outcome_vectors.json` | `src/canopy/contracts/write_outcome_vectors.json` | `2cd15e2f5fed1fb3f0b1b3f5d3e90ec03020ad9c` |
 
-Both copies match canopy commit `0f05191517530c7105f39e5b67f15ad5db28998a`, which last changed either file. That
+Both copies match canopy commit `773afccb31a414241ae498a6b7ae9ce71900269c`, which last changed either file. That
 commit is not on canopy `main` yet; the files land there with the canopy change that adds the heartbeat
 reachability and write-state fields and the write relay. `git hash-object <file>` here must print the blob
 above, and equal `git rev-parse <canopy commit>:<canopy source>`.

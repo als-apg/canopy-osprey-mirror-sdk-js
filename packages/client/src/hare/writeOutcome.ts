@@ -83,6 +83,18 @@ export const WRITE_OUTCOME_ROWS: Readonly<Record<string, WriteOutcomeRow>> = {
     code: 'pv_write_refused',
     detail: REFUSED_GENERIC,
   },
+  'connector-target-changed': {
+    outcome: 'target_changed',
+    status: 409,
+    code: 'pv_target_changed',
+    detail: 'the control target changed; nothing written',
+  },
+  'connector-switch-in-progress': {
+    outcome: 'switch_in_progress',
+    status: 409,
+    code: 'pv_switch_in_progress',
+    detail: 'a target switch is in progress; nothing written',
+  },
   confirmed: { outcome: 'confirmed', status: 200, code: null, detail: 'written' },
   mismatch: {
     outcome: 'mismatch',
@@ -163,6 +175,8 @@ export const WRITE_OUTCOME_COALESCED_TOAST = 'a newer value replaced this one; n
  */
 const CODE_ROWS: Readonly<Record<string, { row: string; serverDetail: boolean }>> = {
   pv_write_refused: { row: 'connector-refused', serverDetail: true },
+  pv_target_changed: { row: 'connector-target-changed', serverDetail: true },
+  pv_switch_in_progress: { row: 'connector-switch-in-progress', serverDetail: true },
   pv_write_mismatch: { row: 'mismatch', serverDetail: true },
   pv_write_unconfirmed: { row: 'unconfirmed', serverDetail: true },
   pv_write_unknown: { row: 'connector-unknown', serverDetail: true },
