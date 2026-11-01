@@ -66,7 +66,7 @@ export type {
   HareWriteOptions,
 } from './hare/HarePVService.js';
 export { HarePVService } from './hare/HarePVService.js';
-export type { WriteOutcomeRow } from './hare/writeOutcome.js';
+export type { ClientRowId, WriteOutcomeRow } from './hare/writeOutcome.js';
 export {
   WRITE_OUTCOME_COALESCED_TOAST,
   WRITE_OUTCOME_DETAIL_MAX_CHARS,

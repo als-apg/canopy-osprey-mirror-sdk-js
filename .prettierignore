@@ -18,5 +18,5 @@ src/routeTree.gen.ts
 # Byte-pinned wire fixtures (sha256 asserted here and in canopy); never reformat
 packages/client/src/fox/__fixtures__
 
-# Byte copies of canopy's heartbeat and WC6 write-outcome vectors (sha256 gated across canopy and the sdk); never reformat
+# Byte copies of canopy's heartbeat and write-outcome vectors (sha256 gated across canopy and the sdk); never reformat
 packages/client/test-vectors

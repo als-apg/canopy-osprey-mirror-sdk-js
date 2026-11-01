@@ -1,8 +1,8 @@
-// HarePVService.submit() and heartbeat(): WC6's client discipline (row 16
-// without a request, the heartbeat binding, one request in flight per PV,
+// HarePVService.submit() and heartbeat(): the write-outcome client discipline
+// (target-changed without a request, the heartbeat binding, one request in flight per PV,
 // coalescing, no retry, the put time budget) and the outcome table, which is
-// checked against ../../test-vectors/wc6_vectors.json — a byte copy of
-// canopy's src/canopy/contracts/wc6_vectors.json. Never edit or reformat that
+// checked against ../../test-vectors/write_outcome_vectors.json — a byte copy
+// of canopy's src/canopy/contracts/write_outcome_vectors.json. Never edit or reformat that
 // copy here; copy it again from canopy.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -20,7 +20,7 @@ import {
   outcomeFromResponse,
 } from './writeOutcome.js';
 
-import vectorFile from '../../test-vectors/wc6_vectors.json' with { type: 'json' };
+import vectorFile from '../../test-vectors/write_outcome_vectors.json' with { type: 'json' };
 
 type VectorRow = {
   outcome: string | null;
@@ -40,7 +40,7 @@ const vectors = vectorFile as unknown as {
 const BASE_URL = 'ws://host/hare/v1/ws/pvs';
 const BINDING = 'va@3';
 const UNKNOWN_TEXT = 'outcome unknown — check the readback';
-const TARGET_CHANGED_TEXT = vectors.rows['16']!.default!;
+const TARGET_CHANGED_TEXT = vectors.rows['target-changed']!.default!;
 
 function heartbeatFrame(binding: string | null, backend = 'va'): HareHeartbeatFrame {
   return { type: 'heartbeat', timestamp: 0, backend, label: null, notice: null, binding };
@@ -132,7 +132,7 @@ function envelope(code: string, detail: string): string {
   return JSON.stringify({ code, detail });
 }
 
-describe('WC6 outcome table', () => {
+describe('write-outcome table', () => {
   it('equals the vector file row for row (outcome, status, code, default detail)', () => {
     expect(Object.keys(WRITE_OUTCOME_ROWS).sort()).toEqual(Object.keys(vectors.rows).sort());
     for (const [id, row] of Object.entries(vectors.rows)) {
@@ -143,7 +143,7 @@ describe('WC6 outcome table', () => {
         detail: row.default,
       });
     }
-    expect(WRITE_OUTCOME_COALESCED_TOAST).toBe(vectors.rows['16-coalesced']!.toast);
+    expect(WRITE_OUTCOME_COALESCED_TOAST).toBe(vectors.rows['coalesced']!.toast);
   });
 
   it('caps an envelope detail at the vector file length', () => {
@@ -172,40 +172,38 @@ describe('WC6 outcome table', () => {
     expect(sentence.startsWith(got.slice(0, -1) + ' ')).toBe(true);
   });
 
-  it('gives row 16 its own text, apart from the server rows 2 and 3', () => {
-    expect(WRITE_OUTCOME_ROWS['16']!.detail).not.toBe(WRITE_OUTCOME_ROWS['2']!.detail);
-    expect(WRITE_OUTCOME_ROWS['16']!.detail).not.toBe(WRITE_OUTCOME_ROWS['3']!.detail);
-    expect(clientOutcome('16')).toEqual({
+  it('answers target-changed with its own text', () => {
+    expect(clientOutcome('target-changed')).toEqual({
       outcome: 'target_changed',
       code: null,
       status: null,
-      detail: vectors.rows['16']!.default,
+      detail: vectors.rows['target-changed']!.default,
       coalesced: false,
     });
   });
 
-  it('fills row 16a with the label, and with the default for a null label', () => {
-    const row = vectors.rows['16a']!;
+  it('fills write-state-changed with the label, and with the default for a null label', () => {
+    const row = vectors.rows['write-state-changed']!;
     expect(row.dynamic).toBe(true);
-    expect(clientOutcome('16a', 'Simulator')).toEqual({
+    expect(clientOutcome('write-state-changed', 'Simulator')).toEqual({
       outcome: 'target_changed',
       code: null,
       status: null,
       detail: row.detail!.replace('<label>', 'Simulator'),
       coalesced: false,
     });
-    expect(clientOutcome('16a', 'Simulator').detail).toBe(
+    expect(clientOutcome('write-state-changed', 'Simulator').detail).toBe(
       'the write state of Simulator changed; nothing written'
     );
-    expect(clientOutcome('16a', null).detail).toBe(row.default);
-    expect(clientOutcome('16a').detail).toBe(row.default);
+    expect(clientOutcome('write-state-changed', null).detail).toBe(row.default);
+    expect(clientOutcome('write-state-changed').detail).toBe(row.default);
   });
 
   it('fills only the label token: a label that looks like a token stays as given', () => {
-    expect(clientOutcome('16a', '<label>').detail).toBe(
+    expect(clientOutcome('write-state-changed', '<label>').detail).toBe(
       'the write state of <label> changed; nothing written'
     );
-    expect(clientOutcome('16a', '$&').detail).toBe(
+    expect(clientOutcome('write-state-changed', '$&').detail).toBe(
       'the write state of $& changed; nothing written'
     );
   });
@@ -446,9 +444,9 @@ describe('HarePVService.heartbeat / submit', () => {
     });
   });
 
-  // ── row 16 with no request ───────────────────────────────────────────────
+  // ── target-changed with no request ──────────────────────────────────────────
 
-  describe('row 16 without a request', () => {
+  describe('target-changed without a request', () => {
     it('answers target_changed when never connected', async () => {
       const fetchFn = replyFetch({ ok: true, status: 200 });
       const service = new HarePVService({ url: BASE_URL, fetchFn });
@@ -537,20 +535,20 @@ describe('HarePVService.heartbeat / submit', () => {
     it('maps the response by code with toast-ready detail', async () => {
       const fetchFn = replyFetch({
         ok: false,
-        status: 409,
-        text: envelope('pv_switch_in_progress', 'a target switch is in progress; nothing written'),
+        status: 403,
+        text: envelope('pv_write_refused', 'channel SR:X is read-only'),
       });
       const { service } = connected(fetchFn);
       await expect(service.submit('X', 1)).resolves.toEqual({
-        outcome: 'switch_in_progress',
-        code: 'pv_switch_in_progress',
-        status: 409,
-        detail: 'a target switch is in progress; nothing written',
+        outcome: 'refused',
+        code: 'pv_write_refused',
+        status: 403,
+        detail: 'channel SR:X is read-only',
         coalesced: false,
       });
     });
 
-    it('never rejects: a network error is row 15, and is not retried', async () => {
+    it('never rejects: a network error is client-unknown, and is not retried', async () => {
       const fetchFn = vi.fn<FetchLike>(async () => {
         throw new Error('network down');
       });
@@ -580,7 +578,7 @@ describe('HarePVService.heartbeat / submit', () => {
           throw new Error('stream reset');
         },
       }));
-      // A 2xx is row 10 only on a write-result body; an unreadable one is row 15.
+      // A 2xx is confirmed only on a write-result body; an unreadable one is client-unknown.
       const b = connected(unreadable);
       expect((await b.service.submit('X', 1)).outcome).toBe('unknown');
     });

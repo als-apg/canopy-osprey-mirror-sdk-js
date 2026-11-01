@@ -398,22 +398,22 @@ export class HarePVService implements PVService {
   /**
    * Write one value with the write-outcome client discipline; never rejects.
    *
-   * - Answers row 16 (`target_changed`) with no request unless the current
+   * - Answers `target-changed` with no request unless the current
    *   socket is open and has delivered a heartbeat.
    * - Sends `options.binding`, or else the current heartbeat binding at call
    *   time; a null binding is omitted from the body.
    * - One request in flight per PV. A value submitted meanwhile waits; a newer
    *   one supersedes it, and the superseded call resolves with the newer one's
    *   outcome and `coalesced: true`. A waiting value whose socket closed or
-   *   whose heartbeat binding changed resolves row 16 with no request.
-   * - Never retries. No reply within `putTimeoutMs` of the send resolves row 15
-   *   (`unknown`); the PV's slot stays held until that request settles.
+   *   whose heartbeat binding changed resolves `target-changed` with no request.
+   * - Never retries. No reply within `putTimeoutMs` of the send resolves
+   *   `client-unknown`; the PV's slot stays held until that request settles.
    */
   submit(pvName: string, value: PVWriteValue, options: SubmitOptions = {}): Promise<WriteOutcome> {
     const hb = this.heartbeat();
     const connection = this.connection;
     if (!hb.seen || connection === null) {
-      return Promise.resolve(clientOutcome('16'));
+      return Promise.resolve(clientOutcome('target-changed'));
     }
     return new Promise<WriteOutcome>((resolve) => {
       const entry: QueuedWrite = {
@@ -449,7 +449,7 @@ export class HarePVService implements PVService {
       clearTimeout(timer);
       settleWrite(entry, outcome);
     };
-    const timer = setTimeout(() => finish(clientOutcome('15')), this.putTimeoutMs);
+    const timer = setTimeout(() => finish(clientOutcome('client-unknown')), this.putTimeoutMs);
     void this.sendWriteRequest(pvName, entry).then((outcome) => {
       finish(outcome);
       this.releaseWriteSlot(pvName);
@@ -469,19 +469,19 @@ export class HarePVService implements PVService {
     const hb = this.heartbeat();
     if (!hb.seen || this.connection !== next.connection || hb.binding !== next.heartbeatBinding) {
       this.writeSlots.delete(pvName);
-      settleWrite(next, clientOutcome('16'));
+      settleWrite(next, clientOutcome('target-changed'));
       return;
     }
     this.dispatchWrite(pvName, next);
   }
 
-  /** Resolve every waiting value row 16 (its socket closed or its binding changed); in-flight requests run on. */
+  /** Resolve every waiting value `target-changed` (its socket closed or its binding changed); in-flight requests run on. */
   private dropPendingWrites(keep: (entry: QueuedWrite) => boolean): void {
     for (const slot of this.writeSlots.values()) {
       const entry = slot.pending;
       if (entry && !keep(entry)) {
         slot.pending = null;
-        settleWrite(entry, clientOutcome('16'));
+        settleWrite(entry, clientOutcome('target-changed'));
       }
     }
   }
@@ -515,7 +515,7 @@ export class HarePVService implements PVService {
   private async sendWriteRequest(pvName: string, entry: QueuedWrite): Promise<WriteOutcome> {
     try {
       const fetchFn = this.fetchFn;
-      if (!fetchFn) return clientOutcome('15');
+      if (!fetchFn) return clientOutcome('client-unknown');
       const body: PVWriteRequestDTO = { value: entry.value };
       if (entry.timeoutS !== undefined) body.timeout = entry.timeoutS;
       if (entry.binding !== null) body.binding = entry.binding;
@@ -536,7 +536,7 @@ export class HarePVService implements PVService {
       }
       return outcomeFromResponse(res.ok, res.status, text, res.type);
     } catch {
-      return clientOutcome('15');
+      return clientOutcome('client-unknown');
     }
   }
 

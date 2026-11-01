@@ -1,24 +1,21 @@
-// The WC6 write-outcome table: how a PUT /hare/v1/pvs/{pv} (or its absence)
+// The write-outcome table: how a PUT /hare/v1/pvs/{pv} (or its absence)
 // becomes a `WriteOutcome`.
 //
-// WC6 is canopy's write-outcome contract. Its one definition is the vector
-// file `src/canopy/contracts/wc6_vectors.json` in the canopy repository: one
-// entry per row, each row one way a screen write can end (refused because
-// writes are off, the control target changed, the readback did not match, no
-// reply, ...), with its HTTP status, envelope `code` and the toast text the
-// viewer shows. A row id names one such row. It is the row's number in that
-// table, with a suffix when one number covers several causes: `1-off-origin`
-// is row 1 (screen writes are off) for the cause "agent pages have no origin of
-// their own", `14b-401` is row 14b (the panel server in front of canopy refused
-// the write) answered with HTTP 401, and `16` is "the control target or its
-// write state changed", answered by the client without sending a request. The
-// vector file's `about` field describes the fields of a row; the canopy server
-// and this client both map their outcomes from it.
+// canopy owns the write-outcome contract. Its one definition is the vector
+// file `src/canopy/contracts/write_outcome_vectors.json` in the canopy
+// repository: one entry per row, each row one way a screen write can end
+// (refused by the PV connector, refused by the panel server in front of canopy,
+// the readback did not match, no reply, the control target changed, ...), with
+// its HTTP status, envelope `code` and the toast text the viewer shows. A row
+// id names who decides the outcome and how: `connector-refused`,
+// `front-refused-401`, `client-unknown`. The vector file's `about` field
+// describes the fields of a row; the canopy server and this client both map
+// their outcomes from it.
 //
 // This table mirrors each row's `outcome`, `status`, `code` and `default`; a
 // vitest (submit.test.ts) checks it against a byte copy of the vector file
-// (packages/client/test-vectors/wc6_vectors.json). Edit both together, and
-// change the vector file in canopy first.
+// (packages/client/test-vectors/write_outcome_vectors.json). Edit both
+// together, and change the vector file in canopy first.
 
 import type { WriteOutcome, WriteOutcomeKind } from './types.js';
 
@@ -61,7 +58,6 @@ export function cutWriteOutcomeDetail(
 }
 
 const REFUSED_GENERIC = 'the write was refused; nothing written';
-const TARGET_CHANGED = 'the control target changed; nothing written';
 const TARGET_OR_WRITES_CHANGED = 'the control target or its write state changed; nothing written';
 const WRITES_CHANGED = 'the write state of this target changed; nothing written';
 const UNKNOWN = 'outcome unknown — check the readback';
@@ -69,121 +65,92 @@ const FRONT_REFUSED = 'the panel server refused this write; nothing written';
 
 /** Every write-outcome row by id, mirroring the vector file. */
 export const WRITE_OUTCOME_ROWS: Readonly<Record<string, WriteOutcomeRow>> = {
-  '1-off-disabled': {
+  'connector-refused': {
     outcome: 'refused',
     status: 403,
     code: 'pv_write_refused',
-    detail: 'writes from screens are not enabled in this deployment; nothing written',
+    detail: REFUSED_GENERIC,
   },
-  '1-off-origin': {
-    outcome: 'refused',
-    status: 403,
-    code: 'pv_write_refused',
-    detail: 'screens stay read-only until agent pages have their own origin; nothing written',
-  },
-  '2': {
-    outcome: 'target_changed',
-    status: 409,
-    code: 'pv_target_changed',
-    detail: TARGET_CHANGED,
-  },
-  '3': {
-    outcome: 'target_changed',
-    status: 409,
-    code: 'pv_target_changed',
-    detail: TARGET_CHANGED,
-  },
-  '3a': {
-    outcome: 'refused',
-    status: 403,
-    code: 'pv_write_refused',
-    detail: WRITES_CHANGED,
-  },
-  '4': {
-    outcome: 'refused',
-    status: 403,
-    code: 'pv_write_refused',
-    detail: 'no control target record; nothing written',
-  },
-  '4b': {
-    outcome: 'refused',
-    status: 403,
-    code: 'pv_write_refused',
-    detail: 'this control target cannot be served here; nothing written',
-  },
-  '5': {
-    outcome: 'switch_in_progress',
-    status: 409,
-    code: 'pv_switch_in_progress',
-    detail: 'a target switch is in progress; nothing written',
-  },
-  '5a': {
-    outcome: 'refused',
-    status: 403,
-    code: 'pv_write_refused',
-    detail: 'the audit ledger is unavailable; nothing written',
-  },
-  '5b': {
-    outcome: 'refused',
-    status: 403,
-    code: 'pv_write_refused',
-    detail: 'a write to this channel is still in progress; nothing written',
-  },
-  '5c': {
-    outcome: 'refused',
-    status: 403,
-    code: 'pv_write_refused',
-    detail: 'the switch state could not be checked; nothing written',
-  },
-  '6': { outcome: 'refused', status: 403, code: 'pv_write_refused', detail: REFUSED_GENERIC },
-  '6-readonly-run': {
+  'connector-refused-read-only': {
     outcome: 'refused',
     status: 403,
     code: 'pv_write_refused',
     detail: 'the whole deployment is running read-only; nothing written',
   },
-  '7': { outcome: 'refused', status: 403, code: 'pv_write_refused', detail: REFUSED_GENERIC },
-  '8': { outcome: 'refused', status: 403, code: 'pv_write_refused', detail: REFUSED_GENERIC },
-  '9': { outcome: 'refused', status: 403, code: 'pv_write_refused', detail: REFUSED_GENERIC },
-  '10': { outcome: 'confirmed', status: 200, code: null, detail: 'written' },
-  '11': {
+  'connector-limits': {
+    outcome: 'refused',
+    status: 403,
+    code: 'pv_write_refused',
+    detail: REFUSED_GENERIC,
+  },
+  confirmed: { outcome: 'confirmed', status: 200, code: null, detail: 'written' },
+  mismatch: {
     outcome: 'mismatch',
     status: 409,
     code: 'pv_write_mismatch',
     detail: 'written; the channel holds a different value',
   },
-  '12': {
+  unconfirmed: {
     outcome: 'unconfirmed',
     status: 502,
     code: 'pv_write_unconfirmed',
     detail: 'sent, not verified',
   },
-  '13': { outcome: 'unknown', status: 502, code: 'pv_write_unknown', detail: UNKNOWN },
-  '14': { outcome: 'unknown', status: 502, code: 'pv_write_unknown', detail: UNKNOWN },
-  '14a': {
+  'connector-unknown': {
+    outcome: 'unknown',
+    status: 502,
+    code: 'pv_write_unknown',
+    detail: UNKNOWN,
+  },
+  'writes-not-enabled': {
     outcome: 'refused',
     status: 405,
     code: null,
     detail: 'writes are not enabled on this server',
   },
-  '14b-401': {
+  'front-refused-401': {
     outcome: 'refused',
     status: 401,
     code: 'invalid_access_credential',
     detail: FRONT_REFUSED,
   },
-  '14b-403': { outcome: 'refused', status: 403, code: 'pv_write_refused', detail: FRONT_REFUSED },
-  '14b-404': { outcome: 'refused', status: 404, code: 'pv_write_refused', detail: FRONT_REFUSED },
-  '14b-413': { outcome: 'refused', status: 413, code: 'pv_write_refused', detail: FRONT_REFUSED },
-  '15': { outcome: 'unknown', status: null, code: null, detail: UNKNOWN },
-  '16': { outcome: 'target_changed', status: null, code: null, detail: TARGET_OR_WRITES_CHANGED },
-  '16a': { outcome: 'target_changed', status: null, code: null, detail: WRITES_CHANGED },
-  '16-coalesced': { outcome: null, status: null, code: null, detail: null },
+  'front-refused-403': {
+    outcome: 'refused',
+    status: 403,
+    code: 'pv_write_refused',
+    detail: FRONT_REFUSED,
+  },
+  'front-refused-404': {
+    outcome: 'refused',
+    status: 404,
+    code: 'pv_write_refused',
+    detail: FRONT_REFUSED,
+  },
+  'front-refused-413': {
+    outcome: 'refused',
+    status: 413,
+    code: 'pv_write_refused',
+    detail: FRONT_REFUSED,
+  },
+  'client-unknown': { outcome: 'unknown', status: null, code: null, detail: UNKNOWN },
+  'target-changed': {
+    outcome: 'target_changed',
+    status: null,
+    code: null,
+    detail: TARGET_OR_WRITES_CHANGED,
+  },
+  'write-state-changed': {
+    outcome: 'target_changed',
+    status: null,
+    code: null,
+    detail: WRITES_CHANGED,
+  },
+  coalesced: { outcome: null, status: null, code: null, detail: null },
 };
 
 /**
  * The viewer's toast for a run stopped by a coalesced write (row
- * 16-coalesced). A coalesced outcome itself is never toasted.
+ * `coalesced`). A coalesced outcome itself is never toasted.
  */
 export const WRITE_OUTCOME_COALESCED_TOAST = 'a newer value replaced this one; nothing more sent';
 
@@ -192,16 +159,14 @@ export const WRITE_OUTCOME_COALESCED_TOAST = 'a newer value replaced this one; n
  * whose default detail stands in for a missing one, and whether the server's
  * own detail is the toast. Server rows (`pv_*`) carry toast text as their
  * detail; FRONT's access gate (`invalid_access_credential`) does not, so its
- * row text is used. Any other code is row 15.
+ * row text is used. Any other code is row `client-unknown`.
  */
 const CODE_ROWS: Readonly<Record<string, { row: string; serverDetail: boolean }>> = {
-  pv_write_refused: { row: '6', serverDetail: true },
-  pv_target_changed: { row: '2', serverDetail: true },
-  pv_switch_in_progress: { row: '5', serverDetail: true },
-  pv_write_mismatch: { row: '11', serverDetail: true },
-  pv_write_unconfirmed: { row: '12', serverDetail: true },
-  pv_write_unknown: { row: '13', serverDetail: true },
-  invalid_access_credential: { row: '14b-401', serverDetail: false },
+  pv_write_refused: { row: 'connector-refused', serverDetail: true },
+  pv_write_mismatch: { row: 'mismatch', serverDetail: true },
+  pv_write_unconfirmed: { row: 'unconfirmed', serverDetail: true },
+  pv_write_unknown: { row: 'connector-unknown', serverDetail: true },
+  invalid_access_credential: { row: 'front-refused-401', serverDetail: false },
 };
 
 /**
@@ -229,17 +194,21 @@ function rowOutcome(
   };
 }
 
-/** Row 16a's text with its one token, `<label>`; a null label takes the row's default. */
+/** Row `write-state-changed`'s text with its one token, `<label>`; a null label takes the row's default. */
 const WRITES_CHANGED_TEMPLATE = 'the write state of <label> changed; nothing written';
 
+/** A row the client answers itself, with no request sent or no reply. */
+export type ClientRowId = 'client-unknown' | 'target-changed' | 'write-state-changed';
+
 /**
- * A client-side row that sent no request or got no reply: '15' (unknown),
- * '16' (the target or its write state changed) or '16a' (the write state of
- * the target named by `label` changed). Only '16a' reads `label`; a null or
- * absent label gives the row's default text.
+ * A client-side row that sent no request or got no reply: `client-unknown`,
+ * `target-changed` (the target or its write state changed) or
+ * `write-state-changed` (the write state of the target named by `label`
+ * changed). Only `write-state-changed` reads `label`; a null or absent label
+ * gives the row's default text.
  */
-export function clientOutcome(rowId: '15' | '16' | '16a', label?: string | null): WriteOutcome {
-  if (rowId === '16a' && label != null) {
+export function clientOutcome(rowId: ClientRowId, label?: string | null): WriteOutcome {
+  if (rowId === 'write-state-changed' && label != null) {
     return rowOutcome(
       rowId,
       null,
@@ -273,14 +242,14 @@ function jsonObject(bodyText: string): Record<string, unknown> | null {
 
 /**
  * Map a PUT response to its write outcome. A redirect (`type` is
- * `'opaqueredirect'` under `redirect: 'manual'`, or any 3xx status) is row 15:
- * the write did not reach the relay, or nobody can say whether it did. A 2xx
- * is row 10 only when its body is the server's write result, a JSON object
- * with a string `pv` (shape only: the name is not compared); any other 2xx
- * body — a followed redirect's login page, an empty body — is row 15. Other
- * statuses map by envelope code, and a 405 with none is row 14a (generic
- * canopy with the relay off). An unrecognised code, or a non-2xx with no
- * envelope, is row 15.
+ * `'opaqueredirect'` under `redirect: 'manual'`, or any 3xx status) is
+ * `client-unknown`: the write did not reach the relay, or nobody can say
+ * whether it did. A 2xx is `confirmed` only when its body is the server's
+ * write result, a JSON object with a string `pv` (shape only: the name is not
+ * compared); any other 2xx body — a followed redirect's login page, an empty
+ * body — is `client-unknown`. Other statuses map by envelope code, and a 405
+ * with none is `writes-not-enabled` (generic canopy with the relay off). An
+ * unrecognised code, or a non-2xx with no envelope, is `client-unknown`.
  */
 export function outcomeFromResponse(
   ok: boolean,
@@ -288,20 +257,20 @@ export function outcomeFromResponse(
   bodyText: string,
   type?: string
 ): WriteOutcome {
-  if (type === 'opaqueredirect') return rowOutcome('15', null, null);
-  if (status >= 300 && status < 400) return rowOutcome('15', status, null);
+  if (type === 'opaqueredirect') return rowOutcome('client-unknown', null, null);
+  if (status >= 300 && status < 400) return rowOutcome('client-unknown', status, null);
   if (ok) {
     const result = jsonObject(bodyText);
     return typeof result?.pv === 'string'
-      ? rowOutcome('10', status, null)
-      : rowOutcome('15', status, null);
+      ? rowOutcome('confirmed', status, null)
+      : rowOutcome('client-unknown', status, null);
   }
-  if (status === 405) return rowOutcome('14a', status, null);
+  if (status === 405) return rowOutcome('writes-not-enabled', status, null);
 
   const envelope = jsonObject(bodyText);
   const code = typeof envelope?.code === 'string' ? envelope.code : null;
   const mapping = code !== null && Object.hasOwn(CODE_ROWS, code) ? CODE_ROWS[code] : undefined;
-  if (!mapping) return rowOutcome('15', status, code);
+  if (!mapping) return rowOutcome('client-unknown', status, code);
   const detail = mapping.serverDetail ? toastText(envelope?.detail) : undefined;
   return rowOutcome(mapping.row, status, code, detail);
 }
