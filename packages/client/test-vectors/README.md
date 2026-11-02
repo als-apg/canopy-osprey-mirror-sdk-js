@@ -5,12 +5,11 @@ tests against them.
 
 | File | canopy source | git blob |
 |------|---------------|----------|
-| `heartbeat_vectors.json` | `src/canopy/contracts/heartbeat_vectors.json` | `d88ddf45a271f3a4eae8df2fc277b4cf50314d5c` |
+| `heartbeat_vectors.json` | `src/canopy/contracts/heartbeat_vectors.json` | `cc10af4e9fc30111de2073006a543ff7d9cffa04` |
 | `write_outcome_vectors.json` | `src/canopy/contracts/write_outcome_vectors.json` | `2cd15e2f5fed1fb3f0b1b3f5d3e90ec03020ad9c` |
 
-Both copies match canopy commit `773afccb31a414241ae498a6b7ae9ce71900269c`, which last changed either file. That
-commit is not on canopy `main` yet; the files land there with the canopy change that adds the heartbeat
-reachability and write-state fields and the write relay. `git hash-object <file>` here must print the blob
+Both copies match canopy commit `23c082f9f783e8532a520b147c8faf934f95ab3b`, which last changed either file (the
+`asked` and `held` write states). That commit is not on canopy `main` yet. `git hash-object <file>` here must print the blob
 above, and equal `git rev-parse <canopy commit>:<canopy source>`.
 
 - `heartbeat_vectors.json`: what a heartbeat's `reachable` and `writes` fields mean and what the viewer shows for

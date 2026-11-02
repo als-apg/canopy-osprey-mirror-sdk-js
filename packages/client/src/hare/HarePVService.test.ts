@@ -807,6 +807,15 @@ describe('HarePVService', () => {
       expect(service.getBackend()!.writes!.state).toBe('applying');
     });
 
+    it.each<[HareWritesState, string]>([
+      ['asked', 'asked'],
+      ['held', 'session_held'],
+    ])('the writes state union includes %s, carried through as said', (state, cause) => {
+      const { service, socket } = connected();
+      socket.message(heartbeat({ writes: { state, reason: null, cause } }));
+      expect(service.getBackend()!.writes).toEqual({ state, reason: null, cause });
+    });
+
     it('fires onBackendChange when any reachable or writes field changes', () => {
       const onBackendChange = vi.fn();
       const { socket } = connected(onBackendChange);

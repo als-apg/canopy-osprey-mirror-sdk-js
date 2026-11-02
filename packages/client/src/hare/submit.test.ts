@@ -532,6 +532,20 @@ describe('HarePVService.heartbeat / submit', () => {
       expect(JSON.parse(fetchFn.mock.calls[1]![1].body as string)).toEqual({ value: 1 });
     });
 
+    it('sends confirmed: true when a person confirmed the write, and no confirmed key otherwise', async () => {
+      const fetchFn = replyFetch({ ok: true, status: 200 });
+      const { service } = connected(fetchFn, { binding: null });
+      await service.submit('X', 1, { confirmed: true });
+      await service.submit('Y', 1, { confirmed: false });
+      await service.submit('Z', 1);
+      expect(JSON.parse(fetchFn.mock.calls[0]![1].body as string)).toEqual({
+        value: 1,
+        confirmed: true,
+      });
+      expect(JSON.parse(fetchFn.mock.calls[1]![1].body as string)).toEqual({ value: 1 });
+      expect(JSON.parse(fetchFn.mock.calls[2]![1].body as string)).toEqual({ value: 1 });
+    });
+
     it('maps the response by code with toast-ready detail', async () => {
       const fetchFn = replyFetch({
         ok: false,

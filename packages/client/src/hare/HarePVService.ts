@@ -115,6 +115,8 @@ interface QueuedWrite {
   binding: string | null;
   origin: PVWriteOrigin | undefined;
   timeoutS: number | undefined;
+  /** Sent as `confirmed: true` when a person confirmed the write. */
+  confirmed: boolean;
   /** The connection and its heartbeat binding at call time: a pending write is dropped when either changed. */
   connection: number;
   heartbeatBinding: string | null;
@@ -401,7 +403,8 @@ export class HarePVService implements PVService {
    * - Answers `target-changed` with no request unless the current
    *   socket is open and has delivered a heartbeat.
    * - Sends `options.binding`, or else the current heartbeat binding at call
-   *   time; a null binding is omitted from the body.
+   *   time; a null binding is omitted from the body. Sends `confirmed: true`
+   *   when `options.confirmed` is true, else no `confirmed` key.
    * - One request in flight per PV. A value submitted meanwhile waits; a newer
    *   one supersedes it, and the superseded call resolves with the newer one's
    *   outcome and `coalesced: true`. A waiting value whose socket closed or
@@ -421,6 +424,7 @@ export class HarePVService implements PVService {
         binding: options.binding !== undefined ? options.binding : hb.binding,
         origin: options.origin,
         timeoutS: options.timeoutS,
+        confirmed: options.confirmed === true,
         connection,
         heartbeatBinding: hb.binding,
         resolve,
@@ -520,6 +524,7 @@ export class HarePVService implements PVService {
       if (entry.timeoutS !== undefined) body.timeout = entry.timeoutS;
       if (entry.binding !== null) body.binding = entry.binding;
       if (entry.origin !== undefined) body.origin = entry.origin;
+      if (entry.confirmed) body.confirmed = true;
       const { url, headers } = this.pvWriteRequest(pvName);
       // A redirect is never followed: a login page behind it would read as a 2xx.
       const res = await fetchFn(url, {

@@ -131,10 +131,12 @@ export interface HareReachable {
 }
 
 /**
- * Writes words. Only `on` accepts writes; `off`, `locked` and `applying`
- * (the new write state is coming up) are inert, as is any unknown word.
+ * Writes words. `on` and `asked` accept writes (`asked`: a person confirms
+ * each one first, and the PUT carries `confirmed: true`); `off`, `locked`,
+ * `applying` (the new write state is coming up) and `held` (a watchdog's hold
+ * on the session) are inert, as is any unknown word.
  */
-export type HareWritesState = 'on' | 'off' | 'locked' | 'applying';
+export type HareWritesState = 'on' | 'asked' | 'off' | 'locked' | 'applying' | 'held';
 
 export interface HareWrites {
   state: HareWritesState | HareUnknownStateWord;
@@ -211,6 +213,8 @@ export interface PVWriteRequestDTO {
   /** The control-target binding the screen showed; a backend that checks it refuses a PUT naming another. */
   binding?: string;
   origin?: PVWriteOrigin;
+  /** True when a person confirmed the write; a backend at `asked` refuses a PUT without it. */
+  confirmed?: boolean;
 }
 
 export interface PVWriteResultDTO {
@@ -255,6 +259,8 @@ export interface SubmitOptions {
   binding?: string | null;
   /** Sent as the request's `timeout`; never weakens the server's confirm policy. */
   timeoutS?: number;
+  /** True when a person confirmed this write in a dialog: sent as `confirmed: true`. */
+  confirmed?: boolean;
 }
 
 /** Per-socket heartbeat state, as returned by `HarePVService.heartbeat()`. */
