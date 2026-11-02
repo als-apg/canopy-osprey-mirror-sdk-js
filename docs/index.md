@@ -11,10 +11,10 @@ chrome, and dev tooling. Apps such as react-trace, react-squirrel and the
 screen runtime consume it, so these pieces are written once instead of per
 app.
 
-The packages are published in lockstep to GitHub Packages under the
-`@slaclab` scope; see the
+The packages are published in lockstep to npmjs.com under the `@slaclab`
+scope; see the
 [repository README](https://github.com/slaclab/canopy-sdk-js#installing-consumers)
-for registry setup.
+for how to install them.
 
 ## Protocol client and tooling
 
