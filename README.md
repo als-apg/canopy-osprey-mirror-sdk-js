@@ -117,3 +117,9 @@ Three GitHub Actions workflows run on pull requests and pushes to `main`:
 - **Lint & Format** — ESLint, Prettier, and TypeScript type-check
 - **Test** — Vitest test suite
 - **Build & Deploy Documentation** — builds the Zensical docs site and deploys to GitHub Pages
+
+## Contributing and license
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Report vulnerabilities privately, as [SECURITY.md](SECURITY.md) describes.
+
+canopy-sdk-js is distributed under the terms in [LICENSE.md](LICENSE.md).
