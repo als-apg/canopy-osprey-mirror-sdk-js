@@ -67,9 +67,10 @@ const { config, error, loading } = useCanopyElogConfig('trace');
 const showPostButton = config?.enabled === true;
 ```
 
-One `GET /elog/v1/apps/{app}/config` per app (no API key needed), aborted
-on unmount and app change. A disabled app is `config.enabled: false` with a
-`reason`; a failed request is on `error` (not retried).
+One `GET /elog/v1/apps/{app}/config` per app and connection (no API key
+needed), aborted on unmount and when either changes. A disabled app is
+`config.enabled: false` with a `reason`; a failed request is on `error` (not
+retried).
 `useElogConfig(conn, app)` takes an explicit connection.
 
 ## Live PVs

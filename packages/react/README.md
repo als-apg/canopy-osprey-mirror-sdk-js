@@ -150,8 +150,9 @@ function PostToElogButton() {
 - A failed request (network, a malformed app name, ...) is surfaced on
   `error` with `config: null`, and not retried; remount or change the app
   to try again.
-- One request per app; it is aborted on unmount and when the app changes,
-  and results are keyed by app, so a previous app's config never shows.
+- One request per app and connection; it is aborted on unmount and when
+  either changes, and each result is tied to its request, so a previous
+  app's or connection's config never shows.
 
 ## Migrating from 0.1
 

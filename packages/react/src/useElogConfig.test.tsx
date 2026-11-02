@@ -93,6 +93,38 @@ describe('useElogConfig', () => {
     ]);
   });
 
+  it.each<[string, (conn: CanopyConnection) => CanopyConnection]>([
+    ['baseUrl', (conn) => ({ ...conn, baseUrl: 'http://other-canopy' })],
+    ['apiKey', (conn) => ({ ...conn, apiKey: 'other-key' })],
+    ['fetch', (conn) => ({ ...conn, fetch: (url, init) => conn.fetch!(url, init) })],
+  ])("never shows the previous connection's config when %s changes", async (_field, change) => {
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const fetch = createFakeFetch({
+      'GET /elog/v1/apps/trace/config': [
+        jsonResponse(enabled),
+        async () => {
+          await held;
+          return jsonResponse(disabled);
+        },
+      ],
+    });
+    const conn: CanopyConnection = { baseUrl: 'http://canopy', fetch };
+    const { result, rerender } = renderHook((props) => useElogConfig(props, 'trace'), {
+      initialProps: conn,
+    });
+    await waitFor(() => expect(result.current.config).toEqual(enabled));
+
+    rerender(change(conn));
+    expect(result.current).toEqual({ config: null, error: null, loading: true });
+
+    release();
+    await waitFor(() => expect(result.current.config).toEqual(disabled));
+    expect(result.current).toEqual({ config: disabled, error: null, loading: false });
+  });
+
   it('aborts the request in flight on unmount', async () => {
     let signal: { aborted: boolean } | undefined;
     const fetch = createFakeFetch({
