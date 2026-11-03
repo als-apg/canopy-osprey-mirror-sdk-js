@@ -1,15 +1,33 @@
 // Runtime validation of a screen document against the canonical Screen IR.
 // Layered: (1) structural conformance to the JSON Schema
-// (../schema/screen-ir.schema.json), then (2) the cross-field/cross-reference
-// rules the schema can't express (macro defaults, formula:// resolution). So
-// validate() is the FULL contract, not just the structural subset.
+// (../spec/screen-ir/screen-ir.schema.json, copied from slaclab/canopy-spec), then
+// (2) the semantic rules the schema can't express (macro defaults, formula://
+// resolution). So validate() is the FULL contract, not just the structural subset.
+//
+// Rule ids and error locations follow canopy-spec's README; the spec's
+// conformance cases (spec/conformance) check both, see conformance.test.ts.
 
 // Named import (not CJS default) so the class type survives NodeNext resolution.
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import type { ValidateFunction } from 'ajv/dist/2020.js';
 
 import { formulaName, isFormulaRef } from './formula.js';
-import schema from '../schema/screen-ir.schema.json' with { type: 'json' };
+import schema from '../spec/screen-ir/screen-ir.schema.json' with { type: 'json' };
+
+/** `schema` for a JSON Schema failure, otherwise a canopy-spec semantic rule id. */
+export type ValidationRule =
+  | 'schema'
+  | 'macro-default-required'
+  | 'macro-default-forbidden'
+  | 'formula-ref-unresolved';
+
+export interface ValidationError {
+  readonly rule: ValidationRule;
+  /** JSON Pointer (RFC 6901) to the failing location; `""` is the document root. */
+  readonly instancePath: string;
+  /** Human-readable message — exactly what {@link validate} returns. */
+  readonly message: string;
+}
 
 // Lazily compiled on first validate() call so type-only consumers of the
 // package barrel don't pay ajv's schema-compilation cost at import time.
@@ -26,13 +44,25 @@ function getValidator(): ValidateFunction {
  * (converter output, hand-authored, older `source` types). Does not mutate input.
  */
 export function validate(screen: unknown): string[] {
-  const errors: string[] = [];
+  return validateDetailed(screen).map((error) => error.message);
+}
+
+/**
+ * {@link validate}, with each error's canopy-spec rule id and JSON Pointer
+ * location alongside its message.
+ */
+export function validateDetailed(screen: unknown): ValidationError[] {
+  const errors: ValidationError[] = [];
   const validateSchema = getValidator();
 
   if (!validateSchema(screen)) {
     for (const err of validateSchema.errors ?? []) {
       const path = err.instancePath || '(root)';
-      errors.push(`${path} ${err.message ?? 'is invalid'}`);
+      errors.push({
+        rule: 'schema',
+        instancePath: err.instancePath,
+        message: `${path} ${err.message ?? 'is invalid'}`,
+      });
     }
     // Structural failures make the semantic checks below unreliable; stop here.
     return errors;
@@ -50,15 +80,23 @@ export function validate(screen: unknown): string[] {
 // --- Semantic checks the JSON Schema can't express ------------------------
 
 /** `default` required on a `screen`, forbidden on a `template`. */
-function checkMacroDefaults(doc: ScreenLike, errors: string[]): void {
+function checkMacroDefaults(doc: ScreenLike, errors: ValidationError[]): void {
   const kind = doc.kind ?? 'screen';
-  for (const macro of doc.macros ?? []) {
+  for (const [i, macro] of (doc.macros ?? []).entries()) {
     const hasDefault = macro.default !== undefined && macro.default !== null;
     if (kind === 'screen' && !hasDefault) {
-      errors.push(`macro '${macro.name}' needs a default on a screen (kind='screen')`);
+      errors.push({
+        rule: 'macro-default-required',
+        instancePath: `/macros/${i}`,
+        message: `macro '${macro.name}' needs a default on a screen (kind='screen')`,
+      });
     }
     if (kind === 'template' && hasDefault) {
-      errors.push(`macro '${macro.name}' must not declare a default on a template`);
+      errors.push({
+        rule: 'macro-default-forbidden',
+        instancePath: `/macros/${i}`,
+        message: `macro '${macro.name}' must not declare a default on a template`,
+      });
     }
   }
 }
@@ -67,39 +105,62 @@ function checkMacroDefaults(doc: ScreenLike, errors: string[]): void {
  * Every `formula://` reference (in calc-PV channel props, rule `pvs[].name`, and
  * `Rule.formula`) resolves to a declared `formulas[]` entry.
  */
-function checkFormulaRefs(doc: ScreenLike, errors: string[]): void {
+function checkFormulaRefs(doc: ScreenLike, errors: ValidationError[]): void {
   const formulaNames = new Set((doc.formulas ?? []).map((f) => f.name));
 
-  const requireFormula = (name: string, where: string): void => {
+  const requireFormula = (name: string, where: string, instancePath: string): void => {
     if (!formulaNames.has(name)) {
-      errors.push(`${where} references formula '${name}' but no formulas[] entry declares it`);
+      errors.push({
+        rule: 'formula-ref-unresolved',
+        instancePath,
+        message: `${where} references formula '${name}' but no formulas[] entry declares it`,
+      });
     }
   };
 
-  const walk = (node: WidgetLike | undefined): void => {
+  const walk = (node: WidgetLike | undefined, path: string): void => {
     if (!node) return;
 
     for (const [key, value] of Object.entries(node.props ?? {})) {
-      if (isFormulaRef(value))
-        requireFormula(formulaName(value), `widget '${node.id}' prop '${key}'`);
+      if (isFormulaRef(value)) {
+        requireFormula(
+          formulaName(value),
+          `widget '${node.id}' prop '${key}'`,
+          `${path}/props/${pointerToken(key)}`
+        );
+      }
     }
 
-    for (const rule of node.rules ?? []) {
+    for (const [j, rule] of (node.rules ?? []).entries()) {
       // `formula`/`pvs[].name` are schema-typed as strings; the guards here are
       // defensive and would fail-open if a future schema edit loosened them.
       if (typeof rule.formula === 'string') {
-        requireFormula(formulaName(rule.formula), `rule '${rule.id}' on widget '${node.id}'`);
+        requireFormula(
+          formulaName(rule.formula),
+          `rule '${rule.id}' on widget '${node.id}'`,
+          `${path}/rules/${j}/formula`
+        );
       }
-      for (const pv of rule.pvs ?? []) {
-        if (isFormulaRef(pv.name))
-          requireFormula(formulaName(pv.name), `rule '${rule.id}' on widget '${node.id}' pv`);
+      for (const [k, pv] of (rule.pvs ?? []).entries()) {
+        if (isFormulaRef(pv.name)) {
+          requireFormula(
+            formulaName(pv.name),
+            `rule '${rule.id}' on widget '${node.id}' pv`,
+            `${path}/rules/${j}/pvs/${k}/name`
+          );
+        }
       }
     }
 
-    for (const child of node.children ?? []) walk(child);
+    for (const [c, child] of (node.children ?? []).entries()) walk(child, `${path}/children/${c}`);
   };
 
-  walk(doc.root);
+  walk(doc.root, '/root');
+}
+
+/** Escape one JSON Pointer reference token (RFC 6901). */
+function pointerToken(key: string): string {
+  return key.replace(/~/g, '~0').replace(/\//g, '~1');
 }
 
 // --- Minimal structural shapes for post-schema inspection -----------------

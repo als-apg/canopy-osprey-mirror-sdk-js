@@ -28,4 +28,8 @@ export type {
 
 export type { Rule, RulePvBinding, RuleCondition } from './rules.js';
 
-export { validate } from './validate.js';
+export { IR_WIDGET_TYPES, WIDGET_DEFINITIONS } from './widgets.js';
+export type { IRWidgetType, WidgetDefinition } from './widgets.js';
+
+export { validate, validateDetailed } from './validate.js';
+export type { ValidationError, ValidationRule } from './validate.js';

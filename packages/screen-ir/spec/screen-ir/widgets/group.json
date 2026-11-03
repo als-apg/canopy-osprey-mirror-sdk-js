@@ -1,0 +1,23 @@
+{
+  "id": "group",
+  "version": "1.0.0",
+  "description": "Logical container grouping child widgets. Children keep absolute screen coordinates (the IR geometry contract).",
+  "supportsPv": false,
+  "supportsRules": true,
+  "supportsChildren": true,
+  "propSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "layoutMode": {
+        "type": "string",
+        "enum": [
+          "absolute",
+          "flex",
+          "grid"
+        ],
+        "default": "absolute"
+      }
+    }
+  }
+}

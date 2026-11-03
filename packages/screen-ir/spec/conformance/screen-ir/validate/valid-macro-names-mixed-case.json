@@ -1,0 +1,47 @@
+{
+  "description": "Macro names may be lowercase or mixed case (PyDM and EDM sources use names like `dev`).",
+  "valid": true,
+  "screen": {
+    "schemaVersion": "1.0",
+    "kind": "screen",
+    "id": "conformance",
+    "metadata": {
+      "title": "Conformance",
+      "source": {
+        "type": "hand-authored"
+      },
+      "size": {
+        "width": 100,
+        "height": 100
+      }
+    },
+    "macros": [
+      {
+        "name": "dev",
+        "default": ""
+      },
+      {
+        "name": "signal",
+        "default": "X"
+      },
+      {
+        "name": "PREFIX",
+        "default": "DEMO"
+      }
+    ],
+    "root": {
+      "id": "w-001",
+      "type": "absolute-canvas",
+      "props": {
+        "width": 100,
+        "height": 100
+      },
+      "geometry": {
+        "x": 0,
+        "y": 0,
+        "width": 100,
+        "height": 100
+      }
+    }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "id": "pv-spinbox",
+  "version": "1.0.0",
+  "description": "Numeric spinbox bound to a PV. Writes the value on change.",
+  "supportsPv": true,
+  "supportsRules": true,
+  "supportsChildren": false,
+  "propSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": [
+      "pv"
+    ],
+    "properties": {
+      "pv": {
+        "type": "string",
+        "format": "pv-channel"
+      },
+      "precision": {
+        "type": "number",
+        "minimum": 0
+      },
+      "precisionFromPV": {
+        "type": "boolean",
+        "default": true
+      },
+      "showStepExponent": {
+        "type": "boolean",
+        "default": false
+      },
+      "minValue": {
+        "type": "number"
+      },
+      "maxValue": {
+        "type": "number"
+      },
+      "limitsFromPV": {
+        "type": "boolean",
+        "default": true
+      },
+      "alarmSensitive": {
+        "type": "boolean",
+        "default": false
+      }
+    }
+  }
+}

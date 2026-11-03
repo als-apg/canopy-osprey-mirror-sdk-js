@@ -1,0 +1,47 @@
+{
+  "id": "pv-progress-bar",
+  "version": "1.0.0",
+  "description": "Bar visualization of a numeric PV between configured limits.",
+  "supportsPv": true,
+  "supportsRules": true,
+  "supportsChildren": false,
+  "propSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": [
+      "pv"
+    ],
+    "properties": {
+      "pv": {
+        "type": "string",
+        "format": "pv-channel"
+      },
+      "min": {
+        "type": "number"
+      },
+      "max": {
+        "type": "number"
+      },
+      "orientation": {
+        "type": "string",
+        "enum": [
+          "horizontal",
+          "vertical"
+        ],
+        "default": "horizontal"
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "determinate",
+          "indeterminate"
+        ],
+        "default": "determinate"
+      },
+      "showValue": {
+        "type": "boolean",
+        "default": true
+      }
+    }
+  }
+}

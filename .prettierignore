@@ -17,3 +17,6 @@ src/routeTree.gen.ts
 
 # Must stay byte-identical to the Canopy license
 LICENSE.md
+
+# Copied byte for byte from slaclab/canopy-spec; formatting would break the copies
+packages/screen-ir/spec

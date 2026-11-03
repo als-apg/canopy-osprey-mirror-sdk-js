@@ -1,0 +1,47 @@
+{
+  "id": "pv-text-input",
+  "version": "1.0.0",
+  "description": "Editable text field bound to a PV. Writes on Enter.",
+  "supportsPv": true,
+  "supportsRules": true,
+  "supportsChildren": false,
+  "propSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": [
+      "pv"
+    ],
+    "properties": {
+      "pv": {
+        "type": "string",
+        "format": "pv-channel"
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "text",
+          "search",
+          "password",
+          "numeric",
+          "read-only"
+        ],
+        "default": "text"
+      },
+      "writeOnEnter": {
+        "type": "boolean",
+        "default": true
+      },
+      "placeholder": {
+        "type": "string"
+      },
+      "alarmSensitive": {
+        "type": "boolean",
+        "default": false
+      },
+      "fontSize": {
+        "type": "number",
+        "title": "Font Size (px)"
+      }
+    }
+  }
+}

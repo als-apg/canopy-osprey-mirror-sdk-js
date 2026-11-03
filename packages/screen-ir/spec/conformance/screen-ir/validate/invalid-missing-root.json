@@ -1,0 +1,26 @@
+{
+  "description": "`root` is required.",
+  "valid": false,
+  "errors": [
+    {
+      "rule": "schema",
+      "instancePath": ""
+    }
+  ],
+  "screen": {
+    "schemaVersion": "1.0",
+    "kind": "screen",
+    "id": "conformance",
+    "metadata": {
+      "title": "Conformance",
+      "source": {
+        "type": "hand-authored"
+      },
+      "size": {
+        "width": 100,
+        "height": 100
+      }
+    },
+    "macros": []
+  }
+}

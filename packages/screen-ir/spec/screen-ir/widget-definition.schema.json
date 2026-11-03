@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:canopy:screen-ir:1.0:widget-definition",
+  "title": "Canopy Screen IR widget definition",
+  "description": "One file per IR widget type under screen-ir/widgets/. Holds only the language-neutral contract: the type id and the props it accepts. Editor metadata (palette, inspector) and converter mappings (qtMapping, qtPropMap) live with their tools, not here.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "version",
+    "description",
+    "supportsPv",
+    "supportsRules",
+    "supportsChildren",
+    "propSchema"
+  ],
+  "properties": {
+    "id": {
+      "description": "The IR `type` value. Kebab-case; must equal the filename stem.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "version": {
+      "description": "Semver of this definition, release versions only (no pre-release suffix). Bump the major version on an incompatible propSchema change and the minor version on a compatible one, such as a new optional prop.",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "supportsPv": {
+      "description": "The widget binds a PV through a top-level `pv-channel` prop. False for widgets whose PVs sit only in nested props, such as `waveform-plot` curves.",
+      "type": "boolean"
+    },
+    "supportsRules": {
+      "description": "Rules may target this widget's props.",
+      "type": "boolean"
+    },
+    "supportsChildren": {
+      "description": "The node may carry `children`.",
+      "type": "boolean"
+    },
+    "propSchema": {
+      "description": "JSON Schema (draft-07) describing the node's `props`. String props that hold a PV address carry `format: \"pv-channel\"` (see README). Descriptive in v0.1: not enforced by conformance (see README).",
+      "type": "object",
+      "required": ["$schema", "type"],
+      "properties": {
+        "$schema": { "const": "http://json-schema.org/draft-07/schema#" },
+        "type": { "const": "object" }
+      }
+    }
+  }
+}

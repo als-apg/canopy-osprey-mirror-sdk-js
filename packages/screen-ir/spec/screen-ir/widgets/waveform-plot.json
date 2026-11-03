@@ -1,0 +1,37 @@
+{
+  "id": "waveform-plot",
+  "version": "1.0.0",
+  "description": "An XY / waveform plot of one or more PV curves.",
+  "supportsPv": false,
+  "supportsRules": true,
+  "supportsChildren": false,
+  "propSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string"
+      },
+      "curves": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        },
+        "description": "Per-curve config (y_channel, x_channel, color, lineStyle, ...)."
+      },
+      "yAxes": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        },
+        "description": "Per-axis config (name, orientation, label, min/max range, ...)."
+      },
+      "xLabels": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

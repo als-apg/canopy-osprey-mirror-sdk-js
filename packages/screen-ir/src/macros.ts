@@ -1,7 +1,7 @@
 // Accepts either case — Canopy's convention is uppercase, but PyDM/EDM sources
 // author lowercase/mixed-case macros (${dev}, ${signal}), which the runtime
-// resolver substitutes fine. Kept in lock-step with the JSON schema's
-// MacroDeclaration.name pattern.
+// resolver substitutes fine. Must equal the copied schema's
+// MacroDeclaration.name pattern; spec.test.ts checks it.
 export const MACRO_NAME_PATTERN = /^[A-Za-z][A-Za-z0-9_]*$/;
 
 /**

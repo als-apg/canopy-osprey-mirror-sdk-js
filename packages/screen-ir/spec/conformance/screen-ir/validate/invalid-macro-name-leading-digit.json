@@ -1,0 +1,45 @@
+{
+  "description": "A macro name must start with a letter.",
+  "valid": false,
+  "errors": [
+    {
+      "rule": "schema",
+      "instancePath": "/macros/0/name"
+    }
+  ],
+  "screen": {
+    "schemaVersion": "1.0",
+    "kind": "screen",
+    "id": "conformance",
+    "metadata": {
+      "title": "Conformance",
+      "source": {
+        "type": "hand-authored"
+      },
+      "size": {
+        "width": 100,
+        "height": 100
+      }
+    },
+    "macros": [
+      {
+        "name": "1BAD",
+        "default": ""
+      }
+    ],
+    "root": {
+      "id": "w-001",
+      "type": "absolute-canvas",
+      "props": {
+        "width": 100,
+        "height": 100
+      },
+      "geometry": {
+        "x": 0,
+        "y": 0,
+        "width": 100,
+        "height": 100
+      }
+    }
+  }
+}

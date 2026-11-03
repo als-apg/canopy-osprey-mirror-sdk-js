@@ -1,0 +1,39 @@
+{
+  "id": "pv-meter",
+  "version": "1.0.0",
+  "description": "Analog meter indicator for a numeric PV between configured limits.",
+  "supportsPv": true,
+  "supportsRules": true,
+  "supportsChildren": false,
+  "propSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": [
+      "pv"
+    ],
+    "properties": {
+      "pv": {
+        "type": "string",
+        "format": "pv-channel"
+      },
+      "min": {
+        "type": "number",
+        "default": 0
+      },
+      "max": {
+        "type": "number",
+        "default": 100
+      },
+      "label": {
+        "type": "string"
+      },
+      "showValue": {
+        "type": "boolean",
+        "default": true
+      },
+      "units": {
+        "type": "string"
+      }
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "id": "group-box",
+  "version": "1.0.0",
+  "description": "Visual container with a title heading and absolute-positioned children.",
+  "supportsPv": false,
+  "supportsRules": true,
+  "supportsChildren": true,
+  "propSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string"
+      },
+      "flat": {
+        "type": "boolean",
+        "default": false
+      }
+    }
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "id": "regular-button",
+  "version": "1.0.0",
+  "description": "Action button with no PV binding. Use with rules or navigation actions.",
+  "supportsPv": false,
+  "supportsRules": true,
+  "supportsChildren": false,
+  "propSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": [
+      "label"
+    ],
+    "properties": {
+      "label": {
+        "type": "string"
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "primary",
+          "secondary",
+          "tertiary",
+          "danger",
+          "ghost"
+        ],
+        "default": "secondary"
+      },
+      "iconOnly": {
+        "type": "boolean",
+        "default": false
+      },
+      "actions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "type"
+          ],
+          "properties": {
+            "type": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "description": "Converter-carried action list (e.g. shell_command, close_display); the Screen Builder lifts these into widget actions."
+      },
+      "fontSize": {
+        "type": "number",
+        "title": "Font Size (px)"
+      }
+    }
+  }
+}

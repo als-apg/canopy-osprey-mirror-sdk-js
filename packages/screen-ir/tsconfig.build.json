@@ -5,7 +5,9 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "outDir": "dist"
+    "outDir": "dist",
+    // The library itself runs in browsers and Node; Node types are for tests only.
+    "types": []
   },
   "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }

@@ -1,0 +1,83 @@
+{
+  "id": "pv-label",
+  "version": "1.0.0",
+  "description": "Displays a PV value as text with optional units, formatting, and alarm coloring.",
+  "supportsPv": true,
+  "supportsRules": true,
+  "supportsChildren": false,
+  "propSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": [],
+    "properties": {
+      "pv": {
+        "type": "string",
+        "title": "PV Channel",
+        "description": "EPICS PV name (supports ${MACRO} substitution)",
+        "format": "pv-channel"
+      },
+      "text": {
+        "type": "string",
+        "title": "Static Text",
+        "description": "Static fallback text shown when no PV is bound (channel-less PyDMLabel)."
+      },
+      "precision": {
+        "oneOf": [
+          {
+            "type": "number",
+            "minimum": 0
+          },
+          {
+            "type": "string",
+            "enum": [
+              "fromPV"
+            ]
+          }
+        ],
+        "default": "fromPV"
+      },
+      "showUnits": {
+        "type": "boolean",
+        "default": false
+      },
+      "alarmSensitive": {
+        "type": "boolean",
+        "default": false
+      },
+      "alarmBorder": {
+        "type": "boolean",
+        "default": false
+      },
+      "format": {
+        "type": "string",
+        "enum": [
+          "default",
+          "exponential",
+          "hex",
+          "binary",
+          "string"
+        ],
+        "default": "default"
+      },
+      "foregroundColor": {
+        "type": "string"
+      },
+      "backgroundColor": {
+        "type": "string"
+      },
+      "fontSize": {
+        "type": "number",
+        "title": "Font Size (px)"
+      },
+      "align": {
+        "type": "string",
+        "enum": [
+          "left",
+          "center",
+          "right"
+        ],
+        "default": "left"
+      }
+    }
+  }
+}

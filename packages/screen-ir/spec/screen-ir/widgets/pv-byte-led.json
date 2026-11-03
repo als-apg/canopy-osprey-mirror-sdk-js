@@ -1,0 +1,49 @@
+{
+  "id": "pv-byte-led",
+  "version": "1.0.0",
+  "description": "Multi-bit status indicator: a row of LEDs driven by individual bits of an integer PV.",
+  "supportsPv": true,
+  "supportsRules": true,
+  "supportsChildren": false,
+  "propSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": [
+      "pv",
+      "numBits"
+    ],
+    "properties": {
+      "pv": {
+        "type": "string",
+        "format": "pv-channel"
+      },
+      "numBits": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 64,
+        "default": 8
+      },
+      "shift": {
+        "type": "integer",
+        "minimum": 0,
+        "default": 0
+      },
+      "orientation": {
+        "type": "string",
+        "enum": [
+          "horizontal",
+          "vertical"
+        ],
+        "default": "horizontal"
+      },
+      "onColor": {
+        "type": "string",
+        "default": "#3ddc84"
+      },
+      "offColor": {
+        "type": "string",
+        "default": "#444444"
+      }
+    }
+  }
+}
