@@ -3,13 +3,14 @@
   "version": "0.2.0",
   "private": false,
   "description": "Vite dev-server proxy for Canopy apps — forwards the API (REST + WebSocket) and elog, injecting the keys server-side so they never reach the browser bundle",
+  "license": "SEE LICENSE IN LICENSE.md",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/slaclab/canopy-sdk-js.git",
     "directory": "packages/vite"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "access": "public"
   },
   "type": "module",
   "main": "./dist/index.js",

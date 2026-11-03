@@ -1,8 +1,8 @@
 // Consumer-side dev linking for canopy-sdk-js.
 //
-// Lets an app (react-badger, react-trace, react-squirrel, ...) develop against
-// this local SDK checkout instead of the published @slaclab/canopy-* packages,
-// without changing any file in the app repo. Opt in per shell, from the app:
+// Lets an app (react-trace, react-squirrel, ...) develop against this local SDK
+// checkout instead of the published @slaclab/canopy-* packages, without
+// changing any file in the app repo. Opt in per shell, from the app:
 //
 //   PowerShell:
 //     $env:pnpm_config_pnpmfile = '<sdk checkout>\scripts\link-sdk.pnpmfile.cjs'
