@@ -62,7 +62,7 @@ export function Root() {
                 actions={<ConnectionStatus />}
                 themeToggle
                 bugReportUrl="https://example.org/bug-form"
-                helpUrl="https://slaclab.github.io/react-badger/"
+                helpUrl="https://example.org/help"
               />
             }
             sideNav={
@@ -139,7 +139,7 @@ How the store behaves:
     </>
   }
   themeToggle
-  bugReportUrl="https://forms.office.com/r/A6p1TmFNw3"
+  bugReportUrl="https://example.org/bug-form"
   onHelp={openDocsWindow}
 />
 ```
