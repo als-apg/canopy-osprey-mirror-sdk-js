@@ -37,8 +37,12 @@ const specFiles = gitFiles(pkgDir, ['spec'])
 
 describe('spec copy', () => {
   it('is pinned to a canopy-spec release tag and commit', () => {
-    expect(lock.repo).toBe('slaclab/canopy-spec');
-    expect(lock.ref).toMatch(/^v\d+\.\d+\.\d+$/);
+    // ALS-only: until slaclab/canopy-spec tags Screen IR 1.1, the copy comes
+    // from the rebase/ir-1.1 branch of the als-apg mirror.
+    expect(lock).toMatchObject({
+      repo: 'als-apg/canopy-osprey-mirror-canopy-spec',
+      ref: 'rebase/ir-1.1',
+    });
     expect(lock.commit).toMatch(/^[0-9a-f]{40}$/);
   });
 
