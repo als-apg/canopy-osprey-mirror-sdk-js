@@ -61,7 +61,9 @@ beforeAll(async () => {
       proxy: canopyDevProxy({
         target: `http://127.0.0.1:${backendPort}`,
         apiKey: 'dev-key',
+        elogApiKey: 'elog-key',
         basePath: '/api/canopy',
+        modules: ['/elog'],
       }),
     },
   });
@@ -155,6 +157,17 @@ describe('canopyDevProxy in a Vite dev server', () => {
     expect(seen).toHaveLength(1);
     expect(seen[0]).toMatchObject({ kind: 'ws', url: '/optimization/v1/ws/runs' });
     expect(seen[0]!.headers['x-api-key']).toBe('dev-key');
+  });
+
+  it("sends elogApiKey to Canopy's e-log module in both modes, apiKey elsewhere", async () => {
+    expect(await get('/api/canopy/elog/v1/apps/trace/config', self())).toBe(200);
+    expect(await get('/elog/v1/apps/trace/logbooks', self())).toBe(200);
+    expect(await get('/api/canopy/elogger', self())).toBe(200);
+    expect(seen.map(({ url, headers }) => [url, headers['x-api-key']])).toEqual([
+      ['/elog/v1/apps/trace/config', 'elog-key'],
+      ['/elog/v1/apps/trace/logbooks', 'elog-key'],
+      ['/elogger', 'dev-key'],
+    ]);
   });
 
   it('refuses a cross-origin WebSocket upgrade', async () => {

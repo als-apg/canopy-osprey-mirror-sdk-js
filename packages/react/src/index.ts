@@ -9,3 +9,5 @@ export { usePV } from './usePV.js';
 export type { PVHandle } from './usePV.js';
 export { useCanopyJob, useJob } from './useJob.js';
 export type { JobState, UseJobOptions, UseJobResult } from './useJob.js';
+export { useCanopyElogConfig, useElogConfig } from './useElogConfig.js';
+export type { UseElogConfigResult } from './useElogConfig.js';

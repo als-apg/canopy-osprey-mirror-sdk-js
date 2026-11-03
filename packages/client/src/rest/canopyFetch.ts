@@ -93,11 +93,34 @@ export interface CanopyConnection {
   fetch?: FetchLike;
 }
 
+/**
+ * Codes of the shared API-key checks (`canopy.core.security`), which any
+ * module's routes may answer with: 401 `invalid_api_key` (missing or unknown
+ * key), 403 `insufficient_module_access` (the key is not scoped to this
+ * module), 403 `insufficient_{read,write,admin}_access` (the key lacks
+ * that scope), and 503 `key_store_unavailable` (Canopy could not reach its
+ * key store to check the key, so the key may be fine; retry later).
+ */
+export type CanopyAuthErrorCode =
+  | 'invalid_api_key'
+  | 'insufficient_read_access'
+  | 'insufficient_write_access'
+  | 'insufficient_admin_access'
+  | 'insufficient_module_access'
+  | 'key_store_unavailable';
+
+/** One query value; arrays repeat the key (`?id=a&id=b`). */
+export type CanopyQueryValue = string | number | boolean;
+
 export interface CanopyFetchOptions {
   /** HTTP method. Default `GET`. */
   method?: string;
-  /** Query parameters; `undefined`/`null` entries are skipped. */
-  query?: Record<string, string | number | boolean | null | undefined>;
+  /**
+   * Query parameters; `undefined`/`null` entries are skipped. An array
+   * repeats the key once per element (`{ id: ['a', 'b'] }` -> `?id=a&id=b`),
+   * and an empty array sends nothing.
+   */
+  query?: Record<string, CanopyQueryValue | readonly CanopyQueryValue[] | null | undefined>;
   /**
    * Request body. Serialized as JSON with `Content-Type: application/json`,
    * except a `FormData`, which is passed through untouched (and without a
@@ -117,7 +140,9 @@ function buildQuery(query: CanopyFetchOptions['query']): string {
   const parts: string[] = [];
   for (const [key, value] of Object.entries(query)) {
     if (value === undefined || value === null) continue;
-    parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`);
+    for (const item of Array.isArray(value) ? value : [value]) {
+      parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(item))}`);
+    }
   }
   return parts.length > 0 ? `?${parts.join('&')}` : '';
 }

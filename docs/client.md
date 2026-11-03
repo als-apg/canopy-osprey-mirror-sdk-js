@@ -12,6 +12,7 @@ deployment from a browser, Node, or a test, with no React, DOM lib, or
 | Formulas (Formula Engine) | `FormulaEngineService`, `FormulaSpec`                                                |
 | History (Mole)            | `fetchData`, `fetchMetadata`, `searchPVs`, `listArchivers`                           |
 | Background jobs           | `getJob`, `awaitJob`, `JobFailedError`, `isJobNotFoundError`                         |
+| E-log                     | `getElogConfig`, `listElogLogbooks`, `uploadElogAttachment`, `createElogEntry`, ...  |
 | Time                      | `nowNs`, `msToNs`, `nsToMs`, `dateToNs`, `nsToDate`                                  |
 | Test doubles              | `@slaclab/canopy-client/testing`: `createFakeFetch`, `jsonResponse`, `FakeWebSocket` |
 
@@ -33,8 +34,9 @@ const proxied: CanopyConnection = { baseUrl: '/api/canopy' };
 ```
 
 `canopyFetch<T>(conn, path, { method?, query?, body?, signal? })` sends
-JSON bodies, passes `FormData` bodies through untouched (multipart), and
-resolves an empty 2xx body to `undefined`.
+JSON bodies, passes `FormData` bodies through untouched (multipart),
+repeats the query key for an array value, and resolves an empty 2xx body
+to `undefined`.
 
 ## Errors
 
@@ -49,6 +51,11 @@ envelope, FastAPI's bodies are normalized:
   `http_error`.
 - A non-JSON body gives `unknown_error`; no response gives `network_error`.
 - Aborts are rethrown unchanged (`AbortError`).
+
+The API-key checks every module shares are typed as `CanopyAuthErrorCode`
+(401 `invalid_api_key`, 403 `insufficient_module_access`, 403
+`insufficient_{read,write,admin}_access`, and 503 `key_store_unavailable`
+when Canopy cannot reach its key store to check the key).
 
 ## Streams
 
@@ -100,6 +107,34 @@ queue, reports `pending`. `awaitJob` rejects on that 404 by default;
 `notFoundGraceMs` keeps polling through it (useful against older backends,
 which answered 404 while a job was queued on a non-default queue). React
 apps get the same model from [`useCanopyJob`](react.md).
+
+## E-log
+
+Canopy's e-log module posts to the e-log backend with one token per client
+app, held server-side. Each per-app call names the app (`'trace'`,
+`'squirrel'`, ...); the API key needs the `elog` scope (`write` to post).
+
+```ts
+import { createElogEntry, getElogConfig, uploadElogAttachment } from '@slaclab/canopy-client';
+
+const config = await getElogConfig(conn, 'trace'); // { enabled, defaultLogbookIds, reason, ... }
+if (config.enabled) {
+  const { id } = await uploadElogAttachment(conn, 'trace', pngBlob, { filename: 'plot.png' });
+  await createElogEntry(conn, 'trace', {
+    logbookIds: config.defaultLogbookIds,
+    title: 'Orbit drift',
+    bodyMarkdown: 'BPM readings drifted.',
+    attachmentIds: [id],
+  });
+}
+```
+
+Also `listElogLogbooks`, `listElogTags`, `searchElogUsers`,
+`listElogRecentEntries`, `getElogHealthSummary` and `getElogWatchdog`.
+Failures are `CanopyError`s; `isElogError(err, code?)` matches the module's
+codes (`elog_not_configured`, `elog_upstream_error`,
+`elog_attachment_too_large`, ...). Empty-string ids are a 422
+`validation_error`. React apps can use [`useElogConfig`](react.md).
 
 ## Testing
 

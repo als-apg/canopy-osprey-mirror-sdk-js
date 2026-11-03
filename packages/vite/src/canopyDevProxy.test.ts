@@ -103,13 +103,17 @@ describe('canopyDevProxy', () => {
     // Keep the developer's real environment out of the defaults under test.
     vi.stubEnv('CANOPY_BASE_URL', '');
     vi.stubEnv('CANOPY_API_KEY', '');
+    vi.stubEnv('CANOPY_ELOG_API_KEY', '');
     vi.stubEnv('ELOG_BASE_URL', '');
     vi.stubEnv('ELOG_API_KEY', '');
     vi.stubEnv('ELOG_TOKEN_HEADER', '');
+    // The deprecated elog option warns; keep test output clean.
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.restoreAllMocks();
   });
 
   describe('basePath mode', () => {
@@ -363,7 +367,130 @@ describe('canopyDevProxy', () => {
     });
   });
 
-  describe('elog', () => {
+  describe("Canopy's e-log module", () => {
+    it('is under basePath like any module: forwarded to /elog/... with X-API-Key', () => {
+      const proxy = canopyDevProxy({ target: 'http://canopy:8000', apiKey: 'dev' });
+
+      expect(Object.keys(proxy)).toHaveLength(1);
+      const entry = route(proxy, '/api/canopy/elog/v1/apps/trace/entries');
+      expect(entry.target).toBe('http://canopy:8000');
+      expect(entry.rewrite!('/api/canopy/elog/v1/apps/trace/entries')).toBe(
+        '/elog/v1/apps/trace/entries'
+      );
+      expect(outgoingHeaders(entry).http).toEqual({ 'X-API-Key': 'dev' });
+    });
+
+    it("is forwarded unchanged with X-API-Key when '/elog' is in modules", () => {
+      const proxy = canopyDevProxy({
+        target: 'http://t',
+        apiKey: 'dev',
+        modules: ['/hare', '/elog'],
+      });
+
+      const entry = route(proxy, '/elog/v1/apps/trace/config');
+      expect(entry).toMatchObject({ target: 'http://t', changeOrigin: true, ws: true });
+      expect(entry.rewrite).toBeUndefined();
+      expect(outgoingHeaders(entry).http).toEqual({ 'X-API-Key': 'dev' });
+    });
+
+    it('sends elogApiKey to the /elog module entry, apiKey to the others', () => {
+      const proxy = canopyDevProxy({
+        apiKey: 'read-only',
+        elogApiKey: 'elog-write',
+        modules: ['/hare', '/elog/'],
+      });
+
+      expect(outgoingHeaders(route(proxy, '/elog/v1/apps/trace/entries'))).toEqual({
+        http: { 'X-API-Key': 'elog-write' },
+        ws: { 'X-API-Key': 'elog-write' },
+      });
+      expect(outgoingHeaders(route(proxy, '/hare/v1/ws/pvs')).ws).toEqual({
+        'X-API-Key': 'read-only',
+      });
+    });
+
+    it('adds a ${basePath}/elog entry ahead of basePath when elogApiKey differs', async () => {
+      const proxy = canopyDevProxy({
+        target: 'http://t',
+        apiKey: 'read-only',
+        elogApiKey: 'elog-write',
+      });
+
+      // Vite uses the first matching key, so the e-log entry must come first.
+      expect(Object.keys(proxy)).toEqual([
+        '^/api/canopy/elog(?=[/?#]|$)',
+        '^/api/canopy(?=[/?#]|$)',
+      ]);
+      const elog = route(proxy, '/api/canopy/elog/v1/apps/trace/attachments');
+      expect(elog).toMatchObject({ target: 'http://t', changeOrigin: true, ws: true });
+      expect(elog.rewrite!('/api/canopy/elog/v1/apps/trace/attachments')).toBe(
+        '/elog/v1/apps/trace/attachments'
+      );
+      expect(outgoingHeaders(elog).http).toEqual({ 'X-API-Key': 'elog-write' });
+
+      for (const url of ['/api/canopy/elogger', '/api/canopy/hare/v1/pvs/X']) {
+        expect(outgoingHeaders(route(proxy, url)).http, url).toEqual({ 'X-API-Key': 'read-only' });
+      }
+
+      const cross = { host: DEV_HOST, origin: 'https://evil.example' };
+      expect((await bypass(elog, cross)).result).toBe(false);
+      expect(outgoingHeaders(elog, cross)).toEqual({ http: {}, ws: {} });
+    });
+
+    it('reads CANOPY_ELOG_API_KEY; unset, empty or equal to apiKey means apiKey', () => {
+      const elogKey = (options: Parameters<typeof canopyDevProxy>[0]) =>
+        outgoingHeaders(route(canopyDevProxy(options), '/api/canopy/elog/x')).http;
+
+      expect(Object.keys(canopyDevProxy({ apiKey: 'dev', elogApiKey: 'dev' }))).toHaveLength(1);
+      expect(elogKey({ apiKey: 'dev', elogApiKey: '' })).toEqual({ 'X-API-Key': 'dev' });
+      // With no apiKey at all, only the e-log module gets a key.
+      expect(elogKey({ apiKey: '', elogApiKey: 'elog-write' })).toEqual({
+        'X-API-Key': 'elog-write',
+      });
+      expect(
+        outgoingHeaders(route(canopyDevProxy({ apiKey: '', elogApiKey: 'e' }), '/api/canopy/x'))
+          .http
+      ).toEqual({});
+
+      vi.stubEnv('CANOPY_ELOG_API_KEY', 'env-elog');
+      expect(elogKey({ apiKey: 'dev' })).toEqual({ 'X-API-Key': 'env-elog' });
+      // An explicit option wins over the env var, even an empty one.
+      expect(elogKey({ apiKey: 'dev', elogApiKey: 'opt' })).toEqual({ 'X-API-Key': 'opt' });
+      expect(elogKey({ apiKey: 'dev', elogApiKey: '' })).toEqual({ 'X-API-Key': 'dev' });
+    });
+  });
+
+  describe('elog (deprecated elog-plus proxy)', () => {
+    it('warns that it is deprecated, only when the route is built', () => {
+      const warn = vi.mocked(console.warn);
+      canopyDevProxy({ elog: {} });
+      expect(warn).not.toHaveBeenCalled();
+
+      canopyDevProxy({ elog: { target: 'http://elog' } });
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0]![0]).toMatch(/deprecated.*removed in 0\.4/);
+    });
+
+    it('refuses a path that overlaps a Canopy route instead of replacing it', () => {
+      expect(() => canopyDevProxy({ modules: ['/elog'], elog: { target: 'http://elog' } })).toThrow(
+        /elog\.path '\/elog' overlaps the Canopy route '\/elog'/
+      );
+      expect(() =>
+        canopyDevProxy({ basePath: '/api/canopy', elog: { target: 'http://elog', path: '/api' } })
+      ).toThrow(/overlaps the Canopy route '\/api\/canopy'/);
+      expect(() =>
+        canopyDevProxy({ modules: ['/elog'], elog: { target: 'http://elog', path: '/elog/v2' } })
+      ).toThrow(/overlaps/);
+
+      // Elsewhere, both coexist.
+      const proxy = canopyDevProxy({
+        modules: ['/elog'],
+        elog: { target: 'http://elog', path: '/elog-plus' },
+      });
+      expect(route(proxy, '/elog/v1/apps/trace/config').target).toBe('http://localhost:8000');
+      expect(route(proxy, '/elog-plus/v2/entries').target).toBe('http://elog');
+    });
+
     it('forwards /elog to elog-plus with the prefix stripped and the access token injected', () => {
       const proxy = canopyDevProxy({
         elog: { target: 'https://elog.example.org', accessToken: 'tok' },

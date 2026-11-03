@@ -41,6 +41,17 @@ export type HostFormData = typeof globalThis extends {
   : never;
 
 /**
+ * `Blob` (a `File` included) when the consumer's type universe declares one,
+ * `never` otherwise; resolved in the consumer's program like
+ * {@link HostFormData}.
+ */
+export type HostBlob = typeof globalThis extends {
+  Blob: abstract new (...args: never) => infer B;
+}
+  ? B
+  : never;
+
+/**
  * Minimal `fetch` shape used by every REST call. The global `fetch` (browser
  * or Node) satisfies it, as do simple test fakes.
  *

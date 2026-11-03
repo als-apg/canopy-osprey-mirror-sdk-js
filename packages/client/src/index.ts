@@ -1,12 +1,13 @@
 // @slaclab/canopy-client — framework-free TypeScript client for Canopy's
 // protocols: Hare live PVs (WebSocket), Formula Engine formulas (WebSocket),
-// Mole history (REST), background jobs (REST), the shared REST core, the
-// reconnecting WebSocket they stream over, and typed wire DTOs.
+// Mole history (REST), background jobs (REST), e-log posting (REST), the shared
+// REST core, the reconnecting WebSocket they stream over, and typed wire DTOs.
 
 export * from './alarm.js';
 
 export type {
   FetchLike,
+  HostBlob,
   HostFormData,
   WebSocketCloseEventLike,
   WebSocketFactory,
@@ -25,8 +26,10 @@ export { ResilientSocket, toWsUrl } from './ws/ResilientSocket.js';
 
 export type {
   AbortSignalLike,
+  CanopyAuthErrorCode,
   CanopyConnection,
   CanopyFetchOptions,
+  CanopyQueryValue,
   ErrorEnvelope,
   ValidationIssue,
 } from './rest/canopyFetch.js';
@@ -35,6 +38,8 @@ export { CanopyError, canopyFetch } from './rest/canopyFetch.js';
 export * from './time.js';
 
 export * from './wire.js';
+
+export * from './health.js';
 
 export * from './formula-engine/types.js';
 export type {
@@ -50,6 +55,9 @@ export * from './mole/mole.js';
 
 export * from './jobs/types.js';
 export * from './jobs/jobs.js';
+
+export * from './elog/types.js';
+export * from './elog/elog.js';
 
 export type { PVData, PVListener, PVService } from './pv/PVService.js';
 export { DISCONNECTED_PV } from './pv/PVService.js';

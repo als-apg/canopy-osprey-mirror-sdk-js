@@ -1,7 +1,7 @@
 // Vite dev-server proxy entries for Canopy apps: forward the Canopy API (REST
 // and WebSocket upgrades) to the backend and inject `X-API-Key` server-side,
-// so the key never ships in the browser bundle; optionally forward `/elog` to
-// elog-plus with its access token. In production a reverse proxy (nginx) owns
+// so the key never ships in the browser bundle; Canopy's e-log module
+// (`/elog`) may get its own key. In production a reverse proxy (nginx) owns
 // the same paths and header injection.
 //
 // Because the proxy adds credentials, it must serve only the app's own page
@@ -21,12 +21,28 @@ export const DEFAULT_CANOPY_TARGET = 'http://localhost:8000';
 /** Prefix used when neither `basePath` nor `modules` is given. */
 export const DEFAULT_CANOPY_BASE_PATH = '/api/canopy';
 
-/** Default path of the elog proxy. */
+/** Canopy's e-log module prefix (`canopy.elog`), which `elogApiKey` applies to. */
+const ELOG_MODULE = '/elog';
+
+/**
+ * Default path of the deprecated elog-plus proxy.
+ *
+ * @deprecated since 0.3.0, with {@link CanopyDevProxyOptions.elog}.
+ */
 export const DEFAULT_ELOG_PATH = '/elog';
 
-/** Default header the elog access token is sent in (elog-plus behind Vouch Proxy). */
+/**
+ * Default header the elog access token is sent in (elog-plus behind Vouch Proxy).
+ *
+ * @deprecated since 0.3.0, with {@link CanopyDevProxyOptions.elog}.
+ */
 export const DEFAULT_ELOG_TOKEN_HEADER = 'x-vouch-idp-accesstoken';
 
+/**
+ * The deprecated direct elog-plus proxy.
+ *
+ * @deprecated since 0.3.0, with {@link CanopyDevProxyOptions.elog}.
+ */
 export interface CanopyElogProxyOptions {
   /** Path prefix proxied to elog, stripped before forwarding. Default `'/elog'`. */
   path?: string;
@@ -54,6 +70,15 @@ export interface CanopyDevProxyOptions {
    */
   apiKey?: string;
   /**
+   * `X-API-Key` for Canopy's e-log module (`/elog`) instead of `apiKey`,
+   * e.g. a dedicated `read+write@elog` key so that `apiKey` can stay
+   * read-only (Canopy's read/write scopes are per key, not per module).
+   * Applies to the `'/elog'` entry of `modules` and, in `basePath` mode, to
+   * `${basePath}/elog`. Default `process.env.CANOPY_ELOG_API_KEY`; unset or
+   * empty means "use `apiKey`" (unlike `apiKey`, where empty sends no key).
+   */
+  elogApiKey?: string;
+  /**
    * Single-prefix mode: requests to `${basePath}/*` are forwarded to
    * `${target}/*` with the prefix stripped (WebSockets included). The app
    * then uses `{ baseUrl: basePath }` as its `CanopyConnection`, the same
@@ -67,7 +92,16 @@ export interface CanopyDevProxyOptions {
    * May be combined with `basePath`.
    */
   modules?: string[];
-  /** Also proxy elog-plus (see {@link CanopyElogProxyOptions}). Off unless given. */
+  /**
+   * Also proxy elog-plus directly, with its access token (see
+   * {@link CanopyElogProxyOptions}). Off unless given.
+   *
+   * @deprecated since 0.3.0; removed in 0.4. Canopy's e-log module holds the
+   * e-log token server-side: list `'/elog'` in `modules` (it is already
+   * under `basePath`) and post through `@slaclab/canopy-client`'s e-log
+   * functions; `elogApiKey` gives it its own key. Its path may not overlap a
+   * Canopy prefix (with `modules: ['/elog']`, set `elog.path` elsewhere).
+   */
   elog?: CanopyElogProxyOptions;
   /**
    * Browser origins, besides the dev server's own, allowed to use the proxy,
@@ -101,6 +135,11 @@ function normalizePrefix(prefix: string, what: string): string {
  */
 function prefixKey(prefix: string): string {
   return `^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=[/?#]|$)`;
+}
+
+/** True when one prefix equals the other or lies under it (`/elog` and `/elog/v1`). */
+function prefixesOverlap(a: string, b: string): boolean {
+  return a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
 }
 
 /** Strip `prefix` from the start of `path` at a segment boundary (`/api/canopy/x?y` -> `/x?y`). */
@@ -272,14 +311,34 @@ export function canopyDevProxy(options: CanopyDevProxyOptions = {}): Record<stri
   }
   const bypass = refuseCrossOrigin(allowedOrigins);
   const canopyConfigure = prepareRequests('X-API-Key', apiKey, true, allowedOrigins);
+  const elogApiKey =
+    nonEmpty(options.elogApiKey ?? process.env.CANOPY_ELOG_API_KEY) ?? nonEmpty(apiKey);
+  const separateElogKey = elogApiKey !== nonEmpty(apiKey);
+  const elogConfigure = separateElogKey
+    ? prepareRequests('X-API-Key', elogApiKey, true, allowedOrigins)
+    : canopyConfigure;
 
   const proxy: Record<string, ProxyOptions> = {};
+  const canopyPrefixes: string[] = [];
   const basePath =
     options.basePath !== undefined || options.modules === undefined
       ? normalizePrefix(options.basePath ?? DEFAULT_CANOPY_BASE_PATH, 'basePath')
       : undefined;
 
   if (basePath !== undefined) {
+    canopyPrefixes.push(basePath);
+    if (separateElogKey) {
+      // Inserted before the basePath entry: Vite uses the first matching key.
+      const elogPrefix = `${basePath}${ELOG_MODULE}`;
+      proxy[prefixKey(elogPrefix)] = {
+        target,
+        changeOrigin: true,
+        ws: true,
+        rewrite: (path) => stripPrefix(path, basePath),
+        bypass,
+        configure: elogConfigure,
+      };
+    }
     proxy[prefixKey(basePath)] = {
       target,
       changeOrigin: true,
@@ -291,19 +350,33 @@ export function canopyDevProxy(options: CanopyDevProxyOptions = {}): Record<stri
   }
 
   for (const modulePrefix of options.modules ?? []) {
-    proxy[prefixKey(normalizePrefix(modulePrefix, 'each module'))] = {
+    const prefix = normalizePrefix(modulePrefix, 'each module');
+    canopyPrefixes.push(prefix);
+    proxy[prefixKey(prefix)] = {
       target,
       changeOrigin: true,
       ws: true,
       bypass,
-      configure: canopyConfigure,
+      configure: prefix === ELOG_MODULE ? elogConfigure : canopyConfigure,
     };
   }
 
+  // Deprecated: the direct elog-plus proxy.
   if (options.elog) {
     const elogTarget = nonEmpty(options.elog.target) ?? nonEmpty(process.env.ELOG_BASE_URL);
     if (elogTarget !== undefined) {
       const elogPath = normalizePrefix(options.elog.path ?? DEFAULT_ELOG_PATH, 'elog.path');
+      const overlapping = canopyPrefixes.find((prefix) => prefixesOverlap(prefix, elogPath));
+      if (overlapping !== undefined) {
+        throw new Error(
+          `canopyDevProxy: elog.path '${elogPath}' overlaps the Canopy route '${overlapping}'. ` +
+            `Canopy's e-log module is served at '${ELOG_MODULE}'; drop the deprecated elog option ` +
+            `(or give it another path).`
+        );
+      }
+      console.warn(
+        "canopyDevProxy: the elog option (a direct elog-plus proxy) is deprecated and will be removed in 0.4. Post through Canopy's e-log module ('/elog') instead, which holds the e-log token server-side."
+      );
       const accessToken = options.elog.accessToken ?? process.env.ELOG_API_KEY;
       const tokenHeader =
         nonEmpty(options.elog.accessTokenHeader) ??
