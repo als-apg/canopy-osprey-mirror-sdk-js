@@ -280,7 +280,7 @@ backend. `isJobNotFoundError(err)` identifies the 404.
 ## E-log
 
 Canopy's e-log module (`/elog/v1/...`) posts to the e-log backend
-(elog-plus at SLAC) with one application token per client app, held
+(elog-plus) with one application token per client app, held
 server-side, so the browser never holds one. Every per-app call names the
 app (`{app}`, `^[a-z0-9_-]{1,64}$`, e.g. `'trace'`), which picks the token.
 The API key needs the `elog` module scope, `read` for lookups and `write`
