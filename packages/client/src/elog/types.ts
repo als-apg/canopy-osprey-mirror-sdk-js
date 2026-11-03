@@ -15,7 +15,8 @@
  * - `elog_upstream_error` (502): the e-log backend rejected the call (an
  *   unknown `additionalAuthors` email, a token without write access to a
  *   logbook, an unknown follow-up parent), was unreachable, or answered
- *   garbage; `detail` carries the backend's message.
+ *   garbage. `detail` includes the backend's own error message when it
+ *   sent one; otherwise it names only the status or the transport error.
  * - `elog_upstream_timeout` (504): the e-log backend did not answer in time.
  * - `elog_not_supported` (501): the provider has no equivalent of the call.
  * - `elog_attachment_too_large` (413): the upload is over the instance's
@@ -100,7 +101,12 @@ export interface ElogEntryCreateDTO {
   logbookIds: string[];
   /** 1 to 255 characters. */
   title: string;
-  /** Rendered to HTML for the e-log. */
+  /**
+   * Up to 1,000,000 characters. Rendered to HTML for the e-log, then cleaned
+   * to paragraphs, headings, emphasis, code, lists, quotes, tables and
+   * `http`/`https`/`mailto` links. Images and raw HTML are dropped: attach
+   * images with `uploadElogAttachment`.
+   */
   bodyMarkdown: string;
   tagIds?: string[];
   /** Ids from `uploadElogAttachment`. */

@@ -311,7 +311,7 @@ try {
     eventAt: new Date().toISOString(), // with an offset; Canopy converts to UTC
   });
 } catch (err) {
-  if (isElogError(err, 'elog_upstream_error')) console.error(err.detail); // the backend's message
+  if (isElogError(err, 'elog_upstream_error')) console.error(err.detail); // the backend's reason, if any
 }
 ```
 
@@ -335,7 +335,13 @@ Notes:
   `additionalAuthors` emails and `followsUpEntryId` must be non-empty:
   `""` is a 422 `validation_error` (leave `followsUpEntryId` out, or send
   `null`, for a fresh entry). So are an empty `logbookIds`, a `title` over
-  255 characters and out-of-range `limit`s.
+  255 characters, a `bodyMarkdown` over 1,000,000 characters and
+  out-of-range `limit`s.
+- `bodyMarkdown` is rendered to HTML and cleaned to paragraphs, headings,
+  emphasis, code, lists, quotes, tables and `http`/`https`/`mailto` links.
+  Images and raw HTML are dropped, so attach images with
+  `uploadElogAttachment`.
+- `listElogLogbooks` lists only the logbooks the app's token can post to.
 - `recent-entries` `loggedAt` is ISO-8601 with a UTC offset, or `null`.
 - `uploadElogAttachment` needs a global `FormData` (browsers, Node 18+).
   Over the instance's limit (20 MiB by default) Canopy answers 413
@@ -345,7 +351,8 @@ Notes:
   `ElogErrorCode`, or any of them without `code`: `invalid_app_name` (400),
   `elog_app_not_found` (404), `elog_not_configured` (503),
   `elog_upstream_error` (502: the backend rejected the call, e.g. an
-  unknown author email; `detail` carries its message),
+  unknown author email, or was unreachable; `detail` includes the
+  backend's own message when it sent one),
   `elog_upstream_timeout` (504), `elog_not_supported` (501),
   `elog_attachment_too_large` (413). Auth failures are
   `CanopyAuthErrorCode`s, not e-log codes.

@@ -59,7 +59,7 @@ export async function getElogConfig(
   return canopyFetch<ElogConfigDTO>(conn, appPath(app, '/config'), { signal });
 }
 
-/** Logbooks the app's token can see. */
+/** Logbooks the app's token can post to. */
 export async function listElogLogbooks(
   conn: CanopyConnection,
   app: string,
