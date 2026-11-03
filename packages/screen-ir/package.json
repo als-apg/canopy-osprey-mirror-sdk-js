@@ -1,6 +1,6 @@
 {
   "name": "@slaclab/canopy-screen-ir",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": false,
   "description": "The Canopy Screen IR contract for TypeScript — the *.screen.json JSON Schema and widget definitions (copied from slaclab/canopy-spec), TypeScript model types, and a validate() helper. Used by the screen builder, the runtime viewer, and the content repo's CI.",
   "license": "SEE LICENSE IN LICENSE.md",
