@@ -41,8 +41,10 @@ rule and location.
 - `MACRO_NAME_PATTERN`, the schema's macro name pattern
 - `IR_WIDGET_TYPES` (every IR widget `type` the spec defines),
   `WIDGET_DEFINITIONS` (each type's `propSchema` and `supports*` flags),
-  `IRWidgetType`, `WidgetDefinition`. Prop schemas are descriptive only for
-  now: don't validate props against them.
+  `IRWidgetType`, `WidgetDefinition`. A definition's `id` is its
+  `IRWidgetType`. Both exports are deep-frozen, since every importer shares
+  them: copy a definition before changing it. Prop schemas are descriptive
+  only for now: don't validate props against them.
 - `@slaclab/canopy-screen-ir/schema.json`: the JSON Schema file itself.
 
 ## Updating the spec

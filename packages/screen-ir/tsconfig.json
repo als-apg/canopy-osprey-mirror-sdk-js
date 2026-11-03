@@ -7,5 +7,7 @@
     // For the tests (node:fs etc.). tsconfig.build.json clears it for the library.
     "types": ["node"]
   },
-  "include": ["src", "spec/screen-ir/**/*.json"]
+  // The spec's JSON comes in through imports; listing it here would also emit
+  // files nothing imports (widget-definition.schema.json) into dist.
+  "include": ["src"]
 }
