@@ -465,7 +465,7 @@ describe('canopyDevProxy', () => {
 
       canopyDevProxy({ elog: { target: 'http://elog' } });
       expect(warn).toHaveBeenCalledTimes(1);
-      expect(warn.mock.calls[0]![0]).toMatch(/deprecated.*removed in 0\.3/);
+      expect(warn.mock.calls[0]![0]).toMatch(/deprecated.*removed in 0\.4/);
     });
 
     it('refuses a path that overlaps a Canopy route instead of replacing it', () => {

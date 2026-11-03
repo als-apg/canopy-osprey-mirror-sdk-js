@@ -67,7 +67,7 @@ const runsWs = toWsUrl(connection.baseUrl, '/optimization/v1/ws/runs'); // ws(s)
 | `basePath`       | `'/api/canopy'` (when `modules` is not given)   | Single-prefix mode: `${basePath}/*` is forwarded to `${target}/*` with the prefix stripped, with `ws: true`.                         |
 | `modules`        | —                                               | Per-module mode (the react-trace/react-squirrel layout): each prefix (`'/hare'`, `'/mole'`, ...) is forwarded unchanged, `ws: true`. |
 | `elogApiKey`     | `CANOPY_ELOG_API_KEY`, else `apiKey`            | `X-API-Key` for Canopy's e-log module only (see [E-log](#e-log)). Empty or unset: `apiKey` is used.                                  |
-| `elog`           | off                                             | **Deprecated** (removed in 0.3): a direct elog-plus proxy. See [Migrating from 0.2](#migrating-from-02).                             |
+| `elog`           | off                                             | **Deprecated** (removed in 0.4): a direct elog-plus proxy. See [Migrating from 0.2](#migrating-from-02).                             |
 | `allowedOrigins` | —                                               | Browser origins besides the dev server's own that may use the proxy, e.g. `['http://localhost:6006']` (see [Security](#security)).   |
 
 Every Canopy route uses `changeOrigin: true`. `basePath` and `modules` can
@@ -155,7 +155,7 @@ has no CORS), and have the key added for it.
 
 ## Migrating from 0.2
 
-**The `elog` option is deprecated** and will be removed in 0.3. It proxied
+**The `elog` option is deprecated** and will be removed in 0.4. It proxied
 `/elog` straight to elog-plus with an access token from the developer's
 `.env` (`ELOG_BASE_URL`, `ELOG_API_KEY`, `ELOG_TOKEN_HEADER`); Canopy's e-log
 module now holds the token server-side. It still works, logs a deprecation

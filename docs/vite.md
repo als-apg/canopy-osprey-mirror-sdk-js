@@ -64,7 +64,7 @@ const wsUrl = toWsUrl(connection.baseUrl, '/optimization/v1/ws/runs'); // from @
   such as a `read+write@elog` key, so that `apiKey` can stay read-only
   (Canopy's `read`/`write` scopes are per key). Unset or empty, e-log gets
   `apiKey`.
-- **elog** (deprecated, removed in 0.3): the direct elog-plus proxy
+- **elog** (deprecated, removed in 0.4): the direct elog-plus proxy
   (`elog: { target, accessToken, path, accessTokenHeader }`). Canopy's e-log
   module holds the e-log token server-side, so drop it; its path may no
   longer overlap a Canopy route.

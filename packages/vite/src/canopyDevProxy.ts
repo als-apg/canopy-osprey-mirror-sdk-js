@@ -27,21 +27,21 @@ const ELOG_MODULE = '/elog';
 /**
  * Default path of the deprecated elog-plus proxy.
  *
- * @deprecated since 0.2.1, with {@link CanopyDevProxyOptions.elog}.
+ * @deprecated since 0.3.0, with {@link CanopyDevProxyOptions.elog}.
  */
 export const DEFAULT_ELOG_PATH = '/elog';
 
 /**
  * Default header the elog access token is sent in (elog-plus behind Vouch Proxy).
  *
- * @deprecated since 0.2.1, with {@link CanopyDevProxyOptions.elog}.
+ * @deprecated since 0.3.0, with {@link CanopyDevProxyOptions.elog}.
  */
 export const DEFAULT_ELOG_TOKEN_HEADER = 'x-vouch-idp-accesstoken';
 
 /**
  * The deprecated direct elog-plus proxy.
  *
- * @deprecated since 0.2.1, with {@link CanopyDevProxyOptions.elog}.
+ * @deprecated since 0.3.0, with {@link CanopyDevProxyOptions.elog}.
  */
 export interface CanopyElogProxyOptions {
   /** Path prefix proxied to elog, stripped before forwarding. Default `'/elog'`. */
@@ -96,7 +96,7 @@ export interface CanopyDevProxyOptions {
    * Also proxy elog-plus directly, with its access token (see
    * {@link CanopyElogProxyOptions}). Off unless given.
    *
-   * @deprecated since 0.2.1; removed in 0.3. Canopy's e-log module holds the
+   * @deprecated since 0.3.0; removed in 0.4. Canopy's e-log module holds the
    * e-log token server-side: list `'/elog'` in `modules` (it is already
    * under `basePath`) and post through `@slaclab/canopy-client`'s e-log
    * functions; `elogApiKey` gives it its own key. Its path may not overlap a
@@ -375,7 +375,7 @@ export function canopyDevProxy(options: CanopyDevProxyOptions = {}): Record<stri
         );
       }
       console.warn(
-        "canopyDevProxy: the elog option (a direct elog-plus proxy) is deprecated and will be removed in 0.3. Post through Canopy's e-log module ('/elog') instead, which holds the e-log token server-side."
+        "canopyDevProxy: the elog option (a direct elog-plus proxy) is deprecated and will be removed in 0.4. Post through Canopy's e-log module ('/elog') instead, which holds the e-log token server-side."
       );
       const accessToken = options.elog.accessToken ?? process.env.ELOG_API_KEY;
       const tokenHeader =
