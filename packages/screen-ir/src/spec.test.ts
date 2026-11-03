@@ -7,11 +7,12 @@
 // brittle.
 
 import { createHash } from 'node:crypto';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, relative, sep } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import { gitFiles } from '../scripts/spec-lib.mjs';
 import { MACRO_NAME_PATTERN } from './macros.js';
 import { SCHEMA_VERSION } from './screen.js';
 import { IR_WIDGET_TYPES, WIDGET_DEFINITIONS } from './widgets.js';
@@ -28,16 +29,11 @@ interface SpecLock {
 }
 const lock = JSON.parse(readFileSync(join(pkgDir, 'spec.lock.json'), 'utf8')) as SpecLock;
 
-function listFiles(dir: string): string[] {
-  return readdirSync(dir)
-    .sort()
-    .flatMap((name) => {
-      const path = join(dir, name);
-      return statSync(path).isDirectory() ? listFiles(path) : [path];
-    });
-}
-
-const specFiles = listFiles(specDir).map((file) => relative(specDir, file).split(sep).join('/'));
+// What git would commit under spec/ (so an ignored .DS_Store doesn't count), as
+// whole-path-sorted paths relative to spec/.
+const specFiles = gitFiles(pkgDir, ['spec'])
+  .map((path) => path.slice('spec/'.length))
+  .sort();
 
 describe('spec copy', () => {
   it('is pinned to a canopy-spec release tag and commit', () => {

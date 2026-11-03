@@ -53,12 +53,14 @@ Change canopy-spec first and tag a release there, then copy the new version in:
 pnpm --filter @slaclab/canopy-screen-ir run spec:sync v0.2.0
 ```
 
-The argument is a canopy-spec release tag. The script fetches it with `git`,
-replaces `spec/`, rewrites `spec.lock.json`, and regenerates
-`src/widgets.generated.ts`. Commit all three.
+The argument must be a canopy-spec release tag of the form `vX.Y.Z`; a branch
+or commit is refused. The script fetches the tag with `git`, replaces `spec/`,
+rewrites `spec.lock.json`, and regenerates `src/widgets.generated.ts`. Commit
+all three. If any step fails, it changes nothing.
 
 Don't edit anything under `spec/` by hand. CI runs `spec:check`, which fails
 unless `spec/` is byte-identical to the tag in `spec.lock.json`, and
-`src/spec.test.ts` fails if a file doesn't match its hash in the lock.
+`src/spec.test.ts` fails if a file doesn't match its hash in the lock. Files
+git ignores, such as `.DS_Store`, don't count.
 `spec/LICENSE.md` is canopy-spec's license, kept next to the copies as it
 requires.

@@ -38,3 +38,6 @@ lerna-debug.log*
 
 # MkDocs
 site/
+
+# Left behind if a canopy-spec sync is killed partway (scripts/spec-lib.mjs)
+packages/screen-ir/.spec-staging-*
