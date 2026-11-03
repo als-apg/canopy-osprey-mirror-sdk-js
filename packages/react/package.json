@@ -1,6 +1,6 @@
 {
   "name": "@slaclab/canopy-react",
-  "version": "0.3.0",
+  "version": "0.3.1-als.1",
   "private": false,
   "description": "React bindings for @slaclab/canopy-client — usePV, the PV service context, useJob, and useElogConfig",
   "license": "SEE LICENSE IN LICENSE.md",
