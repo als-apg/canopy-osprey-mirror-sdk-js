@@ -58,8 +58,9 @@ A `validation_error` also carries the structured entries on `issues`
 (`{ loc, msg, type, input?, ctx? }[]`), so forms can map them onto fields.
 Every module's routes can also fail the shared API-key checks, typed as
 `CanopyAuthErrorCode`: 401 `invalid_api_key`, 403
-`insufficient_module_access` (the key is not scoped to the module) and 403
-`insufficient_{read,write,admin}_access`.
+`insufficient_module_access` (the key is not scoped to the module), 403
+`insufficient_{read,write,admin}_access` and 503 `key_store_unavailable`
+(Canopy could not reach its key store to check the key; retry later).
 Aborts are not wrapped: the `AbortError` passes through unchanged, so
 callers can tell cancellation from failure.
 

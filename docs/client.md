@@ -54,7 +54,8 @@ envelope, FastAPI's bodies are normalized:
 
 The API-key checks every module shares are typed as `CanopyAuthErrorCode`
 (401 `invalid_api_key`, 403 `insufficient_module_access`, 403
-`insufficient_{read,write,admin}_access`).
+`insufficient_{read,write,admin}_access`, and 503 `key_store_unavailable`
+when Canopy cannot reach its key store to check the key).
 
 ## Streams
 

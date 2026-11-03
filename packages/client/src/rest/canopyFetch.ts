@@ -97,15 +97,17 @@ export interface CanopyConnection {
  * Codes of the shared API-key checks (`canopy.core.security`), which any
  * module's routes may answer with: 401 `invalid_api_key` (missing or unknown
  * key), 403 `insufficient_module_access` (the key is not scoped to this
- * module), and 403 `insufficient_{read,write,admin}_access` (the key lacks
- * that scope).
+ * module), 403 `insufficient_{read,write,admin}_access` (the key lacks
+ * that scope), and 503 `key_store_unavailable` (Canopy could not reach its
+ * key store to check the key, so the key may be fine; retry later).
  */
 export type CanopyAuthErrorCode =
   | 'invalid_api_key'
   | 'insufficient_read_access'
   | 'insufficient_write_access'
   | 'insufficient_admin_access'
-  | 'insufficient_module_access';
+  | 'insufficient_module_access'
+  | 'key_store_unavailable';
 
 /** One query value; arrays repeat the key (`?id=a&id=b`). */
 export type CanopyQueryValue = string | number | boolean;
