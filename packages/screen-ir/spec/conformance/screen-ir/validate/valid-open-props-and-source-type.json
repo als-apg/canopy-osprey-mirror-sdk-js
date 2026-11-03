@@ -1,0 +1,57 @@
+{
+  "description": "Read tolerance: props are an open bag (unknown keys are allowed) and `metadata.source.type` is any string.",
+  "valid": true,
+  "screen": {
+    "schemaVersion": "1.0",
+    "kind": "screen",
+    "id": "conformance",
+    "metadata": {
+      "title": "Converted",
+      "source": {
+        "type": "edl-converter",
+        "sourceFile": "demo.edl"
+      },
+      "size": {
+        "width": 100,
+        "height": 100
+      }
+    },
+    "macros": [],
+    "root": {
+      "id": "w-001",
+      "type": "absolute-canvas",
+      "props": {
+        "width": 100,
+        "height": 100
+      },
+      "geometry": {
+        "x": 0,
+        "y": 0,
+        "width": 100,
+        "height": 100
+      },
+      "children": [
+        {
+          "id": "w-002",
+          "type": "pv-label",
+          "props": {
+            "pv": "DEMO:A",
+            "someFutureProp": {
+              "nested": [
+                1,
+                2,
+                3
+              ]
+            }
+          },
+          "geometry": {
+            "x": 10,
+            "y": 10,
+            "width": 80,
+            "height": 20
+          }
+        }
+      ]
+    }
+  }
+}

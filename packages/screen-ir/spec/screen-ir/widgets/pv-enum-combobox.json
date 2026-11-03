@@ -1,0 +1,33 @@
+{
+  "id": "pv-enum-combobox",
+  "version": "1.0.0",
+  "description": "Dropdown selector for a PV with enum_strings.",
+  "supportsPv": true,
+  "supportsRules": true,
+  "supportsChildren": false,
+  "propSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": [
+      "pv"
+    ],
+    "properties": {
+      "pv": {
+        "type": "string",
+        "format": "pv-channel"
+      },
+      "searchable": {
+        "type": "boolean",
+        "default": false
+      },
+      "alarmSensitive": {
+        "type": "boolean",
+        "default": false
+      },
+      "fontSize": {
+        "type": "number",
+        "title": "Font Size (px)"
+      }
+    }
+  }
+}

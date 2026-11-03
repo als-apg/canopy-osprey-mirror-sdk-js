@@ -1,0 +1,45 @@
+{
+  "description": "On a template (`kind: template`) macros must not declare a default.",
+  "valid": false,
+  "errors": [
+    {
+      "rule": "macro-default-forbidden",
+      "instancePath": "/macros/0"
+    }
+  ],
+  "screen": {
+    "schemaVersion": "1.0",
+    "kind": "template",
+    "id": "conformance",
+    "metadata": {
+      "title": "Conformance",
+      "source": {
+        "type": "hand-authored"
+      },
+      "size": {
+        "width": 100,
+        "height": 100
+      }
+    },
+    "macros": [
+      {
+        "name": "dev",
+        "default": "X"
+      }
+    ],
+    "root": {
+      "id": "w-001",
+      "type": "absolute-canvas",
+      "props": {
+        "width": 100,
+        "height": 100
+      },
+      "geometry": {
+        "x": 0,
+        "y": 0,
+        "width": 100,
+        "height": 100
+      }
+    }
+  }
+}

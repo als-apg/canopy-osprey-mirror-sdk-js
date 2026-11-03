@@ -1,0 +1,34 @@
+{
+  "id": "frame",
+  "version": "1.0.0",
+  "description": "Border / visual section without a title. Holds absolute-positioned children.",
+  "supportsPv": false,
+  "supportsRules": true,
+  "supportsChildren": true,
+  "propSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "shape": {
+        "type": "string",
+        "enum": [
+          "box",
+          "panel",
+          "horizontal-line",
+          "vertical-line",
+          "no-frame"
+        ],
+        "default": "panel"
+      },
+      "shadow": {
+        "type": "string",
+        "enum": [
+          "plain",
+          "raised",
+          "sunken"
+        ],
+        "default": "plain"
+      }
+    }
+  }
+}

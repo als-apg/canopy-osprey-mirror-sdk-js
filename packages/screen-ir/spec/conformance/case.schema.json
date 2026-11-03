@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:canopy-spec:conformance-case",
+  "title": "Canopy spec conformance case",
+  "description": "One validation case. An implementation feeds `screen` to its validator and compares the outcome with `valid` (level 1) and `errors` (level 2).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["description", "valid", "screen"],
+  "properties": {
+    "description": { "type": "string", "minLength": 1 },
+    "valid": { "type": "boolean" },
+    "errors": {
+      "description": "Present exactly when `valid` is false. Each expected error must appear among the errors the implementation reports; extra reported errors are allowed.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["rule", "instancePath"],
+        "properties": {
+          "rule": {
+            "description": "`schema` for a JSON Schema failure, otherwise a semantic rule id from the README.",
+            "enum": ["schema", "macro-default-required", "macro-default-forbidden", "formula-ref-unresolved"]
+          },
+          "instancePath": {
+            "description": "JSON Pointer (RFC 6901) to the failing location in `screen`; \"\" is the document root.",
+            "type": "string"
+          }
+        }
+      }
+    },
+    "screen": { "description": "The document under test." }
+  },
+  "if": { "properties": { "valid": { "const": false } } },
+  "then": { "required": ["errors"] },
+  "else": { "not": { "required": ["errors"] } }
+}

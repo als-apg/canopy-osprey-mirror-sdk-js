@@ -4,7 +4,7 @@ TypeScript SDK for building apps on [Canopy](https://github.com/slaclab/canopy) 
 
 Every Canopy web app (react-trace, react-squirrel, the screen system) needs the same three things: a client for Canopy's wire protocols, TypeScript types for its REST/WS contracts, and the standard header/theme. This repo is the single home for those, so they are written once instead of hand-rolled per app.
 
-This is **not** the screen system. The IR renderer and the widget set live in the screen runtime repo, which consumes this SDK exactly like any other client. The Screen IR contract (`@slaclab/canopy-screen-ir`) lives here, because tools that never render a screen (the PyDM converter, CI in screen repos) need it too. The language-neutral IR definition is owned by [canopy-spec](https://github.com/slaclab/canopy-spec); the SDK package follows it (#8).
+This is **not** the screen system. The IR renderer and the widget set live in the screen runtime repo, which consumes this SDK exactly like any other client. The Screen IR contract (`@slaclab/canopy-screen-ir`) lives here, because tools that never render a screen (the PyDM converter, CI in screen repos) need it too. The language-neutral IR definition is owned by [canopy-spec](https://github.com/slaclab/canopy-spec); the SDK package copies its schema, widget definitions and conformance cases, pinned to a release tag.
 
 ## Packages
 

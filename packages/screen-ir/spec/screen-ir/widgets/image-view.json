@@ -1,0 +1,34 @@
+{
+  "id": "image-view",
+  "version": "1.0.0",
+  "description": "Static facility / synoptic background image. Not for live camera data; use pv-image-view (P2) for that.",
+  "supportsPv": false,
+  "supportsRules": true,
+  "supportsChildren": false,
+  "propSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": [
+      "src"
+    ],
+    "properties": {
+      "src": {
+        "type": "string",
+        "description": "URL or path to the image asset."
+      },
+      "fit": {
+        "type": "string",
+        "enum": [
+          "fill",
+          "contain",
+          "cover",
+          "none"
+        ],
+        "default": "contain"
+      },
+      "alt": {
+        "type": "string"
+      }
+    }
+  }
+}

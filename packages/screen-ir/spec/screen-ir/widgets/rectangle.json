@@ -1,0 +1,51 @@
+{
+  "id": "rectangle",
+  "version": "1.0.0",
+  "description": "Static rectangle outline with optional fill.",
+  "supportsPv": false,
+  "supportsRules": true,
+  "supportsChildren": false,
+  "propSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "lineColor": {
+        "type": "string",
+        "default": "#6f6f6f"
+      },
+      "lineWidth": {
+        "type": "number",
+        "minimum": 0,
+        "default": 1
+      },
+      "lineStyle": {
+        "type": "string",
+        "enum": [
+          "solid",
+          "dashed",
+          "dotted"
+        ],
+        "default": "solid"
+      },
+      "fill": {
+        "type": "boolean",
+        "default": false
+      },
+      "fillColor": {
+        "type": "string"
+      },
+      "cornerRadius": {
+        "type": "number",
+        "minimum": 0,
+        "default": 0
+      },
+      "opacity": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "default": 0,
+        "description": "Transparency percent; 100 = fully transparent (carries EDM's 'invisible' flag)."
+      }
+    }
+  }
+}

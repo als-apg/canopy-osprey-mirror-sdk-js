@@ -3,7 +3,9 @@
   "compilerOptions": {
     "lib": ["ES2023"],
     "resolveJsonModule": true,
-    "noEmit": true
+    "noEmit": true,
+    // For the tests (node:fs etc.). tsconfig.build.json clears it for the library.
+    "types": ["node"]
   },
-  "include": ["src", "schema/screen-ir.schema.json"]
+  "include": ["src", "spec/screen-ir/**/*.json"]
 }

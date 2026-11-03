@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://controls.slac.stanford.edu/schemas/screen-ir/1.0/schema.json",
+  "$id": "urn:canopy:screen-ir:1.0",
   "title": "Canopy Screen IR",
-  "description": "Canonical Canopy screen Intermediate Representation. Owned by @canopy/screen-ir; mirrors the TypeScript types in src/. This file is the structural subset of the contract; cross-field rules (macro defaults, the Rule union arm, formula:// resolution) are enforced by validate()'s semantic layer.",
+  "description": "Canonical Canopy screen Intermediate Representation, owned by canopy-spec. This file is the structural part of the contract; the cross-field rules it can't express (macro defaults, formula:// resolution) are the semantic rules in the canopy-spec README.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "kind", "id", "metadata", "macros", "root"],
@@ -49,7 +49,7 @@
       }
     },
     "MacroDeclaration": {
-      "description": "default required on a screen, forbidden on a template — enforced in validate(), not expressible here.",
+      "description": "default required on a screen, forbidden on a template — the semantic rules macro-default-required and macro-default-forbidden, not expressible here.",
       "type": "object",
       "additionalProperties": false,
       "required": ["name"],
@@ -100,7 +100,7 @@
         "id": { "type": "string" },
         "type": { "type": "string" },
         "props": {
-          "description": "Untagged JSON literals. Open by design: per-widget prop sets are not enumerated here. formula:// references live in designated channel props; resolution is checked in validate().",
+          "description": "Untagged JSON literals. Open by design: per-widget prop sets are not enumerated here. formula:// references live in designated channel props; the semantic rule formula-ref-unresolved checks that they resolve.",
           "type": "object"
         },
         "geometry": { "$ref": "#/$defs/Geometry" },
@@ -130,7 +130,7 @@
     },
     "RuleScalar": { "type": ["string", "number", "boolean", "null"] },
     "Rule": {
-      "description": "Discriminated union: conditional arm (pvs + conditions, what the converter emits) or formula arm (formula). validate() enforces exactly one arm.",
+      "description": "Discriminated union: conditional arm (pvs + conditions, what the converter emits) or formula arm (formula). The oneOf below enforces exactly one arm.",
       "type": "object",
       "required": ["id", "name", "targetProperty", "default"],
       "oneOf": [

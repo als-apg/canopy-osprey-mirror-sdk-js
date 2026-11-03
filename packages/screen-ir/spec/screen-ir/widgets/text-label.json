@@ -1,0 +1,49 @@
+{
+  "id": "text-label",
+  "version": "1.0.0",
+  "description": "Static text label with no PV binding.",
+  "supportsPv": false,
+  "supportsRules": true,
+  "supportsChildren": false,
+  "propSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": [
+      "text"
+    ],
+    "properties": {
+      "text": {
+        "type": "string"
+      },
+      "variant": {
+        "type": "string",
+        "enum": [
+          "heading",
+          "subheading",
+          "body",
+          "caption"
+        ],
+        "default": "body"
+      },
+      "align": {
+        "type": "string",
+        "enum": [
+          "left",
+          "center",
+          "right"
+        ],
+        "default": "left"
+      },
+      "foregroundColor": {
+        "type": "string"
+      },
+      "backgroundColor": {
+        "type": "string"
+      },
+      "fontSize": {
+        "type": "number",
+        "title": "Font Size (px)"
+      }
+    }
+  }
+}

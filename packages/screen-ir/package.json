@@ -2,7 +2,7 @@
   "name": "@slaclab/canopy-screen-ir",
   "version": "0.2.0",
   "private": false,
-  "description": "The Canopy Screen IR contract — the *.screen.json JSON Schema, its schemaVersion, TypeScript model types, and a validate() helper. The single source shared by the screen builder, the runtime viewer, the content repo's CI, and the PyDM converter.",
+  "description": "The Canopy Screen IR contract for TypeScript — the *.screen.json JSON Schema and widget definitions (copied from slaclab/canopy-spec), TypeScript model types, and a validate() helper. Used by the screen builder, the runtime viewer, and the content repo's CI.",
   "license": "SEE LICENSE IN LICENSE.md",
   "repository": {
     "type": "git",
@@ -20,11 +20,11 @@
       "types": "./dist/src/index.d.ts",
       "import": "./dist/src/index.js"
     },
-    "./schema.json": "./schema/screen-ir.schema.json"
+    "./schema.json": "./spec/screen-ir/screen-ir.schema.json"
   },
   "files": [
     "dist",
-    "schema"
+    "spec/screen-ir"
   ],
   "sideEffects": false,
   "scripts": {
@@ -32,12 +32,15 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "spec:sync": "node scripts/sync-spec.mjs sync",
+    "spec:check": "node scripts/sync-spec.mjs check"
   },
   "dependencies": {
     "ajv": "^8.17.1"
   },
   "devDependencies": {
+    "@types/node": "^24.12.3",
     "typescript": "~6.0.2",
     "vitest": "^4.1.6"
   }

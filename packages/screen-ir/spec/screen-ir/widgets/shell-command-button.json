@@ -1,0 +1,41 @@
+{
+  "id": "shell-command-button",
+  "version": "1.0.0",
+  "description": "A button that runs one or more shell commands when clicked.",
+  "supportsPv": false,
+  "supportsRules": true,
+  "supportsChildren": false,
+  "propSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "command": {
+        "type": "string",
+        "description": "Shell command to execute on click (first of the widget's commands list)."
+      },
+      "label": {
+        "type": "string"
+      },
+      "showIcon": {
+        "type": "boolean",
+        "default": false
+      },
+      "allowMultipleExecutions": {
+        "type": "boolean",
+        "default": false
+      },
+      "alarmSensitive": {
+        "type": "boolean",
+        "default": false
+      },
+      "alarmBorder": {
+        "type": "boolean",
+        "default": false
+      },
+      "fontSize": {
+        "type": "number",
+        "title": "Font Size (px)"
+      }
+    }
+  }
+}

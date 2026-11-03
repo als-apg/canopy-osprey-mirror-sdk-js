@@ -1,0 +1,40 @@
+{
+  "id": "pv-led",
+  "version": "1.0.0",
+  "description": "Status indicator that lights up based on a PV value.",
+  "supportsPv": true,
+  "supportsRules": true,
+  "supportsChildren": false,
+  "propSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": [
+      "pv"
+    ],
+    "properties": {
+      "pv": {
+        "type": "string",
+        "format": "pv-channel"
+      },
+      "onValue": {
+        "type": [
+          "number",
+          "string"
+        ],
+        "default": 1
+      },
+      "onColor": {
+        "type": "string",
+        "default": "#3ddc84"
+      },
+      "offColor": {
+        "type": "string",
+        "default": "#888888"
+      },
+      "alarmSensitive": {
+        "type": "boolean",
+        "default": true
+      }
+    }
+  }
+}

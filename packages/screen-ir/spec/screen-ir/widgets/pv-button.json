@@ -1,0 +1,95 @@
+{
+  "id": "pv-button",
+  "version": "1.1.0",
+  "description": "Action button that writes press/release values to a PV.",
+  "supportsPv": true,
+  "supportsRules": true,
+  "supportsChildren": false,
+  "propSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": [
+      "pv"
+    ],
+    "properties": {
+      "pv": {
+        "type": "string",
+        "format": "pv-channel"
+      },
+      "readbackPV": {
+        "type": "string",
+        "format": "pv-channel",
+        "description": "State source for toggle/on-off labeling (EDM indicatorPv); pv stays the write channel."
+      },
+      "label": {
+        "type": "string"
+      },
+      "onLabel": {
+        "type": "string"
+      },
+      "offLabel": {
+        "type": "string"
+      },
+      "buttonType": {
+        "type": "string",
+        "enum": [
+          "push",
+          "toggle"
+        ],
+        "default": "push"
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "primary",
+          "secondary",
+          "tertiary",
+          "danger",
+          "ghost"
+        ],
+        "default": "primary"
+      },
+      "iconOnly": {
+        "type": "boolean",
+        "default": false
+      },
+      "pressValue": {
+        "type": [
+          "number",
+          "string"
+        ]
+      },
+      "releaseValue": {
+        "type": [
+          "number",
+          "string"
+        ]
+      },
+      "fontSize": {
+        "type": "number",
+        "title": "Font Size (px)"
+      },
+      "labelType": {
+        "type": "string",
+        "enum": [
+          "literal",
+          "pvState"
+        ],
+        "default": "literal",
+        "description": "pvState renders the readback PV's current enum string as the face text (EDM menu-button behavior)."
+      },
+      "onColor": {
+        "type": "string"
+      },
+      "offColor": {
+        "type": "string"
+      },
+      "foregroundColor": {
+        "type": "string"
+      },
+      "backgroundColor": {
+        "type": "string"
+      }
+    }
+  }
+}

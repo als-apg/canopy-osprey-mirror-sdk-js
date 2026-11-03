@@ -1,0 +1,26 @@
+{
+  "id": "unknown-widget",
+  "version": "1.0.0",
+  "description": "Placeholder the converter emits for a source class with no widget definition. The original class and props are preserved verbatim so nothing is lost; renderers show a labeled placeholder.",
+  "supportsPv": false,
+  "supportsRules": true,
+  "supportsChildren": true,
+  "propSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": [
+      "originalClass",
+      "originalProps"
+    ],
+    "properties": {
+      "originalClass": {
+        "type": "string",
+        "description": "Source class name, e.g. a Qt or EDM class."
+      },
+      "originalProps": {
+        "type": "object",
+        "description": "Source props, preserved verbatim."
+      }
+    }
+  }
+}

@@ -24,5 +24,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Check the canopy-spec copy
+        run: pnpm --filter @slaclab/canopy-screen-ir run spec:check
+
       - name: Run tests
         run: pnpm test

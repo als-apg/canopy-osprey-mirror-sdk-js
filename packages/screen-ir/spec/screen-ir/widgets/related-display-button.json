@@ -1,0 +1,50 @@
+{
+  "id": "related-display-button",
+  "version": "1.0.0",
+  "description": "Opens another screen with optional macro forwarding.",
+  "supportsPv": false,
+  "supportsRules": true,
+  "supportsChildren": false,
+  "propSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": [
+      "file"
+    ],
+    "properties": {
+      "file": {
+        "type": "string",
+        "description": "Path to a .screen.json document."
+      },
+      "label": {
+        "type": "string"
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "primary",
+          "secondary",
+          "tertiary",
+          "danger",
+          "ghost"
+        ],
+        "default": "tertiary"
+      },
+      "macros": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        },
+        "description": "Macros forwarded to the opened screen."
+      },
+      "openInNewWindow": {
+        "type": "boolean",
+        "default": false
+      },
+      "fontSize": {
+        "type": "number",
+        "title": "Font Size (px)"
+      }
+    }
+  }
+}
