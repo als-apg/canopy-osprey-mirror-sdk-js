@@ -340,12 +340,15 @@ describe('canopyDevProxy', () => {
 
   describe('modules mode', () => {
     it('forwards each module prefix unchanged (no rewrite) with ws enabled', () => {
-      const proxy = canopyDevProxy({ target: 'http://t', modules: ['/hare', 'mole', '/fox/'] });
+      const proxy = canopyDevProxy({
+        target: 'http://t',
+        modules: ['/hare', 'mole', '/formula-engine/'],
+      });
 
       expect(Object.keys(proxy)).toEqual([
         '^/hare(?=[/?#]|$)',
         '^/mole(?=[/?#]|$)',
-        '^/fox(?=[/?#]|$)',
+        '^/formula-engine(?=[/?#]|$)',
       ]);
       for (const entry of Object.values(proxy)) {
         expect(entry).toMatchObject({ target: 'http://t', changeOrigin: true, ws: true });
@@ -353,7 +356,7 @@ describe('canopyDevProxy', () => {
       }
       expect(routeFor(proxy, '/hare/v1/ws/pvs')).toBeDefined();
       expect(routeFor(proxy, '/hare-foo/v1')).toBeUndefined();
-      expect(routeFor(proxy, '/foxes')).toBeUndefined();
+      expect(routeFor(proxy, '/formula-engines')).toBeUndefined();
     });
 
     it('can be combined with an explicit basePath', () => {

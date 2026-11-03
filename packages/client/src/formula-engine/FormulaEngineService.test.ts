@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createFakeWebSocketFactory } from '../testing/fakeWebSocket.js';
-import { FoxFormulaService } from './FoxFormulaService.js';
-import type { FoxError } from './FoxFormulaService.js';
+import { FormulaEngineService } from './FormulaEngineService.js';
+import type { FormulaEngineError } from './FormulaEngineService.js';
 import type { FormulaResultDTO, FormulaSpec } from './types.js';
 
 const BASE_URL = 'https://host';
@@ -24,7 +24,7 @@ function makeResult(value: number): FormulaResultDTO {
   };
 }
 
-describe('FoxFormulaService', () => {
+describe('FormulaEngineService', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -38,7 +38,7 @@ describe('FoxFormulaService', () => {
   describe('connect', () => {
     it('derives the ws(s) endpoint from baseUrl and appends ?api_key=', () => {
       const { factory, instances } = createFakeWebSocketFactory();
-      const service = new FoxFormulaService({
+      const service = new FormulaEngineService({
         baseUrl: BASE_URL,
         apiKey: 'secret-key',
         webSocketFactory: factory,
@@ -47,28 +47,30 @@ describe('FoxFormulaService', () => {
       service.connect();
 
       expect(instances).toHaveLength(1);
-      expect(instances[0]!.url).toBe('wss://host/fox/v1/ws/formulas?api_key=secret-key');
+      expect(instances[0]!.url).toBe('wss://host/formula-engine/v1/ws/formulas?api_key=secret-key');
     });
 
     it('uses a ws:// baseUrl as-is and honors the wsUrl override', () => {
       const { factory, instances } = createFakeWebSocketFactory();
-      new FoxFormulaService({ baseUrl: 'ws://host/', webSocketFactory: factory }).connect();
-      expect(instances[0]!.url).toBe('ws://host/fox/v1/ws/formulas');
+      new FormulaEngineService({ baseUrl: 'ws://host/', webSocketFactory: factory }).connect();
+      expect(instances[0]!.url).toBe('ws://host/formula-engine/v1/ws/formulas');
 
-      new FoxFormulaService({
+      new FormulaEngineService({
         baseUrl: BASE_URL,
-        wsUrl: 'wss://elsewhere/fox/v1/ws/formulas',
+        wsUrl: 'wss://elsewhere/formula-engine/v1/ws/formulas',
         webSocketFactory: factory,
       }).connect();
-      expect(instances[1]!.url).toBe('wss://elsewhere/fox/v1/ws/formulas');
+      expect(instances[1]!.url).toBe('wss://elsewhere/formula-engine/v1/ws/formulas');
     });
 
     it('resolves a relative baseUrl (a dev-proxy prefix) against the page location', () => {
       vi.stubGlobal('location', { protocol: 'http:', host: 'localhost:5173', pathname: '/' });
       try {
         const { factory, instances } = createFakeWebSocketFactory();
-        new FoxFormulaService({ baseUrl: '/api/canopy', webSocketFactory: factory }).connect();
-        expect(instances[0]!.url).toBe('ws://localhost:5173/api/canopy/fox/v1/ws/formulas');
+        new FormulaEngineService({ baseUrl: '/api/canopy', webSocketFactory: factory }).connect();
+        expect(instances[0]!.url).toBe(
+          'ws://localhost:5173/api/canopy/formula-engine/v1/ws/formulas'
+        );
       } finally {
         vi.unstubAllGlobals();
       }
@@ -77,12 +79,12 @@ describe('FoxFormulaService', () => {
     it('does not resolve baseUrl when wsUrl overrides it', () => {
       const { factory, instances } = createFakeWebSocketFactory();
       // A relative base with no location would throw if it were resolved.
-      new FoxFormulaService({
+      new FormulaEngineService({
         baseUrl: '/api/canopy',
-        wsUrl: 'ws://host/fox/v1/ws/formulas',
+        wsUrl: 'ws://host/formula-engine/v1/ws/formulas',
         webSocketFactory: factory,
       }).connect();
-      expect(instances[0]!.url).toBe('ws://host/fox/v1/ws/formulas');
+      expect(instances[0]!.url).toBe('ws://host/formula-engine/v1/ws/formulas');
     });
   });
 
@@ -91,7 +93,7 @@ describe('FoxFormulaService', () => {
   describe('subscribe + result routing', () => {
     it('sends nothing before the socket opens, then one subscribe frame with only the provided options', () => {
       const { factory, instances } = createFakeWebSocketFactory();
-      const service = new FoxFormulaService({ baseUrl: BASE_URL, webSocketFactory: factory });
+      const service = new FormulaEngineService({ baseUrl: BASE_URL, webSocketFactory: factory });
 
       service.connect();
       service.subscribe(makeSpec(), { t0Ns: 123, onResult: vi.fn() });
@@ -108,7 +110,7 @@ describe('FoxFormulaService', () => {
 
     it('remaps the server-assigned id onto the local subscription and routes results by id', () => {
       const { factory, instances } = createFakeWebSocketFactory();
-      const service = new FoxFormulaService({ baseUrl: BASE_URL, webSocketFactory: factory });
+      const service = new FormulaEngineService({ baseUrl: BASE_URL, webSocketFactory: factory });
       service.connect();
       const socket = instances[0]!;
       socket.open();
@@ -132,7 +134,7 @@ describe('FoxFormulaService', () => {
 
     it('a completed frame (fixed-window one-shot) is accepted and keeps the subscription held', () => {
       const { factory, instances } = createFakeWebSocketFactory();
-      const service = new FoxFormulaService({ baseUrl: BASE_URL, webSocketFactory: factory });
+      const service = new FormulaEngineService({ baseUrl: BASE_URL, webSocketFactory: factory });
       service.connect();
       const socket = instances[0]!;
       socket.open();
@@ -152,7 +154,7 @@ describe('FoxFormulaService', () => {
   describe('unsubscribe', () => {
     it('sends an unsubscribe with the server id and drops later results', () => {
       const { factory, instances } = createFakeWebSocketFactory();
-      const service = new FoxFormulaService({ baseUrl: BASE_URL, webSocketFactory: factory });
+      const service = new FormulaEngineService({ baseUrl: BASE_URL, webSocketFactory: factory });
       service.connect();
       const socket = instances[0]!;
       socket.open();
@@ -174,7 +176,7 @@ describe('FoxFormulaService', () => {
 
     it('unsubscribing while the subscribe is still in flight releases the id as soon as it is assigned', () => {
       const { factory, instances } = createFakeWebSocketFactory();
-      const service = new FoxFormulaService({ baseUrl: BASE_URL, webSocketFactory: factory });
+      const service = new FormulaEngineService({ baseUrl: BASE_URL, webSocketFactory: factory });
       service.connect();
       const socket = instances[0]!;
       socket.open();
@@ -207,7 +209,7 @@ describe('FoxFormulaService', () => {
   describe('reconnect', () => {
     it('re-sends every held subscription with backoff and remaps the newly assigned server ids', () => {
       const { factory, instances } = createFakeWebSocketFactory();
-      const service = new FoxFormulaService({ baseUrl: BASE_URL, webSocketFactory: factory });
+      const service = new FormulaEngineService({ baseUrl: BASE_URL, webSocketFactory: factory });
       service.connect();
 
       const onResultA = vi.fn();
@@ -256,7 +258,7 @@ describe('FoxFormulaService', () => {
 
     it('grows the backoff delay when a reconnect attempt itself fails to open', () => {
       const { factory, instances } = createFakeWebSocketFactory();
-      const service = new FoxFormulaService({ baseUrl: BASE_URL, webSocketFactory: factory });
+      const service = new FormulaEngineService({ baseUrl: BASE_URL, webSocketFactory: factory });
       service.connect();
       service.subscribe(makeSpec(), { onResult: vi.fn() });
 
@@ -283,7 +285,7 @@ describe('FoxFormulaService', () => {
     it('routes an id-carrying error to that subscription and leaves others alone', () => {
       const { factory, instances } = createFakeWebSocketFactory();
       const serviceOnError = vi.fn();
-      const service = new FoxFormulaService({
+      const service = new FormulaEngineService({
         baseUrl: BASE_URL,
         webSocketFactory: factory,
         onError: serviceOnError,
@@ -292,7 +294,7 @@ describe('FoxFormulaService', () => {
       const socket = instances[0]!;
       socket.open();
 
-      const onErrorA = vi.fn<(error: FoxError) => void>();
+      const onErrorA = vi.fn<(error: FormulaEngineError) => void>();
       service.subscribe(makeSpec({ expression: 'A' }), { onResult: vi.fn(), onError: onErrorA });
       const onResultB = vi.fn();
       service.subscribe(makeSpec({ expression: 'B' }), { onResult: onResultB });
@@ -314,12 +316,12 @@ describe('FoxFormulaService', () => {
 
     it('treats an id-less error as the reply to the oldest in-flight subscribe and drops that subscription for good', () => {
       const { factory, instances } = createFakeWebSocketFactory();
-      const service = new FoxFormulaService({ baseUrl: BASE_URL, webSocketFactory: factory });
+      const service = new FormulaEngineService({ baseUrl: BASE_URL, webSocketFactory: factory });
       service.connect();
       const socket = instances[0]!;
       socket.open();
 
-      const onErrorBad = vi.fn<(error: FoxError) => void>();
+      const onErrorBad = vi.fn<(error: FormulaEngineError) => void>();
       const onResultGood = vi.fn();
       service.subscribe(makeSpec({ expression: ')(' }), {
         onResult: vi.fn(),
@@ -351,8 +353,8 @@ describe('FoxFormulaService', () => {
 
     it('reports an id-less error with no in-flight subscribe to the service-level onError', () => {
       const { factory, instances } = createFakeWebSocketFactory();
-      const serviceOnError = vi.fn<(error: FoxError) => void>();
-      const service = new FoxFormulaService({
+      const serviceOnError = vi.fn<(error: FormulaEngineError) => void>();
+      const service = new FormulaEngineService({
         baseUrl: BASE_URL,
         webSocketFactory: factory,
         onError: serviceOnError,
@@ -375,7 +377,7 @@ describe('FoxFormulaService', () => {
   describe('heartbeat', () => {
     it('pings on the configured interval; a pong disarms the deadline, silence closes and reconnects', () => {
       const { factory, instances } = createFakeWebSocketFactory();
-      const service = new FoxFormulaService({
+      const service = new FormulaEngineService({
         baseUrl: BASE_URL,
         webSocketFactory: factory,
         pingIntervalMs: 1000,
@@ -406,7 +408,7 @@ describe('FoxFormulaService', () => {
   describe('dispose', () => {
     it('closes the socket without reconnecting and keeps subscriptions for a later connect()', () => {
       const { factory, instances } = createFakeWebSocketFactory();
-      const service = new FoxFormulaService({ baseUrl: BASE_URL, webSocketFactory: factory });
+      const service = new FormulaEngineService({ baseUrl: BASE_URL, webSocketFactory: factory });
       service.connect();
       const socket = instances[0]!;
       socket.open();
@@ -438,7 +440,7 @@ describe('FoxFormulaService', () => {
     it('fires onStatusChange exactly when the status value changes', () => {
       const { factory, instances } = createFakeWebSocketFactory();
       const onStatusChange = vi.fn();
-      const service = new FoxFormulaService({
+      const service = new FormulaEngineService({
         baseUrl: BASE_URL,
         webSocketFactory: factory,
         onStatusChange,
@@ -455,8 +457,8 @@ describe('FoxFormulaService', () => {
   describe('terminal close codes', () => {
     it('stops reconnecting after a 1008 close and keeps subscriptions for a later connect()', () => {
       const { factory, instances } = createFakeWebSocketFactory();
-      const onError = vi.fn<(error: FoxError) => void>();
-      const service = new FoxFormulaService({
+      const onError = vi.fn<(error: FormulaEngineError) => void>();
+      const service = new FormulaEngineService({
         baseUrl: BASE_URL,
         webSocketFactory: factory,
         onError,
@@ -472,7 +474,7 @@ describe('FoxFormulaService', () => {
       expect(onError).toHaveBeenCalledExactlyOnceWith({
         code: 'ws_terminal_close',
         message:
-          'FoxFormulaService: server closed the connection with code 1008 (invalid_api_key); not reconnecting',
+          'FormulaEngineService: server closed the connection with code 1008 (invalid_api_key); not reconnecting',
       });
       vi.advanceTimersByTime(60_000);
       expect(instances).toHaveLength(1);
@@ -484,7 +486,7 @@ describe('FoxFormulaService', () => {
 
     it('keeps reconnecting on 1008 when terminalCloseCodes is empty', () => {
       const { factory, instances } = createFakeWebSocketFactory();
-      const service = new FoxFormulaService({
+      const service = new FormulaEngineService({
         baseUrl: BASE_URL,
         webSocketFactory: factory,
         terminalCloseCodes: [],

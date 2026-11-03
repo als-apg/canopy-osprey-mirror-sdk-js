@@ -4,17 +4,17 @@ The framework-free protocol client: everything needed to talk to a Canopy
 deployment from a browser, Node, or a test, with no React, DOM lib, or
 `@types/node` dependency.
 
-| Area            | Exports                                                                              |
-| --------------- | ------------------------------------------------------------------------------------ |
-| REST core       | `CanopyConnection`, `canopyFetch`, `CanopyError`, `ValidationIssue`                  |
-| Streams         | `ResilientSocket`, `toWsUrl`, `SocketStatus`                                         |
-| Live PVs (Hare) | `HarePVService`, `PVService`, `MockPVService`, `LocalPVService`, `RoutedPVService`   |
-| Formulas (Fox)  | `FoxFormulaService`, `FormulaSpec`                                                   |
-| History (Mole)  | `fetchData`, `fetchMetadata`, `searchPVs`, `listArchivers`                           |
-| Background jobs | `getJob`, `awaitJob`, `JobFailedError`, `isJobNotFoundError`                         |
-| E-log           | `getElogConfig`, `listElogLogbooks`, `uploadElogAttachment`, `createElogEntry`, ...  |
-| Time            | `nowNs`, `msToNs`, `nsToMs`, `dateToNs`, `nsToDate`                                  |
-| Test doubles    | `@slaclab/canopy-client/testing`: `createFakeFetch`, `jsonResponse`, `FakeWebSocket` |
+| Area                      | Exports                                                                              |
+| ------------------------- | ------------------------------------------------------------------------------------ |
+| REST core                 | `CanopyConnection`, `canopyFetch`, `CanopyError`, `ValidationIssue`                  |
+| Streams                   | `ResilientSocket`, `toWsUrl`, `SocketStatus`                                         |
+| Live PVs (Hare)           | `HarePVService`, `PVService`, `MockPVService`, `LocalPVService`, `RoutedPVService`   |
+| Formulas (Formula Engine) | `FormulaEngineService`, `FormulaSpec`                                                |
+| History (Mole)            | `fetchData`, `fetchMetadata`, `searchPVs`, `listArchivers`                           |
+| Background jobs           | `getJob`, `awaitJob`, `JobFailedError`, `isJobNotFoundError`                         |
+| E-log                     | `getElogConfig`, `listElogLogbooks`, `uploadElogAttachment`, `createElogEntry`, ...  |
+| Time                      | `nowNs`, `msToNs`, `nsToMs`, `dateToNs`, `nsToDate`                                  |
+| Test doubles              | `@slaclab/canopy-client/testing`: `createFakeFetch`, `jsonResponse`, `FakeWebSocket` |
 
 The full reference is the
 [package README](https://github.com/slaclab/canopy-sdk-js/tree/main/packages/client).
@@ -59,7 +59,7 @@ The API-key checks every module shares are typed as `CanopyAuthErrorCode`
 ## Streams
 
 `ResilientSocket` is the reconnecting JSON WebSocket under `HarePVService`
-and `FoxFormulaService`; use it for any other Canopy stream:
+and `FormulaEngineService`; use it for any other Canopy stream:
 
 ```ts
 import { ResilientSocket, toWsUrl } from '@slaclab/canopy-client';

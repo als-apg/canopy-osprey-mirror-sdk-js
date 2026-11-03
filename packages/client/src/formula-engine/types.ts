@@ -1,8 +1,9 @@
-// Wire DTOs for Canopy Fox's live formula protocol (WS /fox/v1/ws/formulas).
+// Wire DTOs for the Canopy Formula Engine's live formula protocol
+// (WS /formula-engine/v1/ws/formulas).
 //
 // These mirror Canopy's Python contracts (`canopy.contracts.formula`,
-// `canopy.fox.api.v1.ws`), whose pydantic base (`CanopyModel`) serializes
-// snake_case field names to camelCase on the wire.
+// `canopy.formula_engine.api.v1.ws`), whose pydantic base (`CanopyModel`)
+// serializes snake_case field names to camelCase on the wire.
 
 import type { WireAlarmSeverity } from '../wire.js';
 
@@ -64,9 +65,9 @@ export interface FormulaResultDTO {
   waveform: WaveformResultDTO | null;
 }
 
-// ── Client -> server messages on WS /fox/v1/ws/formulas ─────────────────────
+// ── Client -> server messages on WS /formula-engine/v1/ws/formulas ──────────────
 
-export interface FoxSubscribeMessage {
+export interface FormulaEngineSubscribeMessage {
   type: 'subscribe';
   spec: FormulaSpec;
   /** Window start (epoch ns). Server default 0. */
@@ -81,34 +82,37 @@ export interface FoxSubscribeMessage {
   intervalMs?: number;
 }
 
-export interface FoxUnsubscribeMessage {
+export interface FormulaEngineUnsubscribeMessage {
   type: 'unsubscribe';
   /** The server-assigned subscription id from the `subscribed` frame. */
   id: string;
 }
 
-export interface FoxPingMessage {
+export interface FormulaEnginePingMessage {
   type: 'ping';
 }
 
-export type FoxClientMessage = FoxSubscribeMessage | FoxUnsubscribeMessage | FoxPingMessage;
+export type FormulaEngineClientMessage =
+  | FormulaEngineSubscribeMessage
+  | FormulaEngineUnsubscribeMessage
+  | FormulaEnginePingMessage;
 
 // ── Server -> client frames ──────────────────────────────────────────────────
 
 /** Acknowledges one `subscribe`, carrying the server-assigned subscription id. */
-export interface FoxSubscribedFrame {
+export interface FormulaEngineSubscribedFrame {
   type: 'subscribed';
   id: string;
 }
 
-export interface FoxResultFrame {
+export interface FormulaEngineResultFrame {
   type: 'result';
   id: string;
   data: FormulaResultDTO;
 }
 
 /** Sent after the single result of a fixed-window (`t1Ns` != 0) evaluation. */
-export interface FoxCompletedFrame {
+export interface FormulaEngineCompletedFrame {
   type: 'completed';
   id: string;
 }
@@ -118,21 +122,21 @@ export interface FoxCompletedFrame {
  * absent when it is the (negative) reply to the oldest in-flight `subscribe`
  * (e.g. an invalid spec) or a connection-level protocol error.
  */
-export interface FoxErrorFrame {
+export interface FormulaEngineErrorFrame {
   type: 'error';
   id?: string;
   code: string;
   message: string;
 }
 
-export interface FoxPongFrame {
+export interface FormulaEnginePongFrame {
   type: 'pong';
   timestamp: number;
 }
 
-export type FoxServerFrame =
-  | FoxSubscribedFrame
-  | FoxResultFrame
-  | FoxCompletedFrame
-  | FoxErrorFrame
-  | FoxPongFrame;
+export type FormulaEngineServerFrame =
+  | FormulaEngineSubscribedFrame
+  | FormulaEngineResultFrame
+  | FormulaEngineCompletedFrame
+  | FormulaEngineErrorFrame
+  | FormulaEnginePongFrame;

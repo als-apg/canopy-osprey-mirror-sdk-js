@@ -95,9 +95,9 @@ key read-only, give e-log its own key:
 
 ```ts
 canopyDevProxy({
-  apiKey: env.CANOPY_API_KEY, // e.g. <token>:read@mole+hare+fox
+  apiKey: env.CANOPY_API_KEY, // e.g. <token>:read@mole+hare+formula-engine
   elogApiKey: env.CANOPY_ELOG_API_KEY, // e.g. <token>:read+write@elog
-  modules: ['/mole', '/hare', '/fox', '/elog'],
+  modules: ['/mole', '/hare', '/formula-engine', '/elog'],
 });
 ```
 
@@ -112,12 +112,12 @@ differs from `apiKey`, where an empty value sends no key at all.)
 Their hand-written blocks map to:
 
 ```ts
-// react-trace: /mole, /hare, /fox, /elog with a dedicated e-log key, same-origin baseUrl ''
+// react-trace: /mole, /hare, /formula-engine, /elog with a dedicated e-log key, same-origin baseUrl ''
 canopyDevProxy({
   target: env.CANOPY_BASE_URL,
   apiKey: env.CANOPY_API_KEY,
   elogApiKey: env.CANOPY_ELOG_API_KEY,
-  modules: ['/mole', '/hare', '/fox', '/elog'],
+  modules: ['/mole', '/hare', '/formula-engine', '/elog'],
 });
 
 // react-squirrel: one key for every module

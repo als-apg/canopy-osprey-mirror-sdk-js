@@ -41,3 +41,54 @@ describe('@slaclab/canopy-screen-ir validate', () => {
     expect(validate(screen).length).toBeGreaterThan(0);
   });
 });
+
+describe('@slaclab/canopy-screen-ir validate: formula references', () => {
+  const rule = { id: 'r-001', name: 'R', targetProperty: 'visible', default: false };
+  const pvRule = (name: string) => ({
+    ...rule,
+    pvs: [{ name, trigger: true }],
+    conditions: [{ expression: '{0} > 1', value: true }],
+  });
+
+  /** A screen declaring formula `sum`, with one child widget under the root. */
+  const screenWith = (child: { props?: object; rules?: object[] }) => ({
+    ...minimal,
+    formulas: [{ name: 'sum', expression: 'A + B', bindings: { A: 'sim://a', B: 'sim://b' } }],
+    root: {
+      ...minimal.root,
+      children: [
+        { id: 'w-002', type: 'text-update', props: {}, geometry: minimal.root.geometry, ...child },
+      ],
+    },
+  });
+
+  it('accepts a declared formula:// reference in a widget prop', () => {
+    expect(validate(screenWith({ props: { channel: 'formula://sum' } }))).toEqual([]);
+  });
+
+  it('flags an undeclared formula:// reference in a widget prop', () => {
+    expect(validate(screenWith({ props: { channel: 'formula://missing' } }))).toEqual([
+      "widget 'w-002' prop 'channel' references formula 'missing' but no formulas[] entry declares it",
+    ]);
+  });
+
+  it('accepts a declared formula:// reference in a rule PV binding', () => {
+    expect(validate(screenWith({ rules: [pvRule('formula://sum')] }))).toEqual([]);
+  });
+
+  it('flags an undeclared formula:// reference in a rule PV binding', () => {
+    expect(validate(screenWith({ rules: [pvRule('formula://missing')] }))).toEqual([
+      "rule 'r-001' on widget 'w-002' pv references formula 'missing' but no formulas[] entry declares it",
+    ]);
+  });
+
+  it('resolves a bare-name Rule.formula against formulas[]', () => {
+    expect(validate(screenWith({ rules: [{ ...rule, formula: 'sum' }] }))).toEqual([]);
+  });
+
+  it('flags an undeclared bare-name Rule.formula', () => {
+    expect(validate(screenWith({ rules: [{ ...rule, formula: 'missing' }] }))).toEqual([
+      "rule 'r-001' on widget 'w-002' references formula 'missing' but no formulas[] entry declares it",
+    ]);
+  });
+});

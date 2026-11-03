@@ -1,11 +1,13 @@
 name: Release
 
-# Publishes every workspace package to GitHub Packages when a version tag is
-# pushed. Flow: bump versions (lockstep) on main → tag v<version> → push tag.
-# Auth is the workflow's own GITHUB_TOKEN — no secrets to manage. After the
-# FIRST publish, grant each consumer repo read access on every package
-# (package page → Package settings → Manage Actions access), or their CI
-# cannot install these packages.
+# Publishes every workspace package to npmjs.com when a version tag is pushed.
+# Flow: bump versions (lockstep) on main → tag v<version> → push tag.
+# Auth is npm trusted publishing (OIDC) — no secrets to manage. Each package
+# must name this repo and this workflow as its trusted publisher on npmjs.com.
+# That needs the package to exist, so a NEW package's first version is published
+# by hand with `pnpm publish --access public` before the tag is pushed. Use pnpm,
+# not npm (see scripts/check-package-tarballs.sh). This workflow then skips that
+# version.
 
 on:
   push:
@@ -13,11 +15,11 @@ on:
 
 permissions:
   contents: read
-  packages: write
+  id-token: write
 
 jobs:
   publish:
-    name: Publish to GitHub Packages
+    name: Publish to npm
     runs-on: ubuntu-latest
 
     steps:
@@ -31,7 +33,7 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-          registry-url: "https://npm.pkg.github.com"
+          registry-url: "https://registry.npmjs.org"
 
       - name: Verify tag matches package versions
         # Guard against the silent-skip footgun: pnpm -r publish skips any
@@ -59,7 +61,8 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: Check package tarballs
+        run: ./scripts/check-package-tarballs.sh
+
       - name: Publish
         run: pnpm -r publish --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
