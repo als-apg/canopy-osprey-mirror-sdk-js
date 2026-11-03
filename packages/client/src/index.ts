@@ -1,7 +1,7 @@
 // @slaclab/canopy-client — framework-free TypeScript client for Canopy's
-// protocols: Hare live PVs (WebSocket), Fox formulas (WebSocket), Mole history
-// (REST), background jobs (REST), the shared REST core, the reconnecting
-// WebSocket they stream over, and typed wire DTOs.
+// protocols: Hare live PVs (WebSocket), Formula Engine formulas (WebSocket),
+// Mole history (REST), background jobs (REST), the shared REST core, the
+// reconnecting WebSocket they stream over, and typed wire DTOs.
 
 export * from './alarm.js';
 
@@ -36,14 +36,14 @@ export * from './time.js';
 
 export * from './wire.js';
 
-export * from './fox/types.js';
+export * from './formula-engine/types.js';
 export type {
-  FoxConnectionStatus,
-  FoxError,
-  FoxFormulaServiceOptions,
-  FoxSubscribeOptions,
-} from './fox/FoxFormulaService.js';
-export { FoxFormulaService } from './fox/FoxFormulaService.js';
+  FormulaEngineConnectionStatus,
+  FormulaEngineError,
+  FormulaEngineServiceOptions,
+  FormulaEngineSubscribeOptions,
+} from './formula-engine/FormulaEngineService.js';
+export { FormulaEngineService } from './formula-engine/FormulaEngineService.js';
 
 export * from './mole/types.js';
 export * from './mole/mole.js';

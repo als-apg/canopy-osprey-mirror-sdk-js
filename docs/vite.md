@@ -49,7 +49,7 @@ const wsUrl = toWsUrl(connection.baseUrl, '/optimization/v1/ws/runs'); // from @
 - **`basePath` mode** (default `/api/canopy`): `${basePath}/*` is forwarded
   to `${target}/*` with the prefix stripped, with `changeOrigin` and
   `ws: true`.
-- **`modules` mode**: `modules: ['/hare', '/mole', '/fox']` forwards each
+- **`modules` mode**: `modules: ['/hare', '/mole', '/formula-engine']` forwards each
   prefix unchanged (the react-trace / react-squirrel layout, with a
   same-origin `baseUrl: ''`). It can be combined with `basePath`.
 - **API key**: `X-API-Key` is set on proxied requests and on WebSocket

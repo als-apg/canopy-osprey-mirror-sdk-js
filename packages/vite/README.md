@@ -101,11 +101,11 @@ elog route is left out, so the app can hide its logbook features.
 Their hand-written blocks map to:
 
 ```ts
-// react-trace: /mole, /hare, /fox (+ /elog), same-origin baseUrl ''
+// react-trace: /mole, /hare, /formula-engine (+ /elog), same-origin baseUrl ''
 canopyDevProxy({
   target: env.CANOPY_BASE_URL,
   apiKey: env.CANOPY_API_KEY,
-  modules: ['/mole', '/hare', '/fox'],
+  modules: ['/mole', '/hare', '/formula-engine'],
   elog: { target: env.ELOG_BASE_URL, accessToken: env.ELOG_API_KEY },
 });
 ```

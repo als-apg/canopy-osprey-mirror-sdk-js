@@ -20,7 +20,7 @@ for how to install them.
 
 - [`@slaclab/canopy-client`](client.md): framework-free protocol client —
   REST core and error handling, the reconnecting `ResilientSocket`, Hare
-  live PVs, Fox formulas, Mole history, background jobs, and test doubles
+  live PVs, Formula Engine formulas, Mole history, background jobs, and test doubles
   (`@slaclab/canopy-client/testing`).
 - [`@slaclab/canopy-react`](react.md): React bindings — `CanopyProvider`,
   `useCanopyJob`/`useJob`, `usePV`.

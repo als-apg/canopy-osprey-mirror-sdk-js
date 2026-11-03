@@ -2,16 +2,16 @@
 export type FormulaKind = 'scalar' | 'timeseries' | 'waveform';
 
 /**
- * A named screen-level formula evaluated by Canopy's Fox math engine.
+ * A named screen-level formula evaluated by Canopy's Formula Engine.
  *
- * Formulas are referenced by name via the `fox://<name>` convention — from a
+ * Formulas are referenced by name via the `formula://<name>` convention — from a
  * widget's channel prop (a "calc PV"), from a rule's PV binding
- * (`pvs[].name = "fox://<name>"`), or from a formula-driven rule
+ * (`pvs[].name = "formula://<name>"`), or from a formula-driven rule
  * (`Rule.formula = "<name>"`). The reference is always just the name; the
- * `fox://` prefix marks it as a formula rather than a PV.
+ * `formula://` prefix marks it as a formula rather than a PV.
  *
  * `bindings` maps the placeholder names used in `expression` (e.g. `A`, `B`) to
- * the PV channels that feed them. Shape-compatible with Fox's `FormulaSpec`.
+ * the PV channels that feed them. Shape-compatible with the Formula Engine's `FormulaSpec`.
  */
 export interface FormulaDeclaration {
   readonly name: string;
@@ -22,14 +22,14 @@ export interface FormulaDeclaration {
 }
 
 /** Marks a value as a formula reference rather than a PV. */
-export const FOX_PREFIX = 'fox://';
+export const FORMULA_PREFIX = 'formula://';
 
-/** Whether `value` is a `fox://` formula reference. */
-export function isFoxRef(value: unknown): value is string {
-  return typeof value === 'string' && value.startsWith(FOX_PREFIX);
+/** Whether `value` is a `formula://` formula reference. */
+export function isFormulaRef(value: unknown): value is string {
+  return typeof value === 'string' && value.startsWith(FORMULA_PREFIX);
 }
 
-/** The bare name, with the `fox://` prefix stripped if present. */
-export function foxName(ref: string): string {
-  return ref.startsWith(FOX_PREFIX) ? ref.slice(FOX_PREFIX.length) : ref;
+/** The bare name, with the `formula://` prefix stripped if present. */
+export function formulaName(ref: string): string {
+  return ref.startsWith(FORMULA_PREFIX) ? ref.slice(FORMULA_PREFIX.length) : ref;
 }
