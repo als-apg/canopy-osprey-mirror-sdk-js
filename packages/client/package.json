@@ -1,6 +1,6 @@
 {
   "name": "@slaclab/canopy-client",
-  "version": "0.3.0",
+  "version": "0.3.1-als.2",
   "private": false,
   "description": "Framework-free TypeScript client for Canopy's protocols — Hare live PVs, Formula Engine formulas, Mole history, background jobs, e-log posting, the shared REST core, and typed wire DTOs",
   "license": "SEE LICENSE IN LICENSE.md",
