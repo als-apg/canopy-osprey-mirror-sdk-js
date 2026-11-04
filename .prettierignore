@@ -31,3 +31,6 @@ packages/client/test-vectors
 packages/shell/host-contract.css
 packages/shell/tokens.json
 packages/shell/wiring.json
+
+# Byte copy of the runtime-generated expand() vectors (identity gated); never reformat
+packages/screen-ir/test-vectors
